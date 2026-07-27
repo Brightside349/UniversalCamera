@@ -1,9 +1,11 @@
-# Universal Camera Pro v6 · Modular
+# Universal Camera Pro v7 · Modular
 
-Camara libre cinematografica para Roblox. **14 modos de camara, 30 filtros, Bullet Time universal, espectador con 9 estilos, modo Director con waypoints, post-procesado completo, efectos de diversion y un Gimbal de bloqueo de objetivo** — todo envuelto en una UI de 12 pestanas de Rayfield.
+Camara libre cinematografica para Roblox. **14 modos de camara, 30 filtros, Bullet Time universal, espectador con 9 estilos, modo Director con waypoints, post-procesado completo, efectos de diversion, nuevas funciones v7 y una UI expandida** — todo envuelto en una UI de 12+ pestanas de Rayfield.
 
+> Versión actual: rama `main` (v7).
+> La versión anterior quedó preservada en la rama `legacy/v6` y en el tag `v6.0.0`.
 > Script original: `Universal Camera.lua` (6292 lineas, 235 KB).
-> Refactorizado en **23 archivos** siguiendo el plan del documento `PLAN_MODULARIZACION.md`.
+> Refactorizado en varios archivos siguiendo el plan del documento `PLAN_MODULARIZACION.md`.
 
 ---
 
@@ -31,10 +33,10 @@ Sube el contenido de `src/` (incluyendo la subcarpeta `ui/`) a tu repo en la ram
 Para produccion, **fija la URL a un tag** en vez de `@main`:
 
 ```lua
-local BASE = "https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/v6.0.0/src/"
+local BASE = "https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/v7.0.0/src/"
 ```
 
-Asi, si rompes algo en `main`, los usuarios siguen recibiendo la version estable.
+La rama `main` contiene la version principal actual. Si necesitas la antigua, usa la rama `legacy/v6` o el tag `v6.0.0`.
 
 ---
 

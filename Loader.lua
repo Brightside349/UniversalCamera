@@ -1,6 +1,6 @@
 -- ============================================================
 -- Universal Camera PRO · Loader
--- By Cocoa Feliz · v6 modular
+-- By Cocoa Feliz · v7 modular
 --
 -- ESTE es el unico script que pegas en el juego.
 -- Descarga cada parte desde GitHub raw y la ejecuta inyectando el
