@@ -371,6 +371,7 @@ function UCam.updateSlowMo(deltaTime)
         end
     end
 
+    -- v7: Optimización O(1) para remover partes muertas
     if #dead > 0 then
         for _, p in ipairs(dead) do
             UCam.SlowMo.Parts[p] = nil
@@ -378,9 +379,13 @@ function UCam.updateSlowMo(deltaTime)
             UCam.SlowMo.RealPositions[p] = nil
             UCam.SlowMo.LastSetCFrame[p] = nil
             UCam.SlowMo.PrevRealPositions[p] = nil
+            
+            -- v7: Swap-with-last O(1) removal en vez de table.remove O(n)
             for j = 1, #UCam.SlowMo.PartKeys do
                 if UCam.SlowMo.PartKeys[j] == p then
-                    table.remove(UCam.SlowMo.PartKeys, j)
+                    -- Swap con el último elemento
+                    UCam.SlowMo.PartKeys[j] = UCam.SlowMo.PartKeys[#UCam.SlowMo.PartKeys]
+                    UCam.SlowMo.PartKeys[#UCam.SlowMo.PartKeys] = nil
                     break
                 end
             end

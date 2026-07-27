@@ -339,6 +339,18 @@ local function applyTransitionBlend()
 end
 
 function UCam.updateCamera(deltaTime)
+    -- v7: Control de Tiempo (Time Ramp / Frame-by-Frame / Fast Forward) se actualiza
+    -- en cada frame sin importar el modo de cámara, para que el ramp se propague
+    -- siempre (incluso mientras se espectea). updateReplay no necesita tick global
+    -- porque usa su propio Heartbeat en startPlayback/startRecording.
+    if UCam.updateTimeControl then
+        pcall(UCam.updateTimeControl, deltaTime)
+    end
+    -- v7: transiciones de filtro / temporal / chromatic aberration
+    if UCam.updateFilters then
+        pcall(UCam.updateFilters, deltaTime)
+    end
+
     if UCam.Spectate.Active then
         UCam.updateSpectateCamera(deltaTime)
 
@@ -516,10 +528,10 @@ function UCam.updateCamera(deltaTime)
             or (UCam.rootPart and UCam.rootPart.Position)
         if pivot then
             local vStep = UCam.currentSpeed * deltaTime * 0.4
-            if UCam.UserInputService:IsKeyDown(Enum.KeyCode.Space) and not UCam.UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            if UCam.isKeybindDown("Up") and not UCam.isKeybindDown("Sprint") then
                 UCam.Crane.Height = UCam.clamp(UCam.Crane.Height + vStep, UCam.Crane.MinHeight, UCam.Crane.MaxHeight)
             end
-            if UCam.UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            if UCam.isKeybindDown("Down") then
                 UCam.Crane.Height = UCam.clamp(UCam.Crane.Height - vStep, UCam.Crane.MinHeight, UCam.Crane.MaxHeight)
             end
             UCam.Crane.Angle       = UCam.Crane.Angle + (UCam.Crane.AutoSpin and deltaTime * UCam.Crane.SpinSpeed or 0)
@@ -590,6 +602,70 @@ function UCam.updateCamera(deltaTime)
         end
         local cf = UCam.camCFrame * CFrame.Angles(0, 0, UCam.RollAxis.Accumulated + UCam.dutchRoll)
         UCam.camera.CFrame = cf
+    elseif UCam.camMode == "FPV Dron" then
+        -- v7: dron FPV con inercia y roll extremo al girar
+        UCam.moveCamera(deltaTime)
+        UCam.holdCharacterPosition()
+        local pos = UCam.camCFrame.Position
+        local newCF = UCam.buildFreeCameraCFrame(pos)
+        -- Inercia: lerp entre la CFrame anterior y la nueva
+        local inertia = UCam.clamp(UCam.FPVDrone.Inertia or 0.85, 0, 0.95)
+        UCam.camCFrame = UCam.camCFrame:Lerp(newCF, 1 - inertia)
+        -- Roll extremo proporcional a la velocidad de giro del yaw
+        UCam.FPVDrone._prevYaw = UCam.FPVDrone._prevYaw or UCam.cameraYaw
+        local yawDelta = UCam.cameraYaw - UCam.FPVDrone._prevYaw
+        UCam.FPVDrone._prevYaw = UCam.cameraYaw
+        local rollRad = math.rad(UCam.clamp(UCam.FPVDrone.MaxRoll or 45, 0, 90))
+        local roll = UCam.clamp(-yawDelta * (UCam.FPVDrone.RollSpeed or 120), -rollRad, rollRad)
+        UCam.camera.CFrame = UCam.camCFrame * CFrame.Angles(0, 0, roll + UCam.dutchRoll)
+    elseif UCam.camMode == "Snorricam" then
+        -- v7: cámara atada al personaje, mirando hacia su cara
+        UCam.refreshCharacterRefs()
+        UCam.holdCharacterPosition()
+        if UCam.rootPart then
+            local dist = UCam.Snorricam.Distance or 3
+            local hOff  = UCam.Snorricam.HeightOffset or 0.5
+            -- Posicionar la cámara frente al personaje mirando hacia él
+            local lookPos = UCam.rootPart.CFrame.Position + Vector3.new(0, 2 + hOff, 0)
+            local camPos  = lookPos + UCam.rootPart.CFrame.LookVector * dist
+            if UCam.camCFrame then
+                UCam.camCFrame = UCam.camCFrame:Lerp(CFrame.lookAt(camPos, lookPos), UCam.clamp(deltaTime * 15, 0, 1))
+            else
+                UCam.camCFrame = CFrame.lookAt(camPos, lookPos)
+            end
+            UCam.camera.CFrame = UCam.camCFrame
+        end
+    elseif UCam.camMode == "Cable Cam" then
+        -- v7: cámara que se mueve en línea recta entre dos puntos (PointA/PointB)
+        UCam.holdCharacterPosition()
+        local A = UCam.CableCam.PointA
+        local B = UCam.CableCam.PointB
+        if A and B then
+            UCam.CableCam.Progress = UCam.CableCam.Progress + (UCam.CableCam.Speed or 0.5) * deltaTime
+            if UCam.CableCam.Progress > 1 then
+                UCam.CableCam.Progress = UCam.Waypoint.Loop and 0 or 1
+            end
+            local t = UCam.clamp(UCam.CableCam.Progress, 0, 1)
+            local pos = A:Lerp(B, t)
+            -- Mirar siempre hacia adelante a lo largo del cable
+            local lookAt = A:Lerp(B, UCam.clamp(t + 0.01, 0, 1))
+            UCam.camCFrame = CFrame.lookAt(pos.Position, lookAt.Position)
+            UCam.camera.CFrame = UCam.camCFrame
+        else
+            -- Auto-configurar: A = posición actual, B = 40 studs hacia adelante
+            UCam.CableCam.PointA = UCam.camCFrame or CFrame.new()
+            UCam.CableCam.PointB = (UCam.CableCam.PointA or CFrame.new()) * CFrame.new(0, 0, -40)
+        end
+    elseif UCam.camMode == "Security Cam" then
+        -- v7: cámara estática con paneo automático lento
+        UCam.holdCharacterPosition()
+        UCam.SecurityCam.Phase = UCam.SecurityCam.Phase + (UCam.SecurityCam.PanSpeed or 0.3) * deltaTime
+        local anchor = UCam.SecurityCam.Anchor or (UCam.camCFrame and UCam.camCFrame.Position) or Vector3.new(0, 30, 0)
+        local halfAngle = math.rad(UCam.SecurityCam.PanAngle or 60)
+        local pan = math.sin(UCam.SecurityCam.Phase) * halfAngle
+        local lookPos = anchor + CFrame.Angles(0, pan, 0).LookVector * 10
+        UCam.camCFrame = CFrame.lookAt(anchor, lookPos)
+        UCam.camera.CFrame = UCam.camCFrame
     end
 
     -- EFECTOS GLOBALES
@@ -605,6 +681,48 @@ function UCam.updateCamera(deltaTime)
         fovPulseT = fovPulseT + deltaTime
         local osc = math.sin(fovPulseT * UCam.FovPulse.Speed * math.pi) * UCam.FovPulse.Amplitude
         UCam.camera.FieldOfView = UCam.clamp(UCam.camera.FieldOfView + osc * deltaTime * 6, UCam.MIN_FOV, UCam.MAX_FOV)
+    end
+
+    -- v7: Smooth zoom (interpolar FOV hacia el target)
+    if UCam.CamCore.SmoothZoom and UCam.CamCore.TargetFOV then
+        local cur = UCam.camera.FieldOfView
+        local alpha = UCam.clamp(deltaTime * (UCam.CamCore.ZoomSpeed or 10), 0, 1)
+        UCam.camera.FieldOfView = UCam.clamp(UCam.lerpNum(cur, UCam.CamCore.TargetFOV, alpha), UCam.MIN_FOV, UCam.MAX_FOV)
+        if math.abs(UCam.camera.FieldOfView - UCam.CamCore.TargetFOV) < 0.05 then
+            UCam.CamCore.TargetFOV = nil
+        end
+    end
+
+    -- v7: Auto-exposure — ajusta el brillo del ColorCorrection según la
+    -- luminosidad promedio mirada (raycast hacia el centro de la pantalla).
+    if UCam.CamCore.AutoExposure then
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+        rayParams.FilterDescendantsInstances = { UCam.character, UCam.camera }
+        local r = workspace:Raycast(UCam.camera.CFrame.Position, UCam.camera.CFrame.LookVector * 200, rayParams)
+        if r and r.Instance and r.Instance:IsA("BasePart") then
+            -- Heurística simple: partes oscuras (grises bajos) suben el brillo
+            local c = r.Instance.Color
+            local luminance = (c.R + c.G + c.B) / 3
+            local target = UCam.clamp((0.5 - luminance) * 0.3, UCam.CamCore.ExposureRange.min, UCam.CamCore.ExposureRange.max)
+            local cc = UCam.getColorEffect()
+            cc.Brightness = UCam.lerpNum(cc.Brightness or 0, target, UCam.clamp(deltaTime * 3, 0, 1))
+            cc.Enabled = true
+        end
+    end
+
+    -- v7: Motion blur simulado — sobrescribe el FOV levemente o usa la viñeta
+    -- existente como overlay. Aquí solo engrosamos la viñeta si MB está activo.
+    -- (Implementación ligera: no crea GUIs extra para no competir con la viñeta.)
+    if UCam.CamCore.MotionBlur and not UCam.Spectate.Active then
+        -- Utiliza deriva del Dutch roll previo para detectar giro rápido y aplicar FOV jitter sutil
+        local delta = UCam.cameraYaw - (UCam.CamCore._prevYaw or UCam.cameraYaw)
+        UCam.CamCore._prevYaw = UCam.cameraYaw
+        if math.abs(delta) > 0.02 and UCam.CamCore.MBAmount > 0 then
+            UCam.camera.FieldOfView = UCam.clamp(
+                UCam.camera.FieldOfView + math.abs(delta) * UCam.CamCore.MBAmount * 5,
+                UCam.MIN_FOV, UCam.MAX_FOV)
+        end
     end
 
     if UCam.CameraTransition.Active then
@@ -713,6 +831,33 @@ UCam.RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================
+-- v7: GUARDAR / CARGAR POSICIONES DE CÁMARA (5 slots)
+-- ============================================================
+function UCam.saveCameraPosition(slot)
+    slot = UCam.clamp(math.floor(slot or 1), 1, 5)
+    local cf = UCam.camCFrame or UCam.camera.CFrame
+    UCam.CamCore.SavedPositions[slot] = cf
+    UCam.notify("Cámara", string.format("Posición %d guardada.", slot))
+end
+
+function UCam.loadCameraPosition(slot)
+    slot = UCam.clamp(math.floor(slot or 1), 1, 5)
+    local cf = UCam.CamCore.SavedPositions[slot]
+    if not cf then
+        UCam.notify("Cámara", string.format("Slot %d vacío.", slot))
+        return
+    end
+    if not UCam.freeCamEnabled then
+        UCam.notify("Cámara", "Activa la cámara libre para saltar a la posición.")
+        return
+    end
+    UCam.camCFrame = cf
+    if UCam.triggerTransition then UCam.triggerTransition() end
+    UCam.camera.CFrame = cf
+    UCam.notify("Cámara", string.format("Saltado a posición %d.", slot))
+end
+
+-- ============================================================
 -- INPUT: MouseButton2 (rotacion), MouseWheel (FOV)
 -- ============================================================
 UCam.UserInputService.InputBegan:Connect(function(input, gpe)
@@ -750,8 +895,16 @@ UCam.UserInputService.InputChanged:Connect(function(input)
             end
         end
     elseif input.UserInputType == Enum.UserInputType.MouseWheel then
-        local newFov = UCam.camera.FieldOfView - (input.Position.Z * 3)
-        UCam.camera.FieldOfView = UCam.clamp(newFov, UCam.MIN_FOV, UCam.MAX_FOV)
+        local current = UCam.CamCore.TargetFOV or UCam.camera.FieldOfView
+        local newFov = current - (input.Position.Z * 3)
+        newFov = UCam.clamp(newFov, UCam.MIN_FOV, UCam.MAX_FOV)
+        if UCam.CamCore.SmoothZoom then
+            -- Smooth zoom: solo actualiza el target; el lerp ocurre en updateCamera
+            UCam.CamCore.TargetFOV = newFov
+        else
+            UCam.camera.FieldOfView = newFov
+            UCam.CamCore.TargetFOV = nil
+        end
     end
 end)
 

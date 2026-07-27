@@ -172,9 +172,103 @@ function UCam.build_espectador(Window)
         task.defer(function()
             if UCam.Spectate.Active and UCam.Spectate.Target == p then
                 UCam.notify("Espectador", p.DisplayName .. " salio del juego.")
-                UCam.stopSpectate()
+                if UCam.Spectate.AutoJump then
+                    UCam.spectateAutoJump()
+                else
+                    UCam.stopSpectate()
+                end
             end
             refreshPlayerList(UCam.UIRefs.PlayerDropdown)
         end)
     end)
+
+    -- ===== v7: Expansiones Espectador =====
+    SpectateTab:CreateSection("v7 - Anti-clip, Zoom, Auto-jump")
+    SpectateTab:CreateToggle({
+        Name = "Anti-clip (empujar cámara fuera de paredes)",
+        CurrentValue = UCam.Spectate.AntiClip,
+        Callback = function(v) UCam.Spectate.AntiClip = v end,
+    })
+    SpectateTab:CreateToggle({
+        Name = "Zoom con rueda del mouse (al espectar)",
+        CurrentValue = UCam.Spectate.ZoomScroll,
+        Callback = function(v) UCam.Spectate.ZoomScroll = v end,
+    })
+    SpectateTab:CreateToggle({
+        Name = "Auto-jump al siguiente si el target cae",
+        CurrentValue = UCam.Spectate.AutoJump,
+        Callback = function(v) UCam.Spectate.AutoJump = v end,
+    })
+
+    SpectateTab:CreateSection("v7 - Favoritos")
+    SpectateTab:CreateToggle({
+        Name = "Navegar solo entre favoritos (Q/E)",
+        CurrentValue = UCam.Spectate.OnlyFavorites,
+        Callback = function(v) UCam.Spectate.OnlyFavorites = v end,
+    })
+    SpectateTab:CreateDropdown({
+        Name = "Marcar/desmarcar favorito",
+        Options = getDropdownOptions(),
+        CurrentOption = { "(Selecciona uno)" },
+        MultipleOptions = false,
+        Callback = function(options)
+            local v = UCam.resolveDropdownValue(options)
+            if not v or v == "(Sin otros jugadores)" or v == "(Selecciona uno)" then return end
+            local target = UCam.findPlayerByLabel(v)
+            if target then UCam.toggleSpectateFavorite(target) end
+        end,
+    })
+    SpectateTab:CreateButton({
+        Name = "Vaciar lista de favoritos",
+        Callback = function()
+            table.clear(UCam.Spectate.Favorites)
+            UCam.notify("Espectador", "Favoritos vaciados.")
+        end,
+    })
+
+    SpectateTab:CreateSection("v7 - Picture-in-Picture")
+    SpectateTab:CreateToggle({
+        Name = "Activar PiP (ventana de otro jugador)",
+        CurrentValue = UCam.Spectate.PiP.Enabled,
+        Callback = function(v)
+            UCam.Spectate.PiP.Enabled = v
+            if not v then UCam.destroyPiP() end
+        end,
+    })
+    SpectateTab:CreateDropdown({
+        Name = "Jugador a mostrar en PiP",
+        Options = getDropdownOptions(),
+        CurrentOption = { "(Selecciona uno)" },
+        MultipleOptions = false,
+        Callback = function(options)
+            local v = UCam.resolveDropdownValue(options)
+            if not v or v == "(Sin otros jugadores)" or v == "(Selecciona uno)" then return end
+            local target = UCam.findPlayerByLabel(v)
+            if target then UCam.Spectate.PiP.Target = target end
+        end,
+    })
+    SpectateTab:CreateSlider({
+        Name = "Tamaño de ventana PiP",
+        Range = { 0.15, 0.4 },
+        Increment = 0.05,
+        CurrentValue = UCam.Spectate.PiP.Size,
+        Callback = function(v) UCam.Spectate.PiP.Size = v end,
+    })
+
+    SpectateTab:CreateSection("v7 - Director Espectador")
+    SpectateTab:CreateToggle({
+        Name = "Grabar waypoints mientras especto",
+        CurrentValue = UCam.Spectate.DirectorRecord,
+        Callback = function(v) UCam.toggleSpectateDirectorRecord(v) end,
+    })
+    SpectateTab:CreateButton({
+        Name = "Guardar waypoint (cámara actual)",
+        Callback = function() UCam.spectateAddWaypoint() end,
+    })
+    SpectateTab:CreateButton({
+        Name = "Ver waypoints en pestaña Cinematográfico",
+        Callback = function()
+            UCam.notify("Espectador", string.format("%d waypoints guardados. Ábrelos en Cinematográfico → Director.", #UCam.Waypoint.List))
+        end,
+    })
 end

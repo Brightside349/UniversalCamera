@@ -9,7 +9,7 @@ function UCam.build_camaras(Window)
     local CamTab = Window:CreateTab("🎥 Cámaras", "camera")
     local s = UCam.UISliders
 
-    CamTab:CreateSection("Modo de camara (14 modos)")
+    CamTab:CreateSection("Modo de camara (18 modos)")
     s.modeDropdown = CamTab:CreateDropdown({
         Name            = "Modo",
         Options         = UCam.CamModes,
@@ -39,6 +39,21 @@ function UCam.build_camaras(Window)
             if value == "Dolly Glide" then
                 UCam.refreshCharacterRefs()
                 UCam.Dolly.Center = (UCam.rootPart and UCam.rootPart.Position) or UCam.camera.CFrame.Position
+            end
+
+            -- v7: inicializar estado de los nuevos modos
+            if value == "FPV Dron" then
+                UCam.FPVDrone._prevYaw = UCam.cameraYaw
+            elseif value == "Cable Cam" then
+                -- Auto-configurar A/B en la posición actual si no existen
+                if not UCam.CableCam.PointA and UCam.camCFrame then
+                    UCam.CableCam.PointA = UCam.camCFrame
+                    UCam.CableCam.PointB = UCam.camCFrame * CFrame.new(0, 0, -40)
+                    UCam.CableCam.Progress = 0
+                end
+            elseif value == "Security Cam" then
+                UCam.SecurityCam.Anchor = (UCam.camCFrame and UCam.camCFrame.Position) or Vector3.new(0, 30, 0)
+                UCam.SecurityCam.Phase = 0
             end
 
             if value == "Handheld" then
@@ -382,4 +397,156 @@ function UCam.build_camaras(Window)
         CurrentValue = 0,
         Callback = function(v) UCam.dutchRoll = math.rad(v) end,
     })
+
+    -- ===== v7: Nuevos modos de cámara =====
+    CamTab:CreateSection("v7 - FPV Dron")
+    CamTab:CreateSlider({
+        Name = "Inercia (0=rígido, 0.95=muy suave)",
+        Range = { 0, 0.95 },
+        Increment = 0.05,
+        CurrentValue = UCam.FPVDrone.Inertia,
+        Callback = function(v) UCam.FPVDrone.Inertia = v end,
+    })
+    CamTab:CreateSlider({
+        Name = "Velocidad de roll",
+        Range = { 0, 300 },
+        Increment = 10,
+        CurrentValue = UCam.FPVDrone.RollSpeed,
+        Callback = function(v) UCam.FPVDrone.RollSpeed = v end,
+    })
+    CamTab:CreateSlider({
+        Name = "Roll máximo",
+        Range = { 5, 90 },
+        Increment = 5,
+        Suffix = " grados",
+        CurrentValue = UCam.FPVDrone.MaxRoll,
+        Callback = function(v) UCam.FPVDrone.MaxRoll = v end,
+    })
+
+    CamTab:CreateSection("v7 - Snorricam")
+    CamTab:CreateSlider({
+        Name = "Distancia al personaje",
+        Range = { 1.5, 10 },
+        Increment = 0.5,
+        Suffix = " st",
+        CurrentValue = UCam.Snorricam.Distance,
+        Callback = function(v) UCam.Snorricam.Distance = v end,
+    })
+    CamTab:CreateSlider({
+        Name = "Offset de altura",
+        Range = { -2, 4 },
+        Increment = 0.1,
+        CurrentValue = UCam.Snorricam.HeightOffset,
+        Callback = function(v) UCam.Snorricam.HeightOffset = v end,
+    })
+
+    CamTab:CreateSection("v7 - Cable Cam")
+    CamTab:CreateButton({
+        Name = "Definir punto A (posición actual)",
+        Callback = function()
+            UCam.CableCam.PointA = UCam.camCFrame or UCam.camera.CFrame
+            UCam.notify("Cable Cam", "Punto A fijado.")
+        end,
+    })
+    CamTab:CreateButton({
+        Name = "Definir punto B (posición actual)",
+        Callback = function()
+            UCam.CableCam.PointB = UCam.camCFrame or UCam.camera.CFrame
+            UCam.notify("Cable Cam", "Punto B fijado.")
+        end,
+    })
+    CamTab:CreateButton({
+        Name = "Auto A/B: aquí y 40st hacia adelante",
+        Callback = function()
+            UCam.CableCam.PointA = UCam.camCFrame or UCam.camera.CFrame
+            UCam.CableCam.PointB = (UCam.CableCam.PointA) * CFrame.new(0, 0, -40)
+            UCam.CableCam.Progress = 0
+            UCam.notify("Cable Cam", "A/B auto-configurados.")
+        end,
+    })
+    CamTab:CreateSlider({
+        Name = "Velocidad de recorrido",
+        Range = { 0.05, 3 },
+        Increment = 0.05,
+        CurrentValue = UCam.CableCam.Speed,
+        Callback = function(v) UCam.CableCam.Speed = v end,
+    })
+    CamTab:CreateToggle({
+        Name = "Loop (repetir A→B)",
+        CurrentValue = UCam.Waypoint.Loop,
+        Callback = function(v) UCam.Waypoint.Loop = v end,
+    })
+
+    CamTab:CreateSection("v7 - Security Cam")
+    CamTab:CreateButton({
+        Name = "Fijar anclaje en la posición actual",
+        Callback = function()
+            UCam.SecurityCam.Anchor = (UCam.camCFrame and UCam.camCFrame.Position) or UCam.camera.CFrame.Position
+            UCam.notify("Security Cam", "Anclaje fijado.")
+        end,
+    })
+    CamTab:CreateSlider({
+        Name = "Velocidad de paneo",
+        Range = { 0.05, 2 },
+        Increment = 0.05,
+        CurrentValue = UCam.SecurityCam.PanSpeed,
+        Callback = function(v) UCam.SecurityCam.PanSpeed = v end,
+    })
+    CamTab:CreateSlider({
+        Name = "Ángulo de paneo (±)",
+        Range = { 10, 180 },
+        Increment = 5,
+        Suffix = " grados",
+        CurrentValue = UCam.SecurityCam.PanAngle,
+        Callback = function(v) UCam.SecurityCam.PanAngle = v end,
+    })
+
+    -- ===== v7: Mejoras del core de cámara =====
+    CamTab:CreateSection("v7 - Zoom, Exposición, Motion Blur")
+    CamTab:CreateToggle({
+        Name = "Zoom suave (interpolar FOV con rueda)",
+        CurrentValue = UCam.CamCore.SmoothZoom,
+        Callback = function(v)
+            UCam.CamCore.SmoothZoom = v
+            if not v then UCam.CamCore.TargetFOV = nil end
+        end,
+    })
+    CamTab:CreateSlider({
+        Name = "Velocidad de zoom suave",
+        Range = { 2, 30 },
+        Increment = 1,
+        CurrentValue = UCam.CamCore.ZoomSpeed,
+        Callback = function(v) UCam.CamCore.ZoomSpeed = v end,
+    })
+    CamTab:CreateToggle({
+        Name = "Auto-exposure (ajustar brillo automático)",
+        CurrentValue = UCam.CamCore.AutoExposure,
+        Callback = function(v) UCam.CamCore.AutoExposure = v end,
+    })
+    CamTab:CreateToggle({
+        Name = "Motion blur simulado (al girar rápido)",
+        CurrentValue = UCam.CamCore.MotionBlur,
+        Callback = function(v) UCam.CamCore.MotionBlur = v end,
+    })
+    CamTab:CreateSlider({
+        Name = "Cantidad de motion blur",
+        Range = { 0, 1 },
+        Increment = 0.05,
+        CurrentValue = UCam.CamCore.MBAmount,
+        Callback = function(v) UCam.CamCore.MBAmount = v end,
+    })
+
+    CamTab:CreateSection("v7 - Guardar / Cargar posiciones (5 slots)")
+    for i = 1, 5 do
+        CamTab:CreateButton({
+            Name = string.format("Guardar en slot %d", i),
+            Callback = function() UCam.saveCameraPosition(i) end,
+        })
+    end
+    for i = 1, 5 do
+        CamTab:CreateButton({
+            Name = string.format("Cargar slot %d", i),
+            Callback = function() UCam.loadCameraPosition(i) end,
+        })
+    end
 end

@@ -158,6 +158,12 @@ function UCam.clamp(v, lo, hi)
     return v
 end
 
+-- v7: helper de interpación lineal compartido entre módulos
+function UCam.lerpNum(a, b, t)
+    t = UCam.clamp(t, 0, 1)
+    return a + (b - a) * t
+end
+
 function UCam.getEasingFn(name)
     if name == "Linear" then
         return function(t) return t end
@@ -203,12 +209,13 @@ end
 function UCam.getKeyboardDirection()
     if not UCam.camCFrame then return Vector3.new() end
     local direction = Vector3.new()
-    if UCam.UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += UCam.camCFrame.LookVector end
-    if UCam.UserInputService:IsKeyDown(Enum.KeyCode.S) then direction -= UCam.camCFrame.LookVector end
-    if UCam.UserInputService:IsKeyDown(Enum.KeyCode.A) then direction -= UCam.camCFrame.RightVector end
-    if UCam.UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += UCam.camCFrame.RightVector end
-    if UCam.UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.new(0, 1, 0) end
-    if UCam.UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then direction -= Vector3.new(0, 1, 0) end
+    -- v7: usa teclas personalizables desde UCam.Keybinds
+    if UCam.isKeybindDown("Forward")  then direction += UCam.camCFrame.LookVector end
+    if UCam.isKeybindDown("Backward") then direction -= UCam.camCFrame.LookVector end
+    if UCam.isKeybindDown("Left")     then direction -= UCam.camCFrame.RightVector end
+    if UCam.isKeybindDown("Right")    then direction += UCam.camCFrame.RightVector end
+    if UCam.isKeybindDown("Up")       then direction += Vector3.new(0, 1, 0) end
+    if UCam.isKeybindDown("Down")     then direction -= Vector3.new(0, 1, 0) end
     return direction
 end
 
@@ -223,7 +230,7 @@ function UCam.moveCamera(deltaTime)
     local direction = UCam.getKeyboardDirection()
     if direction.Magnitude > 0 then direction = direction.Unit end
     local speed = UCam.currentSpeed
-    if UCam.UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+    if UCam.isKeybindDown("Sprint")
         or UCam.UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
         speed = speed * UCam.SPRINT_MULTIPLIER
     end
@@ -250,56 +257,89 @@ function UCam.drawPathVisualizer()
     local wps = UCam.Waypoint.List
     if #wps == 0 then return end
 
-    for i, cf in ipairs(wps) do
-        local sphere = Instance.new("Part")
-        sphere.Name = "UCamWaypointVisual_" .. i
-        sphere.Shape = Enum.PartType.Ball
-        sphere.Size = Vector3.new(1.2, 1.2, 1.2)
-        sphere.Color = Color3.fromRGB(0, 255, 255)
-        sphere.Material = Enum.Material.Neon
-        sphere.Anchored = true
-        sphere.CanCollide = false
-        sphere.CanQuery = false
-        sphere.CanTouch = false
-        sphere.CFrame = CFrame.new(cf.Position)
-        sphere.Parent = UCam.camera
-        table.insert(UCam.PathVisualizer.VisualParts, sphere)
+    -- Normaliza cada waypoint a CFrame (soporta CFrame puro o tabla v7)
+    local function wpCF(wp)
+        if typeof(wp) == "CFrame" then return wp end
+        if type(wp) == "table" then return wp.cf end
+        return nil
+    end
 
-        local bg = Instance.new("BillboardGui")
-        bg.Size = UDim2.fromOffset(40, 40)
-        bg.AlwaysOnTop = true
-        bg.Parent = sphere
+    for i, wp in ipairs(wps) do
+        local cf = wpCF(wp)
+        if cf then
+            local sphere = Instance.new("Part")
+            sphere.Name = "UCamWaypointVisual_" .. i
+            sphere.Shape = Enum.PartType.Ball
+            sphere.Size = Vector3.new(1.2, 1.2, 1.2)
+            sphere.Color = Color3.fromRGB(0, 255, 255)
+            sphere.Material = Enum.Material.Neon
+            sphere.Anchored = true
+            sphere.CanCollide = false
+            sphere.CanQuery = false
+            sphere.CanTouch = false
+            sphere.CFrame = CFrame.new(cf.Position)
+            sphere.Parent = UCam.camera
+            table.insert(UCam.PathVisualizer.VisualParts, sphere)
 
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.fromScale(1, 1)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = tostring(i)
-        lbl.TextColor3 = Color3.new(1, 1, 1)
-        lbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-        lbl.TextStrokeTransparency = 0
-        lbl.Font = Enum.Font.SourceSansBold
-        lbl.TextSize = 14
-        lbl.Parent = bg
+            local bg = Instance.new("BillboardGui")
+            bg.Size = UDim2.fromOffset(40, 40)
+            bg.AlwaysOnTop = true
+            bg.Parent = sphere
+
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.fromScale(1, 1)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = tostring(i)
+            lbl.TextColor3 = Color3.new(1, 1, 1)
+            lbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+            lbl.TextStrokeTransparency = 0
+            lbl.Font = Enum.Font.SourceSansBold
+            lbl.TextSize = 14
+            lbl.Parent = bg
+        end
     end
 
     for i = 1, #wps - 1 do
-        local posA = wps[i].Position
-        local posB = wps[i + 1].Position
-        local distance = (posA - posB).Magnitude
+        local cfA = wpCF(wps[i])
+        local cfB = wpCF(wps[i + 1])
+        if cfA and cfB then
+            local posA = cfA.Position
+            local posB = cfB.Position
+            local distance = (posA - posB).Magnitude
 
-        local cylinder = Instance.new("Part")
-        cylinder.Name = "UCamWaypointLine_" .. i
-        cylinder.Shape = Enum.PartType.Cylinder
-        cylinder.Size = Vector3.new(distance, 0.15, 0.15)
-        cylinder.Color = Color3.fromRGB(0, 200, 255)
-        cylinder.Material = Enum.Material.Neon
-        cylinder.Anchored = true
-        cylinder.CanCollide = false
-        cylinder.CanQuery = false
-        cylinder.CanTouch = false
-        cylinder.CFrame = CFrame.lookAt(posA, posB) * CFrame.new(0, 0, -distance / 2) * CFrame.Angles(0, math.pi / 2, 0)
-        cylinder.Parent = UCam.camera
-        table.insert(UCam.PathVisualizer.VisualParts, cylinder)
+            local cylinder = Instance.new("Part")
+            cylinder.Name = "UCamWaypointLine_" .. i
+            cylinder.Shape = Enum.PartType.Cylinder
+            cylinder.Size = Vector3.new(distance, 0.15, 0.15)
+            cylinder.Color = Color3.fromRGB(0, 200, 255)
+            cylinder.Material = Enum.Material.Neon
+            cylinder.Anchored = true
+            cylinder.CanCollide = false
+            cylinder.CanQuery = false
+            cylinder.CanTouch = false
+            cylinder.CFrame = CFrame.lookAt(posA, posB) * CFrame.new(0, 0, -distance / 2) * CFrame.Angles(0, math.pi / 2, 0)
+            cylinder.Parent = UCam.camera
+            table.insert(UCam.PathVisualizer.VisualParts, cylinder)
+
+            -- v7: flechas de dirección opcionales (preview de la ruta)
+            if UCam.Waypoint.PreviewArrows then
+                local mid = (posA + posB) * 0.5
+                local arrow = Instance.new("Part")
+                arrow.Name = "UCamWaypointArrow_" .. i
+                arrow.Shape = Enum.PartType.Ball
+                arrow.Size = Vector3.new(0.6, 0.6, 0.6)
+                arrow.Color = Color3.fromRGB(255, 170, 0)
+                arrow.Material = Enum.Material.Neon
+                arrow.Anchored = true
+                arrow.CanCollide = false
+                arrow.CanQuery = false
+                arrow.CanTouch = false
+                -- Orientar la flecha hacia posB usando el LookVector del segmento
+                arrow.CFrame = CFrame.lookAt(mid, posB)
+                arrow.Parent = UCam.camera
+                table.insert(UCam.PathVisualizer.VisualParts, arrow)
+            end
+        end
     end
 end
 
@@ -410,9 +450,13 @@ function UCam.applyLightingTweaks()
             UCam.Lighting.ExposureCompensation = UCam.OriginalLighting.ExposureCompensation
             UCam.Lighting.FogColor             = UCam.OriginalLighting.FogColor
             UCam.Lighting.FogEnd               = UCam.OriginalLighting.FogEnd
+            UCam.Lighting.FogStart             = UCam.OriginalLighting.FogStart
             UCam.Lighting.OutdoorAmbient       = UCam.OriginalLighting.OutdoorAmbient
             UCam.Lighting.Ambient              = UCam.OriginalLighting.Ambient
             UCam.Lighting.Brightness           = UCam.OriginalLighting.Brightness
+            -- v7: restaurar sombras y skybox
+            UCam.Lighting.GlobalShadows        = UCam.OriginalLighting.GlobalShadows
+            UCam.destroyCustomSky()
         end)
         return
     end
@@ -422,8 +466,44 @@ function UCam.applyLightingTweaks()
         UCam.Lighting.ExposureCompensation = UCam.LightingTweaks.ExposureCompensation
         UCam.Lighting.FogColor             = UCam.LightingTweaks.FogColor
         UCam.Lighting.FogEnd               = UCam.LightingTweaks.FogEnd
+        UCam.Lighting.FogStart             = UCam.LightingTweaks.FogStart or 0
         UCam.Lighting.OutdoorAmbient       = UCam.LightingTweaks.OutdoorAmbient
         UCam.Lighting.Ambient              = UCam.LightingTweaks.Ambient
         UCam.Lighting.Brightness           = UCam.LightingTweaks.Brightness
+        -- v7: sombras (intensidad 0..1 mapeada a 0..1, toggle)
+        if UCam.LightingTweaks.ShadowsEnabled ~= nil then
+            UCam.Lighting.GlobalShadows = UCam.LightingTweaks.ShadowsEnabled and UCam.LightingTweaks.ShadowIntensity
+                or UCam.OriginalLighting.GlobalShadows
+        end
+        -- v7: skybox override
+        UCam.applyCustomSky()
     end)
 end
+
+-- ============================================================
+-- v7: SKYBOX OVERRIDE (instancia un Sky con asset o lo destruye)
+-- ============================================================
+function UCam.destroyCustomSky()
+    local sky = UCam.Lighting:FindFirstChild("UCam_SkyOverride")
+    if sky then pcall(function() sky:Destroy() end) end
+end
+
+function UCam.applyCustomSky()
+    UCam.destroyCustomSky()
+    local assetId = UCam.LightingTweaks.SkyboxAssetId
+    if not assetId or assetId == "" or assetId == 0 then return end
+
+    local sky = Instance.new("Sky")
+    sky.Name = "UCam_SkyOverride"
+    -- Aplicar el mismo asset a las 6 caras (típico de skyboxes completos de RBX)
+    local ok = pcall(function()
+        sky.SkyboxBk = ("rbxassetid://%d"):format(assetId)
+        sky.SkyboxDn = ("rbxassetid://%d"):format(assetId)
+        sky.SkyboxFt = ("rbxassetid://%d"):format(assetId)
+        sky.SkyboxLf = ("rbxassetid://%d"):format(assetId)
+        sky.SkyboxRt = ("rbxassetid://%d"):format(assetId)
+        sky.SkyboxUp = ("rbxassetid://%d"):format(assetId)
+    end)
+    if ok then sky.Parent = UCam.Lighting end
+end
+

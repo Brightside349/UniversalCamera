@@ -19,23 +19,90 @@ local UCam = _G.UCam
 -- HELPERS BASICOS
 -- ============================================================
 
+-- v7: Cached arrays para evitar GetDescendants() cada frame
+UCam.Fun._cachedBaseParts = {}
+UCam.Fun._cachedMotor6Ds = {}
+UCam.Fun._descendantAddedConn = nil
+UCam.Fun._descendantRemovingConn = nil
+
+-- v7: Construir cache de partes
+local function rebuildCache()
+    UCam.refreshCharacterRefs()
+    if not UCam.character then return end
+    
+    table.clear(UCam.Fun._cachedBaseParts)
+    table.clear(UCam.Fun._cachedMotor6Ds)
+    
+    for _, descendant in ipairs(UCam.character:GetDescendants()) do
+        if descendant:IsA("BasePart") then
+            table.insert(UCam.Fun._cachedBaseParts, descendant)
+        elseif descendant:IsA("Motor6D") then
+            table.insert(UCam.Fun._cachedMotor6Ds, descendant)
+        end
+    end
+end
+
+-- v7: Setup listeners para mantener cache actualizado
+local function setupCacheListeners()
+    UCam.refreshCharacterRefs()
+    if not UCam.character then return end
+    
+    -- Limpiar listeners previos
+    if UCam.Fun._descendantAddedConn then
+        UCam.Fun._descendantAddedConn:Disconnect()
+    end
+    if UCam.Fun._descendantRemovingConn then
+        UCam.Fun._descendantRemovingConn:Disconnect()
+    end
+    
+    -- Agregar nuevos listeners
+    UCam.Fun._descendantAddedConn = UCam.character.DescendantAdded:Connect(function(descendant)
+        if descendant:IsA("BasePart") then
+            table.insert(UCam.Fun._cachedBaseParts, descendant)
+        elseif descendant:IsA("Motor6D") then
+            table.insert(UCam.Fun._cachedMotor6Ds, descendant)
+        end
+    end)
+    
+    UCam.Fun._descendantRemovingConn = UCam.character.DescendantRemoving:Connect(function(descendant)
+        if descendant:IsA("BasePart") then
+            local idx = table.find(UCam.Fun._cachedBaseParts, descendant)
+            if idx then
+                table.remove(UCam.Fun._cachedBaseParts, idx)
+            end
+        elseif descendant:IsA("Motor6D") then
+            local idx = table.find(UCam.Fun._cachedMotor6Ds, descendant)
+            if idx then
+                table.remove(UCam.Fun._cachedMotor6Ds, idx)
+            end
+        end
+    end)
+end
+
 -- Captura tamaños / colores / materiales originales + valores de Humanoid.
 -- Se llama la primera vez que se activa un efecto que los modifique.
+-- v7: Ahora también construye el cache optimizado
 function UCam.funSnapshotCharacter()
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
+    
+    -- v7: Construir cache de partes
+    rebuildCache()
+    setupCacheListeners()
+    
     table.clear(UCam.Fun._origPartSizes)
     table.clear(UCam.Fun._origBodyColors)
     table.clear(UCam.Fun._origMaterials)
     table.clear(UCam.Fun._origParts)
-    for _, part in ipairs(UCam.character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            UCam.Fun._origPartSizes[part]   = part.Size
-            UCam.Fun._origBodyColors[part]  = part.Color
-            UCam.Fun._origMaterials[part]   = part.Material
-            table.insert(UCam.Fun._origParts, part)
-        end
+    
+    -- v7: Usar cache en vez de GetDescendants()
+    for _, part in ipairs(UCam.Fun._cachedBaseParts) do
+        UCam.Fun._origPartSizes[part]   = part.Size
+        UCam.Fun._origBodyColors[part]  = part.Color
+        UCam.Fun._origMaterials[part]   = part.Material
+        table.insert(UCam.Fun._origParts, part)
     end
+    
     if UCam.humanoid and UCam.Fun._savedWalkSpeed == nil then
         UCam.Fun._savedWalkSpeed  = UCam.humanoid.WalkSpeed
         UCam.Fun._savedJumpPower  = UCam.humanoid.JumpPower
@@ -137,14 +204,15 @@ end
 -- ============================================================
 -- PER-FRAME UPDATES
 -- ============================================================
+-- v7: Optimizado con cache
 local function funUpdateNoclip()
     if not UCam.Fun.Noclip.Enabled then return end
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
-    for _, part in ipairs(UCam.character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            pcall(function() part.CanCollide = false end)
-        end
+    
+    -- v7: Usar cache en vez de GetDescendants()
+    for _, part in ipairs(UCam.Fun._cachedBaseParts) do
+        pcall(function() part.CanCollide = false end)
     end
 end
 
@@ -243,6 +311,7 @@ local function funUpdateBodySpin(dt)
     end)
 end
 
+-- v7: Optimizado con cache
 local function funUpdateRainbow(dt)
     if not UCam.Fun.Rainbow.Enabled then return end
     UCam.refreshCharacterRefs()
@@ -252,8 +321,10 @@ local function funUpdateRainbow(dt)
     local hueDegrees = (UCam.Fun._rainbowTick * 60) % 360
     local hue        = hueDegrees / 360
     local color = Color3.fromHSV(hue, 1, 1)
-    for _, part in ipairs(UCam.character:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+    
+    -- v7: Usar cache en vez de GetDescendants()
+    for _, part in ipairs(UCam.Fun._cachedBaseParts) do
+        if part.Name ~= "HumanoidRootPart" then
             pcall(function() part.Color = color end)
         end
     end
@@ -282,13 +353,14 @@ end
 -- POSE FORZADA (T-Pose ragdoll / globo / sentado / flotando) — v4.3
 -- FIX v4.3: usar PlatformStand en vez de ChangeState (que se revierte solo)
 -- y forzar cada Motor6D a Transform identidad cada frame.
+-- v7: Optimizado con cache
 -- ============================================================
 local function funApplyRestPose()
     if not UCam.character then return end
-    for _, joint in ipairs(UCam.character:GetDescendants()) do
-        if joint:IsA("Motor6D") then
-            pcall(function() joint.Transform = CFrame.new() end)
-        end
+    
+    -- v7: Usar cache en vez de GetDescendants()
+    for _, joint in ipairs(UCam.Fun._cachedMotor6Ds) do
+        pcall(function() joint.Transform = CFrame.new() end)
     end
 end
 
@@ -499,6 +571,7 @@ function UCam.FunV6.updateDisco()
     end)
 end
 
+-- v7: Optimizado con cache
 function UCam.FunV6.applyMaterial(name)
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
@@ -506,20 +579,30 @@ function UCam.FunV6.applyMaterial(name)
     if not enumMat then return end
     if not next(UCam.Fun._origMaterials) then UCam.funSnapshotCharacter() end
     UCam.Fun.Material.Current = name
-    for _, part in ipairs(UCam.character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            pcall(function() part.Material = enumMat end)
-        end
+    
+    -- v7: Usar cache en vez de GetDescendants()
+    for _, part in ipairs(UCam.Fun._cachedBaseParts) do
+        pcall(function() part.Material = enumMat end)
     end
 end
 
+-- v7: Optimizado con cache
 function UCam.FunV6.updateInvisibility()
     if not UCam.Fun.Invisibility.Enabled then return end
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
-    for _, part in ipairs(UCam.character:GetDescendants()) do
-        if (part:IsA("BasePart") or part:IsA("Decal")) and part.Transparency < 1 then
+    
+    -- v7: Usar cache en vez de GetDescendants()
+    for _, part in ipairs(UCam.Fun._cachedBaseParts) do
+        if part.Transparency < 1 then
             pcall(function() part.Transparency = 1 end)
+        end
+    end
+    
+    -- También manejar Decals (no están en cache de BaseParts)
+    for _, descendant in ipairs(UCam.character:GetDescendants()) do
+        if descendant:IsA("Decal") and descendant.Transparency < 1 then
+            pcall(function() descendant.Transparency = 1 end)
         end
     end
 end
@@ -534,6 +617,7 @@ function UCam.funUpdate(dt)
     funUpdateSpeed()
     funUpdateJump()
     funUpdatePose(dt)
+    if UCam.updateAdvPoses then UCam.updateAdvPoses(dt) end
     funUpdateGravity(dt)
     UCam.FunV6.updateTrail(dt)
     UCam.FunV6.updateDisco()
@@ -565,6 +649,8 @@ function UCam.funAnyActive()
         or UCam.Fun.Disco.Enabled
         or UCam.Fun.Invisibility.Enabled
         or UCam.Fun.Pose.Mode ~= "Normal"
+        or UCam.Fun.Particles.Enabled
+        or UCam.Fun.Fly.Enabled
 end
 
 local function stopFun()
@@ -572,6 +658,25 @@ local function stopFun()
         UCam.Fun._connHeartbeat:Disconnect()
         UCam.Fun._connHeartbeat = nil
     end
+    
+    -- v7: Desconectar listeners de cache
+    if UCam.Fun._descendantAddedConn then
+        UCam.Fun._descendantAddedConn:Disconnect()
+        UCam.Fun._descendantAddedConn = nil
+    end
+    if UCam.Fun._descendantRemovingConn then
+        UCam.Fun._descendantRemovingConn:Disconnect()
+        UCam.Fun._descendantRemovingConn = nil
+    end
+    
+    -- v7: Limpiar cache
+    table.clear(UCam.Fun._cachedBaseParts)
+    table.clear(UCam.Fun._cachedMotor6Ds)
+    
+    -- v7: Limpiar nuevas features
+    UCam.FunV7.disableParticles()
+    UCam.FunV7.disableFly()
+    
     funUnfreezeControl()
     UCam.funRestorePartVisuals()
     UCam.funRestoreHumanoid()
@@ -633,3 +738,425 @@ function UCam.FunV6.setInvisibility(enabled)
         if not UCam.funAnyActive() then stopFun() end
     end
 end
+
+
+-- ============================================================
+-- v7: PARTÍCULAS (Auras de fuego, electricidad, hielo, etc.)
+-- ============================================================
+UCam.FunV7 = UCam.FunV7 or {}
+
+function UCam.FunV7.createParticleEmitter(particleType)
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart then return nil end
+    
+    local emitter = Instance.new("ParticleEmitter")
+    emitter.Name = "UCamParticle_" .. particleType
+    
+    if particleType == "Fire" then
+        emitter.Texture = "rbxasset://textures/particles/fire_main.dds"
+        emitter.Color = ColorSequence.new(UCam.Fun.Particles.Color)
+        emitter.Size = NumberSequence.new(0.5, 1.5)
+        emitter.Transparency = NumberSequence.new(0.3, 1)
+        emitter.Lifetime = NumberRange.new(0.5, 1.5)
+        emitter.Rate = 20 * UCam.Fun.Particles.Intensity
+        emitter.Speed = NumberRange.new(3, 6)
+        emitter.VelocitySpread = 30
+        emitter.LightEmission = 1
+    elseif particleType == "Electric" then
+        emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        emitter.Color = ColorSequence.new(Color3.fromRGB(100, 200, 255))
+        emitter.Size = NumberSequence.new(0.1, 0.3)
+        emitter.Transparency = NumberSequence.new(0, 1)
+        emitter.Lifetime = NumberRange.new(0.2, 0.5)
+        emitter.Rate = 40 * UCam.Fun.Particles.Intensity
+        emitter.Speed = NumberRange.new(2, 8)
+        emitter.VelocitySpread = 180
+        emitter.LightEmission = 1
+    elseif particleType == "Ice" then
+        emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
+        emitter.Color = ColorSequence.new(Color3.fromRGB(150, 200, 255))
+        emitter.Size = NumberSequence.new(0.3, 0.8)
+        emitter.Transparency = NumberSequence.new(0.2, 1)
+        emitter.Lifetime = NumberRange.new(1, 2)
+        emitter.Rate = 15 * UCam.Fun.Particles.Intensity
+        emitter.Speed = NumberRange.new(1, 3)
+        emitter.VelocitySpread = 20
+        emitter.LightEmission = 0.5
+    elseif particleType == "Smoke" then
+        emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
+        emitter.Color = ColorSequence.new(Color3.fromRGB(80, 80, 80))
+        emitter.Size = NumberSequence.new(0.8, 2)
+        emitter.Transparency = NumberSequence.new(0.5, 1)
+        emitter.Lifetime = NumberRange.new(2, 4)
+        emitter.Rate = 10 * UCam.Fun.Particles.Intensity
+        emitter.Speed = NumberRange.new(1, 2)
+        emitter.VelocitySpread = 10
+    elseif particleType == "Sparkles" then
+        emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        emitter.Color = ColorSequence.new(UCam.Fun.Particles.Color)
+        emitter.Size = NumberSequence.new(0.2, 0.2)
+        emitter.Transparency = NumberSequence.new(0, 1)
+        emitter.Lifetime = NumberRange.new(0.5, 1.5)
+        emitter.Rate = 30 * UCam.Fun.Particles.Intensity
+        emitter.Speed = NumberRange.new(2, 5)
+        emitter.VelocitySpread = 180
+        emitter.LightEmission = 1
+    end
+    
+    emitter.Parent = UCam.rootPart
+    return emitter
+end
+
+function UCam.FunV7.enableParticles(particleType)
+    UCam.FunV7.disableParticles()
+    
+    local emitter = UCam.FunV7.createParticleEmitter(particleType)
+    if emitter then
+        table.insert(UCam.Fun.Particles._emitters, emitter)
+        UCam.Fun.Particles.Type = particleType
+        UCam.Fun.Particles.Enabled = true
+    end
+end
+
+function UCam.FunV7.disableParticles()
+    for _, emitter in ipairs(UCam.Fun.Particles._emitters) do
+        if emitter and emitter.Parent then
+            emitter:Destroy()
+        end
+    end
+    table.clear(UCam.Fun.Particles._emitters)
+    UCam.Fun.Particles.Enabled = false
+end
+
+-- ============================================================
+-- v7: TELEPORT
+-- ============================================================
+function UCam.FunV7.teleportToSpawn()
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart then return false end
+    
+    -- Guardar posición actual
+    UCam.Fun.Teleport.LastPosition = UCam.rootPart.CFrame
+    
+    -- Buscar spawn
+    local spawnLocation = workspace:FindFirstChild("SpawnLocation") 
+        or workspace:FindFirstChildOfClass("SpawnLocation")
+    
+    if spawnLocation then
+        UCam.rootPart.CFrame = spawnLocation.CFrame + Vector3.new(0, 5, 0)
+        return true
+    end
+    
+    -- Fallback: teleport a 0,50,0
+    UCam.rootPart.CFrame = CFrame.new(0, 50, 0)
+    return true
+end
+
+function UCam.FunV7.teleportToCoordinates(x, y, z)
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart then return false end
+    
+    UCam.Fun.Teleport.LastPosition = UCam.rootPart.CFrame
+    UCam.rootPart.CFrame = CFrame.new(x, y, z)
+    return true
+end
+
+function UCam.FunV7.teleportToCameraTarget()
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart or not workspace.CurrentCamera then return false end
+    
+    local camera = workspace.CurrentCamera
+    local ray = Ray.new(camera.CFrame.Position, camera.CFrame.LookVector * 500)
+    local hit, position = workspace:FindPartOnRay(ray, UCam.character)
+    
+    if hit then
+        UCam.Fun.Teleport.LastPosition = UCam.rootPart.CFrame
+        UCam.rootPart.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
+        return true
+    end
+    
+    return false
+end
+
+function UCam.FunV7.teleportBack()
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart or not UCam.Fun.Teleport.LastPosition then return false end
+    
+    UCam.rootPart.CFrame = UCam.Fun.Teleport.LastPosition
+    return true
+end
+
+-- ============================================================
+-- v7: FLY (Volar con el personaje)
+-- ============================================================
+function UCam.FunV7.enableFly()
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart or not UCam.humanoid then return false end
+    
+    -- Crear BodyVelocity
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "UCamFlyVelocity"
+    bv.MaxForce = Vector3.new(4000, 4000, 4000)
+    bv.Velocity = Vector3.zero
+    bv.Parent = UCam.rootPart
+    UCam.Fun.Fly._bodyVelocity = bv
+    
+    -- Crear BodyGyro
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "UCamFlyGyro"
+    bg.MaxTorque = Vector3.new(4000, 4000, 4000)
+    bg.CFrame = UCam.rootPart.CFrame
+    bg.P = 9000
+    bg.Parent = UCam.rootPart
+    UCam.Fun.Fly._bodyGyro = bg
+    
+    UCam.Fun.Fly.Enabled = true
+    UCam.startFun()
+    
+    return true
+end
+
+function UCam.FunV7.disableFly()
+    if UCam.Fun.Fly._bodyVelocity then
+        UCam.Fun.Fly._bodyVelocity:Destroy()
+        UCam.Fun.Fly._bodyVelocity = nil
+    end
+    if UCam.Fun.Fly._bodyGyro then
+        UCam.Fun.Fly._bodyGyro:Destroy()
+        UCam.Fun.Fly._bodyGyro = nil
+    end
+    UCam.Fun.Fly.Enabled = false
+end
+
+local function funUpdateFly()
+    if not UCam.Fun.Fly.Enabled then return end
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart or not UCam.Fun.Fly._bodyVelocity or not UCam.Fun.Fly._bodyGyro then return end
+    
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+    
+    -- Dirección de movimiento basada en teclas (v7: usa keybinds personalizables)
+    local moveVector = Vector3.zero
+
+    if UCam.isKeybindDown("Forward") then
+        moveVector = moveVector + camera.CFrame.LookVector
+    end
+    if UCam.isKeybindDown("Backward") then
+        moveVector = moveVector - camera.CFrame.LookVector
+    end
+    if UCam.isKeybindDown("Left") then
+        moveVector = moveVector - camera.CFrame.RightVector
+    end
+    if UCam.isKeybindDown("Right") then
+        moveVector = moveVector + camera.CFrame.RightVector
+    end
+    if UCam.isKeybindDown("Up") then
+        moveVector = moveVector + Vector3.new(0, 1, 0)
+    end
+    if UCam.isKeybindDown("Sprint") then
+        moveVector = moveVector - Vector3.new(0, 1, 0)
+    end
+
+    if moveVector.Magnitude > 0 then
+        moveVector = moveVector.Unit
+    end
+    
+    UCam.Fun.Fly._bodyVelocity.Velocity = moveVector * UCam.Fun.Fly.Speed
+    UCam.Fun.Fly._bodyGyro.CFrame = camera.CFrame
+end
+
+-- ============================================================
+-- v7: TRAIL MEJORADO (tipos, rainbow, painting)
+-- ============================================================
+function UCam.FunV7.updateTrail(dt)
+    if not UCam.Fun.Trail.Enabled then return end
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart then return end
+
+    UCam.Fun.Trail._timer = UCam.Fun.Trail._timer + dt
+    local interval = 0.08
+    if UCam.Fun.Trail._timer >= interval then
+        UCam.Fun.Trail._timer = 0
+        
+        local p = Instance.new("Part")
+        p.Name = "UCamTrail"
+        p.Anchored = true
+        p.CanCollide = false
+        p.CanQuery = false
+        p.CanTouch = false
+        p.Massless = true
+        
+        -- Tipo de forma
+        if UCam.Fun.Trail.Type == "Ball" then
+            p.Shape = Enum.PartType.Ball
+            p.Size = Vector3.new(UCam.Fun.Trail.Width, UCam.Fun.Trail.Width, UCam.Fun.Trail.Width)
+        elseif UCam.Fun.Trail.Type == "Line" then
+            p.Shape = Enum.PartType.Block
+            p.Size = Vector3.new(0.2, 0.2, UCam.Fun.Trail.Width)
+        elseif UCam.Fun.Trail.Type == "Star" then
+            p.Shape = Enum.PartType.Ball
+            p.Size = Vector3.new(UCam.Fun.Trail.Width * 0.7, UCam.Fun.Trail.Width * 0.7, UCam.Fun.Trail.Width * 0.7)
+            -- Agregar mesh de estrella
+            local mesh = Instance.new("SpecialMesh")
+            mesh.MeshType = Enum.MeshType.FileMesh
+            mesh.MeshId = "rbxassetid://1290033"
+            mesh.Scale = Vector3.new(UCam.Fun.Trail.Width, UCam.Fun.Trail.Width, UCam.Fun.Trail.Width)
+            mesh.Parent = p
+        elseif UCam.Fun.Trail.Type == "Square" then
+            p.Shape = Enum.PartType.Block
+            p.Size = Vector3.new(UCam.Fun.Trail.Width, UCam.Fun.Trail.Width, UCam.Fun.Trail.Width)
+        end
+        
+        -- Color (rainbow o fijo)
+        if UCam.Fun.Trail.Rainbow then
+            local hue = (os.clock() * 60 % 360) / 360
+            p.Color = Color3.fromHSV(hue, 1, 1)
+        else
+            p.Color = UCam.Fun.Trail.Color
+        end
+        
+        p.Material = Enum.Material.Neon
+        p.CFrame = UCam.rootPart.CFrame
+        p.Parent = workspace
+        
+        table.insert(UCam.Fun.Trail._parts, { part = p, born = os.clock() })
+    end
+
+    -- Limpiar partes viejas (solo si no está en modo painting)
+    if not UCam.Fun.Trail.Painting then
+        local now = os.clock()
+        for i = #UCam.Fun.Trail._parts, 1, -1 do
+            local entry = UCam.Fun.Trail._parts[i]
+            local age = now - entry.born
+            if age >= UCam.Fun.Trail.Duration or not (entry.part and entry.part.Parent) then
+                pcall(function() entry.part:Destroy() end)
+                table.remove(UCam.Fun.Trail._parts, i)
+            else
+                local k = 1 - (age / math.max(UCam.Fun.Trail.Duration, 0.05))
+                local s = math.max(UCam.Fun.Trail.Width * k, 0.05)
+                if UCam.Fun.Trail.Type == "Ball" then
+                    entry.part.Size = Vector3.new(s, s, s)
+                end
+                
+                -- Actualizar color si es rainbow
+                if UCam.Fun.Trail.Rainbow then
+                    local hue = ((now * 60 + i * 10) % 360) / 360
+                    entry.part.Color = Color3.fromHSV(hue, 1, 1)
+                else
+                    entry.part.Color = UCam.Fun.Trail.Color
+                end
+            end
+        end
+    end
+end
+
+-- ============================================================
+-- v7: DISCO FLOOR MEJORADO (formas, luces animadas, espejo)
+-- ============================================================
+function UCam.FunV7.createDisco()
+    UCam.FunV6.destroyDisco()
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart or not UCam.Fun.Disco.Enabled then return end
+    
+    local part = Instance.new("Part")
+    part.Name = "UCamDisco"
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanQuery = false
+    part.CanTouch = false
+    part.Massless = true
+    part.Size = Vector3.new(UCam.Fun.Disco.Size, 0.2, UCam.Fun.Disco.Size)
+    part.Color = UCam.Fun.Disco.Color
+    part.Material = UCam.Fun.Disco.Mirror and Enum.Material.Glass or Enum.Material.Neon
+    part.CFrame = CFrame.new(UCam.rootPart.Position - Vector3.new(0, 3, 0))
+    
+    -- Forma
+    if UCam.Fun.Disco.Shape == "Square" then
+        part.Shape = Enum.PartType.Block
+    elseif UCam.Fun.Disco.Shape == "Circle" then
+        part.Shape = Enum.PartType.Cylinder
+        part.Orientation = Vector3.new(0, 0, 90)
+    elseif UCam.Fun.Disco.Shape == "Star" or UCam.Fun.Disco.Shape == "Hexagon" then
+        local mesh = Instance.new("SpecialMesh")
+        mesh.MeshType = Enum.MeshType.FileMesh
+        if UCam.Fun.Disco.Shape == "Star" then
+            mesh.MeshId = "rbxassetid://1290033"
+        else
+            mesh.MeshId = "rbxassetid://1033714"
+        end
+        mesh.Scale = Vector3.new(UCam.Fun.Disco.Size, 1, UCam.Fun.Disco.Size)
+        mesh.Parent = part
+    end
+    
+    -- Reflectance si es espejo
+    if UCam.Fun.Disco.Mirror then
+        part.Reflectance = 0.8
+    end
+    
+    part.Parent = workspace
+    UCam.Fun.Disco.Part = part
+end
+
+local discoColorTick = 0
+function UCam.FunV7.updateDisco(dt)
+    if not UCam.Fun.Disco.Enabled then return end
+    UCam.refreshCharacterRefs()
+    if not UCam.rootPart then return end
+    if not (UCam.Fun.Disco.Part and UCam.Fun.Disco.Part.Parent) then
+        UCam.FunV7.createDisco()
+        return
+    end
+    
+    pcall(function()
+        UCam.Fun.Disco.Part.Size = Vector3.new(UCam.Fun.Disco.Size, 0.2, UCam.Fun.Disco.Size)
+        UCam.Fun.Disco.Part.CFrame = CFrame.new(UCam.rootPart.Position - Vector3.new(0, 3, 0))
+        
+        -- Luces animadas
+        if UCam.Fun.Disco.AnimatedLights then
+            discoColorTick = discoColorTick + dt
+            local hue = (discoColorTick * 60 % 360) / 360
+            UCam.Fun.Disco.Part.Color = Color3.fromHSV(hue, 1, 1)
+        else
+            UCam.Fun.Disco.Part.Color = UCam.Fun.Disco.Color
+        end
+    end)
+end
+
+-- ============================================================
+-- v7: ACTUALIZAR funUpdate para incluir nuevas features
+-- ============================================================
+-- Guardar la función original
+local originalFunUpdate = UCam.funUpdate
+
+function UCam.funUpdate(dt)
+    -- Llamar a la original
+    if originalFunUpdate then
+        originalFunUpdate(dt)
+    end
+    
+    -- v7: Nuevas features
+    funUpdateFly()
+    UCam.FunV7.updateTrail(dt)
+    UCam.FunV7.updateDisco(dt)
+end
+
+-- Reemplazar clearTrail para usar la nueva
+UCam.FunV6.clearTrail = function()
+    for _, entry in ipairs(UCam.Fun.Trail._parts) do
+        if entry and entry.part then
+            pcall(function() entry.part:Destroy() end)
+        end
+    end
+    table.clear(UCam.Fun.Trail._parts)
+    UCam.Fun.Trail._timer = 0
+end
+
+-- Reemplazar updateTrail para usar la nueva
+UCam.FunV6.updateTrail = UCam.FunV7.updateTrail
+
+-- Reemplazar createDisco para usar la nueva
+UCam.FunV6.createDisco = UCam.FunV7.createDisco
+
+-- Reemplazar updateDisco para usar la nueva
+UCam.FunV6.updateDisco = UCam.FunV7.updateDisco

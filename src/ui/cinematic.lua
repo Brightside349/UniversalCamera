@@ -187,8 +187,117 @@ function UCam.build_cinematic(Window)
         Increment = 1,
         Suffix = " grados",
         CurrentValue = UCam.Waypoint.FOV,
-        Callback = function(v) UCam.Waypoint.FOV = v end,
+        Callback = function(v)
+            UCam.Waypoint.FOV = v
+            UCam.Waypoint.Next.fov = v
+        end,
     })
+
+    -- ===== v7: Expansion Director (curvas + per-waypoint + serialización) =====
+    CinematicTab:CreateSection("Director v7 - Curvas y Waypoint")
+    CinematicTab:CreateDropdown({
+        Name = "Modo de curva (interpolación)",
+        Options = UCam.Waypoint.CurveModes,
+        CurrentOption = { UCam.Waypoint.CurveMode },
+        MultipleOptions = false,
+        Callback = function(o)
+            local v = UCam.resolveDropdownValue(o); if v then
+                UCam.Waypoint.CurveMode = v
+                UCam.drawPathVisualizer()
+            end
+        end,
+    })
+    CinematicTab:CreateToggle({
+        Name = "Mostrar flechas de dirección en preview",
+        CurrentValue = UCam.Waypoint.PreviewArrows,
+        Callback = function(v)
+            UCam.Waypoint.PreviewArrows = v
+            UCam.drawPathVisualizer()
+        end,
+    })
+    CinematicTab:CreateToggle({
+        Name = "Roll (Dutch angle) por waypoint",
+        CurrentValue = UCam.Waypoint.UseRoll,
+        Callback = function(v) UCam.Waypoint.UseRoll = v end,
+    })
+    CinematicTab:CreateSlider({
+        Name = "Roll del SIGUIENTE waypoint (grados)",
+        Range = { -45, 45 },
+        Increment = 1,
+        Suffix = " grados",
+        CurrentValue = math.deg(UCam.Waypoint.Next.roll or 0),
+        Callback = function(v) UCam.Waypoint.Next.roll = math.rad(v) end,
+    })
+    CinematicTab:CreateSlider({
+        Name = "Velocidad del SIGUIENTE segmento (x)",
+        Range = { 0.1, 4 },
+        Increment = 0.1,
+        Suffix = "x",
+        CurrentValue = UCam.Waypoint.Next.speed,
+        Callback = function(v) UCam.Waypoint.Next.speed = v end,
+    })
+    CinematicTab:CreateToggle({
+        Name = "FOV personalizado para el siguiente waypoint",
+        CurrentValue = UCam.Waypoint.Next.useFOV,
+        Callback = function(v) UCam.Waypoint.Next.useFOV = v end,
+    })
+    CinematicTab:CreateSlider({
+        Name = "FOV del SIGUIENTE waypoint",
+        Range = { UCam.MIN_FOV, UCam.MAX_FOV },
+        Increment = 1,
+        Suffix = " grados",
+        CurrentValue = UCam.Waypoint.Next.fov,
+        Callback = function(v) UCam.Waypoint.Next.fov = v end,
+    })
+
+    CinematicTab:CreateSection("Director v7 - Exportar / Importar / Slots")
+    CinematicTab:CreateButton({
+        Name = "Copiar ruta serializada al portapapeles",
+        Callback = function()
+            local str = UCam.directorSerializeRoute()
+            if str and str ~= "" then
+                pcall(function() setclipboard and setclipboard(str) end)
+                UCam.notify("Director", string.format("Ruta copiada (%d chars). Pégala con Ctrl+V.", #str))
+            else
+                UCam.notify("Director", "No hay waypoints para serializar.")
+            end
+        end,
+    })
+    local directorImport = ""
+    CinematicTab:CreateInput({
+        Name = "Pegar ruta serializada aquí",
+        CurrentValue = "",
+        PlaceholderText = "1;Catmull-Rom;5;x,y,z,...;...",
+        Callback = function(v) directorImport = v or "" end,
+    })
+    CinematicTab:CreateButton({
+        Name = "Cargar ruta desde el texto importado",
+        Callback = function()
+            if directorImport and directorImport ~= "" then
+                local ok = UCam.directorDeserializeRoute(directorImport)
+                if ok then
+                    UCam.notify("Director", string.format("Ruta cargada (%d waypoints, %s).",
+                        #UCam.Waypoint.List, UCam.Waypoint.CurveMode))
+                else
+                    UCam.notify("Director", "Datos inválidos o incompletos.")
+                end
+            else
+                UCam.notify("Director", "Pega primero una ruta en el campo de texto.")
+            end
+        end,
+    })
+    for i = 1, 3 do
+        CinematicTab:CreateButton({
+            Name = string.format("Guardar ruta en ranura %d", i),
+            Callback = function() UCam.directorSaveRoute(i) end,
+        })
+    end
+    for i = 1, 3 do
+        CinematicTab:CreateButton({
+            Name = string.format("Cargar ruta de ranura %d", i),
+            Callback = function() UCam.directorLoadRoute(i) end,
+        })
+    end
 
     CinematicTab:CreateSection("Visualizador de Ruta 3D")
     CinematicTab:CreateToggle({

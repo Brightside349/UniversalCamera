@@ -257,4 +257,115 @@ function UCam.build_filters(Window)
             UCam.notify("Filtros custom", "Todos los filtros custom fueron eliminados.")
         end,
     })
+
+    -- ===== v7: Expansion Filtros (transiciones, combinación, temporal, chromatic) =====
+    local function builtinNames()
+        local n = {}
+        for _, f in ipairs(UCam.Filters) do table.insert(n, f.Name) end
+        return n
+    end
+
+    FilterTab:CreateSection("v7 - Transiciones y Mezcla")
+    FilterTab:CreateToggle({
+        Name = "Transición suave al cambiar de filtro",
+        CurrentValue = UCam.FilterTransition.Enabled,
+        Callback = function(v) UCam.FilterTransition.Enabled = v end,
+    })
+    FilterTab:CreateSlider({
+        Name = "Velocidad de transición",
+        Range = { 1, 20 },
+        Increment = 0.5,
+        Suffix = "x",
+        CurrentValue = UCam.FilterTransition.Speed,
+        Callback = function(v) UCam.FilterTransition.Speed = v end,
+    })
+    FilterTab:CreateToggle({
+        Name = "Combinar dos filtros (mezcla)",
+        CurrentValue = UCam.FilterCombine.Enabled,
+        Callback = function(v)
+            UCam.FilterCombine.Enabled = v
+            UCam.applyFilter(UCam.currentFilterIndex, true)
+        end,
+    })
+    FilterTab:CreateDropdown({
+        Name = "Filtro secundario a mezclar",
+        Options = builtinNames(),
+        CurrentOption = { UCam.Filters[UCam.FilterCombine.IndexB] and UCam.Filters[UCam.FilterCombine.IndexB].Name or UCam.Filters[1].Name },
+        MultipleOptions = false,
+        Callback = function(o)
+            local v = UCam.resolveDropdownValue(o)
+            if not v then return end
+            for i, f in ipairs(UCam.Filters) do
+                if f.Name == v then UCam.FilterCombine.IndexB = i; break end
+            end
+            if UCam.FilterCombine.Enabled then UCam.applyFilter(UCam.currentFilterIndex, true) end
+        end,
+    })
+    FilterTab:CreateSlider({
+        Name = "Mezcla (0=filtro A, 1=filtro B)",
+        Range = { 0, 1 },
+        Increment = 0.05,
+        CurrentValue = UCam.FilterCombine.Mix,
+        Callback = function(v)
+            UCam.FilterCombine.Mix = v
+            if UCam.FilterCombine.Enabled then UCam.applyFilter(UCam.currentFilterIndex, true) end
+        end,
+    })
+
+    FilterTab:CreateSection("v7 - Filtro Temporal (auto-desvanecer)")
+    FilterTab:CreateDropdown({
+        Name = "Filtro temporal a aplicar",
+        Options = builtinNames(),
+        CurrentOption = { UCam.Filters[UCam.FilterTemporal.Index] and UCam.Filters[UCam.FilterTemporal.Index].Name or UCam.Filters[1].Name },
+        MultipleOptions = false,
+        Callback = function(o)
+            local v = UCam.resolveDropdownValue(o)
+            if not v then return end
+            for i, f in ipairs(UCam.Filters) do
+                if f.Name == v then UCam.FilterTemporal.Index = i; break end
+            end
+        end,
+    })
+    FilterTab:CreateSlider({
+        Name = "Duración antes de desvanecer",
+        Range = { 0.5, 30 },
+        Increment = 0.5,
+        Suffix = " s",
+        CurrentValue = UCam.FilterTemporal.Duration,
+        Callback = function(v) UCam.FilterTemporal.Duration = v end,
+    })
+    FilterTab:CreateButton({
+        Name = "Aplicar filtro temporal (se desvanece solo)",
+        Callback = function()
+            UCam.FilterTemporal.Active = true
+            UCam.applyFilter(UCam.FilterTemporal.Index, false)
+            UCam.notify("Filtros", string.format("Filtro temporal activo, se desvanecerá en %.1fs.", UCam.FilterTemporal.Duration))
+        end,
+    })
+    FilterTab:CreateButton({
+        Name = "Cancelar filtro temporal",
+        Callback = function()
+            UCam.FilterTemporal.Active = false
+            UCam.notify("Filtros", "Filtro temporal cancelado.")
+        end,
+    })
+
+    FilterTab:CreateSection("v7 - Aberración Cromática (Chromatic)")
+    FilterTab:CreateToggle({
+        Name = "Activar aberración cromática (RGB split)",
+        CurrentValue = UCam.ChromaticAberration.Enabled,
+        Callback = function(v)
+            UCam.ChromaticAberration.Enabled = v
+            UCam.applyChromaticAberration()
+            if not v then UCam.destroyChromaticGui() end
+        end,
+    })
+    FilterTab:CreateSlider({
+        Name = "Cantidad de desplazamiento",
+        Range = { 0, 40 },
+        Increment = 1,
+        Suffix = " px",
+        CurrentValue = UCam.ChromaticAberration.Amount,
+        Callback = function(v) UCam.setChromaticAmount(v) end,
+    })
 end

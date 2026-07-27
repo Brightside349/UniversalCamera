@@ -112,6 +112,12 @@ function UCam.build_inicio(Window)
             UCam.Waypoint.Duration                                 = UCam.DEFAULTS.waypointDuration
             UCam.Waypoint.Easing                                   = UCam.DEFAULTS.waypointEasing
             UCam.Waypoint.FOV                                      = UCam.DEFAULTS.waypointFOV
+            UCam.Waypoint.UseFOV                                   = false
+            UCam.Waypoint.UseRoll                                  = false
+            UCam.Waypoint.Roll                                     = 0
+            UCam.Waypoint.CurveMode                                = "Linear"
+            UCam.Waypoint.PreviewArrows                            = false
+            UCam.Waypoint.Next                                     = { useFOV = false, fov = 70, roll = 0, speed = 1 }
             UCam.Crane.Height                                      = UCam.DEFAULTS.craneHeight
             UCam.Crane.SpinSpeed                                   = UCam.DEFAULTS.craneSpinSpeed
             UCam.Dolly.Distance                                    = UCam.DEFAULTS.dollyDistance

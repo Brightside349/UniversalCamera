@@ -14,7 +14,7 @@
 -- ============================================================
 local UCam = _G.UCam
 
--- Tabla de sub-builders (mismo orden que en PLAN §5)
+-- Tabla de sub-builders (v7: agregados bodycolor, poses, playermod, timecontrol, replay)
 UCam._uiBuilders = {
     "inicio",
     "camaras",
@@ -26,9 +26,59 @@ UCam._uiBuilders = {
     "estudio",
     "gimbal",
     "fun",
+    "bodycolor",    -- v7: Coloreo avanzado por partes
+    "poses",        -- v7: Sistema de poses avanzadas
+    "playermod",    -- v7: Modificar otros jugadores
+    "timecontrol",  -- v7: Control de Tiempo (Time Ramp, Frame-by-Frame, Fast Forward)
+    "replay",       -- v7: Grabación y Replay de cámara
     "config",
     "info",
 }
+
+-- v7: Tabla de builders registrados dinámicamente (para plugins/extensiones)
+UCam._dynamicTabBuilders = {}
+
+-- v7: API para registro dinámico de tabs
+-- Permite que plugins externos agreguen pestañas personalizadas
+-- Uso: UCam.registerTabBuilder("miTab", function(Window) ... end)
+function UCam.registerTabBuilder(name, builderFunction)
+    if type(name) ~= "string" or name == "" then
+        warn("[UCam] registerTabBuilder: 'name' debe ser un string no vacío")
+        return false
+    end
+    
+    if type(builderFunction) ~= "function" then
+        warn("[UCam] registerTabBuilder: 'builderFunction' debe ser una función")
+        return false
+    end
+    
+    -- Verificar que no exista ya
+    for _, existingName in ipairs(UCam._uiBuilders) do
+        if existingName == name then
+            warn(("[UCam] registerTabBuilder: Tab '%s' ya existe en _uiBuilders"):format(name))
+            return false
+        end
+    end
+    
+    if UCam._dynamicTabBuilders[name] then
+        warn(("[UCam] registerTabBuilder: Tab dinámico '%s' ya registrado"):format(name))
+        return false
+    end
+    
+    UCam._dynamicTabBuilders[name] = builderFunction
+    print(("[UCam] Tab dinámico '%s' registrado exitosamente"):format(name))
+    return true
+end
+
+-- v7: Remover un tab dinámico registrado
+function UCam.unregisterTabBuilder(name)
+    if UCam._dynamicTabBuilders[name] then
+        UCam._dynamicTabBuilders[name] = nil
+        print(("[UCam] Tab dinámico '%s' removido"):format(name))
+        return true
+    end
+    return false
+end
 
 -- Sliders/dropdowns que el boton "Restablecer todos los valores" de
 -- Inicio necesita leer/escribir (los crean las pestañas de Camaras
@@ -53,9 +103,9 @@ UCam.UISliders = {
 -- buildUI: arma la ventana y dispara los sub-builders en orden.
 function UCam.buildUI()
     local Window = UCam.Rayfield:CreateWindow({
-        Name                   = "Universal Camera Pro v6 By Cocoa Feliz",
+        Name                   = "Universal Camera Pro v7 By Cocoa Feliz",
         LoadingTitle           = "Universal Camera",
-        LoadingSubtitle        = "Cargando interfaz v6...",
+        LoadingSubtitle        = "Cargando interfaz v7...",
         Icon                   = 4483362458,
         ToggleUIKeybind        = Enum.KeyCode.Delete,
         DisableRayfieldPrompts = true,
@@ -71,6 +121,16 @@ function UCam.buildUI()
             end
         else
             warn(("[UCam] Sub-builder '%s' no registrado. Carga src/ui/%s.lua antes de 80_ui."):format(name, name))
+        end
+    end
+    
+    -- v7: Procesar tabs dinámicos registrados
+    for name, fn in pairs(UCam._dynamicTabBuilders) do
+        if type(fn) == "function" then
+            local ok, err = pcall(fn, Window)
+            if not ok then
+                warn(("[UCam] Tab dinámico '%s' fallo: %s"):format(name, tostring(err)))
+            end
         end
     end
 end

@@ -143,8 +143,87 @@ UCam.CamModes = {
     "Dolly Glide",  -- v3 (carril cinematico lateral / forward)
     "Handheld",     -- v3 (camara en mano con micro-sacudidas)
     "Roll Axis",    -- v3 (roll sobre el eje forward, tipo barrel roll)
-    "Vertigo",      -- NUEVO v6 (dolly zoom / efecto Hitchcock)
+    "Vertigo",      -- v6 (dolly zoom / efecto Hitchcock)
+    "FPV Dron",     -- v7 (drone FPV con inercia y roll extremo)
+    "Snorricam",    -- v7 (cámara atada al personaje mirando hacia su cara)
+    "Cable Cam",    -- v7 (cámara que se mueve solo en una línea entre dos puntos)
+    "Security Cam", -- v7 (cámara estática con paneo automático lento)
 }
+
+-- v7: Nuevos modos de cámara (se implementarán en 70_camcore.lua)
+UCam.FPVDrone = {
+    Inertia = 0.85,
+    RollSpeed = 120,
+    MaxRoll = 45,
+}
+
+UCam.Snorricam = {
+    Distance = 3,
+    HeightOffset = 0.5,
+}
+
+UCam.CableCam = {
+    PointA = nil,
+    PointB = nil,
+    Speed = 0.5,
+    Progress = 0,
+}
+
+UCam.SecurityCam = {
+    PanSpeed = 0.3,
+    PanAngle = 60,
+    Phase = 0,
+    Anchor = nil,      -- v7: posición estática del Security Cam (Vector3)
+}
+
+-- v7: mejoras del core de cámara (smooth zoom, auto-exposure, motion blur, save/load)
+UCam.CamCore = {
+    SmoothZoom    = true,    -- interpolar FOV al usar la rueda (en vez de salto)
+    ZoomSpeed     = 10,      -- velocidad del lerp de FOV
+    TargetFOV     = nil,     -- FOV objetivo para smooth zoom
+    AutoExposure  = false,  -- ajustar brillo automáticamente según dónde mira la cámara
+    ExposureRange = { min = -0.15, max = 0.15 },
+    MotionBlur    = false,  -- blur simulado al girar rápido (overlay de trail)
+    MBAmount      = 0.3,    -- intensidad del motion blur
+    -- Save/Load de posiciones de cámara (5 slots)
+    SavedPositions = {},    -- { [1] = CFrame, ... }
+}
+
+-- ============================================================
+-- v7: TECLAS PERSONALIZABLES (movement keybinds)
+-- getKeyboardDirection() y el fly de Fun leen de aquí, en vez de hardcodear.
+-- Los valores son strings de nombres de Enum.KeyCode.
+-- ============================================================
+UCam.Keybinds = {
+    Forward      = "W",   -- avanzar
+    Backward     = "S",   -- retroceder
+    Left         = "A",   -- izquierda
+    Right        = "D",   -- derecha
+    Up           = "Space",        -- subir
+    Down         = "LeftControl",  -- bajar
+    Sprint       = "LeftShift",    -- sprint
+}
+
+-- Convierte un nombre de key (ej. "LeftControl") a Enum.KeyCode correspondiente.
+-- Acepta strings de teclas comunes; devuelve Unknown si no coincide.
+local function kcFromName(name)
+    if not name or name == "" then return Enum.KeyCode.Unknown end
+    if Enum.KeyCode[name] then return Enum.KeyCode[name] end
+    -- Acepta letras simples (w/a/s/d) mapeándolas a la correspondiente
+    if #name == 1 then
+        local upper = name:upper()
+        if Enum.KeyCode[upper] then return Enum.KeyCode[upper] end
+    end
+    return Enum.KeyCode.Unknown
+end
+UCam.kcFromName = kcFromName
+
+-- Devuelve true si la tecla asociada a un action está actualmente presionada
+function UCam.isKeybindDown(action)
+    local kc = kcFromName(UCam.Keybinds[action])
+    if kc == Enum.KeyCode.Unknown then return false end
+    return UCam.UserInputService:IsKeyDown(kc)
+end
 
 -- Parametros de rotacion libres
 UCam.cameraYaw      = 0
@@ -244,20 +323,32 @@ UCam.RollAxis = {
 }
 
 -- Director: waypoints
+-- v7: cada waypoint ahora es una tabla {cf, fov, roll, speed} para soportar
+-- FOV/roll por waypoint y velocidad por segmento. La lista puede mezclar
+-- CFrames puros (retrocompatibilidad) y tablas completas.
 UCam.Waypoint = {
-    List     = {},
-    Duration = 6,
-    Loop     = false,
-    Easing   = "Smooth",
-    Easings  = { "Linear", "Smooth", "Sin" },
-    UseFOV   = false,
-    FOV      = 70,
+    List        = {},          -- { {cf=CFrame, fov=70, roll=0, speed=1}, ... }
+    Duration    = 6,
+    Loop        = false,
+    Easing      = "Smooth",
+    Easings     = { "Linear", "Smooth", "Sin" },
+    UseFOV      = false,
+    FOV         = 70,         -- FOV global por defecto (si un waypoint no tiene fov)
+    UseRoll     = false,      -- v7: usar roll por waypoint
+    Roll        = 0,           -- roll global por defecto (radianes)
+    CurveMode   = "Linear",   -- v7: "Linear" | "Catmull-Rom" | "Bezier"
+    CurveModes  = { "Linear", "Catmull-Rom", "Bezier" },
+    PreviewArrows = false,    -- v7: dibujar flechas de dirección en el preview 3D
+    -- Valores que se aplicarán al SIGUIENTE waypoint que se guarde
+    Next        = { useFOV = false, fov = 70, roll = 0, speed = 1 },
 }
 UCam.Director = {
     Active       = false,
     StartTime    = 0,
     PlayStartCF  = nil,
     PlayStartFOV = nil,
+    PlayStartRoll = 0,        -- v7: roll inicial para interpolar
+    SavedRoutes  = {},        -- v7: rutas serializadas guardadas (strings)
 }
 
 -- Slow-mo (bullet time) v3
@@ -366,6 +457,20 @@ UCam.Spectate = {
     HideSelf     = true,
     Yaw          = 0,
     Pitch        = 0,
+    -- v7 expansiones
+    AntiClip     = false,    -- empuja la cámara fuera de las paredes (raycast)
+    AutoJump     = true,     -- si el target pierde personaje, salta al siguiente
+    ZoomScroll   = true,      -- rueda del mouse ajusta la distancia
+    Favorites    = {},       -- { Player, ... } marcados para acceso rápido
+    OnlyFavorites = false,   -- al navegar Q/E, iterar solo por favoritos
+    -- Picture-in-Picture
+    PiP = {
+        Enabled  = false,
+        Target   = nil,      -- Player mostrado en la ventana
+        Size     = 0.25,      -- fracción de la pantalla (0.15..0.4)
+    },
+    -- Director Espectador: grabar waypoints mientras espectas
+    DirectorRecord = false,
 }
 
 -- Transicion suave entre modos de camara — v3.1
@@ -434,9 +539,13 @@ UCam.OriginalLighting = {
     ExposureCompensation = UCam.Lighting.ExposureCompensation,
     FogColor             = UCam.Lighting.FogColor,
     FogEnd               = UCam.Lighting.FogEnd,
+    FogStart             = UCam.Lighting.FogStart,
     OutdoorAmbient       = UCam.Lighting.OutdoorAmbient,
     Ambient              = UCam.Lighting.Ambient,
     Brightness           = UCam.Lighting.Brightness,
+    -- v7: snapshot de sombras y skybox originales
+    GlobalShadows        = UCam.Lighting.GlobalShadows,
+    SkyInstance           = UCam.Lighting:FindFirstChildOfClass("Sky"),
 }
 
 UCam.LightingTweaks = {
@@ -444,10 +553,18 @@ UCam.LightingTweaks = {
     ClockTime            = 14,
     ExposureCompensation = 0,
     FogColor             = Color3.fromRGB(192, 192, 192),
+    FogStart             = 0,             -- v7: inicio de la niebla volumétrica
     FogEnd               = 100000,
     OutdoorAmbient       = Color3.fromRGB(128, 128, 128),
     Ambient              = Color3.fromRGB(128, 128, 128),
     Brightness           = 2,
+    -- v7: sombras
+    ShadowsEnabled       = true,
+    ShadowIntensity      = 0.7,           -- unmapeado a (0..1) de GlobalShadows
+    -- v7: skybox override (asset Sky, 6 caras vacías = sin override + (nil preserva el del juego)
+    SkyboxAssetId        = nil,
+    -- Snapshots originales del juego (para restaurar al desactivar)
+    _orig                = nil,
 }
 
 UCam.PathVisualizer = {
@@ -515,12 +632,20 @@ UCam.Fun = {
         Color    = Color3.fromRGB(0, 200, 255),
         _parts   = {},
         _timer   = 0,
+        -- v7: Nuevas opciones
+        Type     = "Ball",          -- "Ball", "Line", "Star", "Square"
+        Rainbow  = false,           -- Trail con colores arcoíris
+        Painting = false,           -- Las esferas no desaparecen (modo pintura)
     },
     Disco = {
         Enabled = false,
         Size    = 14,
         Color   = Color3.fromRGB(255, 0, 200),
         Part    = nil,
+        -- v7: Nuevas opciones
+        Shape   = "Circle",         -- "Circle", "Square", "Star", "Hexagon"
+        AnimatedLights = false,     -- Cambio de color automático
+        Mirror  = false,            -- Efecto de espejo/reflejo
     },
     Material = {
         Current = "Plastic",
@@ -528,6 +653,23 @@ UCam.Fun = {
     },
     Invisibility = {
         Enabled = false,
+    },
+    -- v7: Nuevas secciones
+    Particles = {
+        Enabled = false,
+        Type    = "Fire",           -- "Fire", "Electric", "Ice", "Smoke", "Sparkles"
+        Intensity = 1.0,
+        Color   = Color3.fromRGB(255, 100, 0),
+        _emitters = {},             -- ParticleEmitters activos
+    },
+    Teleport = {
+        LastPosition = nil,         -- Para "volver"
+    },
+    Fly = {
+        Enabled = false,
+        Speed   = 50,
+        _bodyVelocity = nil,
+        _bodyGyro = nil,
     },
     _savedWalkSpeed   = nil,
     _savedJumpPower   = nil,
@@ -580,6 +722,13 @@ UCam.Filters = {
     { Name = "VHS",              Brightness = -0.04, Contrast = 0.10,  Saturation = -0.35, TintColor = Color3.fromRGB(220, 180, 210) },
     { Name = "Noir Frances",     Brightness = -0.06, Contrast = 0.35,  Saturation = -1,    TintColor = Color3.fromRGB(210, 230, 220) },
     { Name = "Bypass Cyan",      Brightness = 0.04,  Contrast = 0.25,  Saturation = -0.50, TintColor = Color3.fromRGB(180, 240, 255) },
+    -- v7: nuevos filtros ambientales
+    { Name = "Noche Estrellada", Brightness = -0.12, Contrast = 0.20,  Saturation = -0.30, TintColor = Color3.fromRGB(150, 170, 255) },
+    { Name = "Underwater",       Brightness = -0.06, Contrast = 0.05,  Saturation = -0.25, TintColor = Color3.fromRGB(120, 200, 230) },
+    { Name = "Calor del Desierto",Brightness = 0.06,  Contrast = 0.18,  Saturation = 0.20,  TintColor = Color3.fromRGB(255, 220, 150) },
+    { Name = "Bosque Encantado", Brightness = 0.04,  Contrast = 0.10,  Saturation = 0.35,  TintColor = Color3.fromRGB(180, 255, 180) },
+    { Name = "Lluvia",           Brightness = -0.08, Contrast = 0.12,  Saturation = -0.35, TintColor = Color3.fromRGB(190, 200, 220) },
+    { Name = "Neblina Densa",    Brightness = 0.05,  Contrast = -0.20, Saturation = -0.50, TintColor = Color3.fromRGB(220, 225, 230) },
 }
 
 -- ============================================================
@@ -596,6 +745,117 @@ UCam.customEditing = {
     B          = 255,
 }
 UCam.customFilterLiveApplied = false
+
+-- ============================================================
+-- EXPANSIÓN FILTROS v7: transiciones suaves, combinación, temporal
+-- ============================================================
+UCam.FilterTransition = {
+    Enabled   = true,    -- transición suave al cambiar de filtro (lerp)
+    Speed     = 6.0,      -- velocidad del lerp (mayor = más rápido)
+    Active    = false,    -- ¿hay una transición en curso?
+    From      = nil,      -- {Brightness, Contrast, Saturation, TintColor} inicial
+    To        = nil,      -- target
+    Elapsed   = 0,
+}
+UCam.FilterCombine = {
+    Enabled   = false,    -- aplicar 2 filtros simultáneamente (mezcla)
+    IndexA    = 1,        -- filtro principal
+    IndexB    = 1,        -- filtro secundario a mezclar
+    Mix       = 0.5,      -- 0 = solo A, 1 = solo B, 0.5 = mitad
+}
+UCam.FilterTemporal = {
+    Active    = false,    -- filtro que se desvanece tras N segundos
+    Index     = 1,
+    Duration  = 3.0,      -- segundos antes de desvanecer
+    StartTime = 0,
+}
+
+-- ============================================================
+-- MÓDULO POSES AVANZADAS (v7) — 33_poses.lua
+-- ============================================================
+UCam.Poses = {
+    Current = "Normal",
+    PosesList = {
+        "Normal", "T-Pose", "A-Pose", "Sentado", "Flotando",
+        "Dab", "Superhero Landing", "Victoria", "Manos Arriba",
+        "Meditando", "Acostado", "Recostado", "Durmiendo",
+        "Zombie Walk", "Robot", "Bailando",
+        "Caída Dramática", "Pose de Acción", "Caminando"
+    },
+    TransitionSpeed = 0.15,
+    CustomPoses = {},           -- poses guardadas por el usuario
+    _originals = {},            -- snapshot original de Motor6Ds
+    _playerTargets = {},        -- para aplicar poses a otros jugadores
+    _connHeartbeat = nil,
+}
+
+-- ============================================================
+-- MÓDULO COLOREAR CUERPO AVANZADO (v7) — 32_bodycolor.lua
+-- ============================================================
+UCam.BodyColor = {
+    Parts = {
+        Head      = { Color = nil, Material = nil, Transparency = 0 },
+        Torso     = { Color = nil, Material = nil, Transparency = 0 },
+        LeftArm   = { Color = nil, Material = nil, Transparency = 0 },
+        RightArm  = { Color = nil, Material = nil, Transparency = 0 },
+        LeftLeg   = { Color = nil, Material = nil, Transparency = 0 },
+        RightLeg  = { Color = nil, Material = nil, Transparency = 0 },
+    },
+    Accessories = { Color = nil, Material = nil, Transparency = 0 },
+    SelectedPart = "Todo",
+    PartOptions = { "Cabeza", "Torso", "Brazo Izq.", "Brazo Der.", "Pierna Izq.", "Pierna Der.", "Accesorios", "Todo" },
+    Presets = {},               -- presets guardados por el usuario
+    PresetOptions = { "Robot", "Fantasma", "Demonio", "Dorado", "Invisible", "Glitch" },
+    RainbowEnabled = false,
+    RainbowSpeed = 1.0,
+    RainbowPart = "Todo",
+    _originals = {},            -- snapshot de estado original
+    _playerTargets = {},        -- para aplicar a otros jugadores
+    _connHeartbeat = nil,
+}
+
+-- ============================================================
+-- MÓDULO MOD JUGADORES (v7) — 35_playermod.lua
+-- ============================================================
+UCam.PlayerMod = {
+    TargetPlayer = nil,
+    Targets = {},               -- { [Player] = { pose, color, scale, effects... } }
+    SelectedPlayers = {},       -- para selección múltiple
+    _snapshots = {},            -- snapshots originales por jugador
+    _connHeartbeat = nil,
+}
+
+-- ============================================================
+-- MÓDULO CONTROL DE TIEMPO (v7) — 45_timecontrol.lua
+-- ============================================================
+UCam.TimeControl = {
+    RampEnabled = false,
+    RampPreset = "Impacto",
+    RampPresets = { "Impacto", "Gradual", "Matrix Bullet" },
+    RampDuration = 2.0,
+    RampStartTime = 0,
+    FrameByFrame = false,
+    FastForward = false,
+    FastForwardSpeed = 2.0,
+    AudioSlowMo = false,
+    VFXOnBulletTime = false,
+    _originalSounds = {},
+}
+
+-- ============================================================
+-- MÓDULO REPLAY / GRABACIÓN (v7) — 55_replay.lua
+-- ============================================================
+UCam.Replay = {
+    Recording = false,
+    Playing = false,
+    Frames = {},                -- { CFrame, FOV, timestamp }
+    MaxDuration = 60,
+    CurrentTime = 0,
+    PlaybackSpeed = 1.0,
+    Loop = false,
+    SavedRoutes = {},           -- hasta 3 rutas guardadas
+    _recordStartTime = 0,
+}
 
 -- ============================================================
 -- PlayerModule controls (para disableControls / enableControls)
