@@ -206,18 +206,18 @@ function UCam.applyCameraRotation(delta)
     end
 end
 
-function UCam.getKeyboardDirection()
-    if not UCam.camCFrame then return Vector3.new() end
-    local direction = Vector3.new()
-    -- v7: usa teclas personalizables desde UCam.Keybinds
-    if UCam.isKeybindDown("Forward")  then direction += UCam.camCFrame.LookVector end
-    if UCam.isKeybindDown("Backward") then direction -= UCam.camCFrame.LookVector end
-    if UCam.isKeybindDown("Left")     then direction -= UCam.camCFrame.RightVector end
-    if UCam.isKeybindDown("Right")    then direction += UCam.camCFrame.RightVector end
-    if UCam.isKeybindDown("Up")       then direction += Vector3.new(0, 1, 0) end
-    if UCam.isKeybindDown("Down")     then direction -= Vector3.new(0, 1, 0) end
-    return direction
-end
+    function UCam.getKeyboardDirection()
+        if not UCam.camCFrame then return Vector3.new() end
+        local direction = Vector3.new()
+        -- v7: usa teclas personalizables desde UCam.Keybinds
+        if UCam.isKeybindDown("Forward")  then direction = direction + UCam.camCFrame.LookVector end
+        if UCam.isKeybindDown("Backward") then direction = direction - UCam.camCFrame.LookVector end
+        if UCam.isKeybindDown("Left")     then direction = direction - UCam.camCFrame.RightVector end
+        if UCam.isKeybindDown("Right")    then direction = direction + UCam.camCFrame.RightVector end
+        if UCam.isKeybindDown("Up")       then direction = direction + Vector3.new(0, 1, 0) end
+        if UCam.isKeybindDown("Down")     then direction = direction - Vector3.new(0, 1, 0) end
+        return direction
+    end
 
 function UCam.moveCamera(deltaTime)
     if UCam.camMode == "Tripode" or UCam.camMode == "Cenital" or UCam.camMode == "Lateral"
@@ -505,5 +505,30 @@ function UCam.applyCustomSky()
         sky.SkyboxUp = ("rbxassetid://%d"):format(assetId)
     end)
     if ok then sky.Parent = UCam.Lighting end
+end
+
+-- ============================================================
+-- COLOR HELPER: HEX -> Color3
+-- Acepta "#RRGGBB", "RRGGBB", "#RGB" o "RGB". Case-insensitive.
+-- Devuelve Color3 o nil si el string no es válido.
+-- ============================================================
+function UCam.hexToColor(hex)
+    if type(hex) ~= "string" then return nil end
+    local s = hex:match("^#?(%x+)$")
+    if not s then return nil end
+    local r, g, b
+    if #s == 6 then
+        r = tonumber(s:sub(1, 2), 16)
+        g = tonumber(s:sub(3, 4), 16)
+        b = tonumber(s:sub(5, 6), 16)
+    elseif #s == 3 then
+        r = tonumber(s:sub(1, 1), 16) * 17
+        g = tonumber(s:sub(2, 2), 16) * 17
+        b = tonumber(s:sub(3, 3), 16) * 17
+    else
+        return nil
+    end
+    if not (r and g and b) then return nil end
+    return Color3.fromRGB(r, g, b)
 end
 

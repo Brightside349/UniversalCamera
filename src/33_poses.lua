@@ -187,6 +187,118 @@ UCam.PoseLibrary = {
         ["Left Hip"]       = CFrame.new(-0.5, -1.2, 0.2) * CFrame.Angles(math.rad(40), 0, 0),
         RootJoint          = CFrame.new(),
     },
+
+    -- ============================================================
+    -- v7: POSES CREATIVAS NUEVAS PARA VIDEOS
+    -- ============================================================
+
+    ["Superman"] = {  -- Vuelo horizontal tipo superhéroe, puños adelante
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(10), 0, 0),
+        ["Right Shoulder"] = CFrame.new(1.2, -0.3, 0.4) * CFrame.Angles(math.rad(85), 0, 0),
+        ["Left Shoulder"]  = CFrame.new(-1.2, -0.3, 0.4) * CFrame.Angles(math.rad(85), 0, 0),
+        ["Right Hip"]      = CFrame.new(0.5, -0.3, 0.3) * CFrame.Angles(math.rad(85), 0, 0),
+        ["Left Hip"]       = CFrame.new(-0.5, -0.6, 0.3) * CFrame.Angles(math.rad(80), 0, 0),
+        RootJoint          = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(90), 0, 0),
+    },
+
+    ["Kamehameha"] = {  -- Cargar energía entre las manos a un lado
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(-5), math.rad(-30), 0),
+        ["Right Shoulder"] = CFrame.new(0.6, 0.3, 0.5) * CFrame.Angles(math.rad(-90), math.rad(30), 0),
+        ["Left Shoulder"]  = CFrame.new(-0.6, 0.3, 0.5) * CFrame.Angles(math.rad(-90), math.rad(-30), 0),
+        ["Right Hip"]      = CFrame.new(0.6, -1, 0) * CFrame.Angles(0, math.rad(30), 0),
+        ["Left Hip"]       = CFrame.new(-0.8, -1.1, 0) * CFrame.Angles(0, math.rad(-15), 0),
+        RootJoint          = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(30), 0),
+    },
+
+    ["Saludo Militar"] = {  -- Mano derecha a la frente, cuerpo erguido
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(10), 0),
+        ["Right Shoulder"] = CFrame.new(0.5, 1.2, 0.2) * CFrame.Angles(math.rad(-150), math.rad(40), math.rad(20)),
+        ["Left Shoulder"]  = CFrame.new(-1.2, 0.5, 0) * CFrame.Angles(0, math.rad(-15), 0),
+        ["Right Hip"]      = CFrame.new(0.5, -1, 0),
+        ["Left Hip"]       = CFrame.new(-0.5, -1, 0),
+        RootJoint          = CFrame.new(),
+    },
+
+    ["Yoga Árbol"] = {  -- Una pierna doblada tipo árbol de yoga, manos en plegaria
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(-5), 0, 0),
+        ["Right Shoulder"] = CFrame.new(0.3, 0.8, 0.3) * CFrame.Angles(math.rad(-60), math.rad(20), math.rad(-40)),
+        ["Left Shoulder"]  = CFrame.new(-0.3, 0.8, 0.3) * CFrame.Angles(math.rad(-60), math.rad(-20), math.rad(40)),
+        ["Right Hip"]      = CFrame.new(0.5, -0.9, 0) * CFrame.Angles(0, 0, math.rad(20)),
+        ["Left Hip"]       = CFrame.new(-0.5, -0.5, 0.2) * CFrame.Angles(math.rad(60), 0, 0),
+        RootJoint          = CFrame.new(0, -0.5, 0),
+    },
+
+    ["Spiderman"] = {  -- Agazapado listo a saltar, una mano al suelo
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(35), math.rad(20), 0),
+        ["Right Shoulder"] = CFrame.new(1, -0.6, 0.8) * CFrame.Angles(math.rad(80), math.rad(20), 0),
+        ["Left Shoulder"]  = CFrame.new(-1.2, 0.3, 0.2) * CFrame.Angles(math.rad(20), math.rad(-20), 0),
+        ["Right Hip"]      = CFrame.new(0.6, -0.6, 0) * CFrame.Angles(math.rad(70), 0, 0),
+        ["Left Hip"]       = CFrame.new(-0.4, -1.2, 0) * CFrame.Angles(math.rad(20), 0, 0),
+        RootJoint          = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(45), 0, 0),
+    },
+
+    ["Crucifixión"] = {  -- Brazos extendidos a los lados, cuerpo recto (cine épico)
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(-15), 0, 0),
+        ["Right Shoulder"] = CFrame.new(1.5, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90)),
+        ["Left Shoulder"]  = CFrame.new(-1.5, 0.5, 0) * CFrame.Angles(0, 0, math.rad(-90)),
+        ["Right Hip"]      = CFrame.new(0.5, -1, 0),
+        ["Left Hip"]       = CFrame.new(-0.5, -1, 0),
+        RootJoint          = CFrame.new(),
+    },
+
+    ["Beso"] = {  -- Inclinado adelante, labios fruncidos (cabeza abajo), manos al pecho
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(45), 0, 0),
+        ["Right Shoulder"] = CFrame.new(0.6, 0.3, 0.4) * CFrame.Angles(math.rad(-70), math.rad(20), 0),
+        ["Left Shoulder"]  = CFrame.new(-0.6, 0.3, 0.4) * CFrame.Angles(math.rad(-70), math.rad(-20), 0),
+        ["Right Hip"]      = CFrame.new(0.5, -1, 0),
+        ["Left Hip"]       = CFrame.new(-0.5, -1, 0),
+        RootJoint          = CFrame.new(0, -0.3, 0) * CFrame.Angles(math.rad(15), 0, 0),
+    },
+
+    ["Cargando Poder"] = {  -- Arrodillado, ambos puños al suelo, cabeza baja (earthquake)
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(40), 0, 0),
+        ["Right Shoulder"] = CFrame.new(1, -0.4, 0.5) * CFrame.Angles(math.rad(110), 0, 0),
+        ["Left Shoulder"]  = CFrame.new(-1, -0.4, 0.5) * CFrame.Angles(math.rad(110), 0, 0),
+        ["Right Hip"]      = CFrame.new(0.5, -0.3, -0.2) * CFrame.Angles(math.rad(95), 0, 0),
+        ["Left Hip"]       = CFrame.new(-0.5, -0.3, 0.2) * CFrame.Angles(math.rad(95), 0, 0),
+        RootJoint          = CFrame.new(0, -1.5, 0) * CFrame.Angles(math.rad(30), 0, 0),
+    },
+
+    ["Plancha"] = {  -- Horizontal boca abajo, cuerpo recto (plank / push-up)
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(90), 0, 0),
+        ["Right Shoulder"] = CFrame.new(1, 0.5, 0.3) * CFrame.Angles(math.rad(90), 0, 0),
+        ["Left Shoulder"]  = CFrame.new(-1, 0.5, 0.3) * CFrame.Angles(math.rad(90), 0, 0),
+        ["Right Hip"]      = CFrame.new(0.5, -1, 0) * CFrame.Angles(math.rad(90), 0, 0),
+        ["Left Hip"]       = CFrame.new(-0.5, -1, 0) * CFrame.Angles(math.rad(90), 0, 0),
+        RootJoint          = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(90), 0, 0),
+    },
+
+    ["Bailarina"] = {  -- Postura de ballet 4ª posición, brazos elegantes
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(-10), 0, 0),
+        ["Right Shoulder"] = CFrame.new(0.8, 1.0, 0.2) * CFrame.Angles(math.rad(-160), math.rad(30), 0),
+        ["Left Shoulder"]  = CFrame.new(-0.8, 1.0, 0.2) * CFrame.Angles(math.rad(-160), math.rad(-30), 0),
+        ["Right Hip"]      = CFrame.new(0.5, -0.5, 0.1) * CFrame.Angles(math.rad(-25), 0, math.rad(15)),
+        ["Left Hip"]       = CFrame.new(-0.5, -1.2, 0) * CFrame.Angles(math.rad(15), 0, 0),
+        RootJoint          = CFrame.new(0, -0.3, 0),
+    },
+
+    ["Agachado Listo"] = {  -- Anticipo de salto, peso atrás, brazos atrás
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(20), 0, 0),
+        ["Right Shoulder"] = CFrame.new(1, -0.5, -0.6) * CFrame.Angles(math.rad(80), 0, math.rad(20)),
+        ["Left Shoulder"]  = CFrame.new(-1, -0.5, -0.6) * CFrame.Angles(math.rad(80), 0, math.rad(-20)),
+        ["Right Hip"]      = CFrame.new(0.5, -0.5, 0) * CFrame.Angles(math.rad(70), 0, 0),
+        ["Left Hip"]       = CFrame.new(-0.5, -0.7, 0) * CFrame.Angles(math.rad(55), 0, 0),
+        RootJoint          = CFrame.new(0, -1.3, 0.2) * CFrame.Angles(math.rad(35), 0, 0),
+    },
+
+    ["James Bond"] = {  -- Una mano adelante tipo pistola, cuerpo lateral
+        Neck           = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(-40), 0),
+        ["Right Shoulder"] = CFrame.new(1.3, 0.4, 0.3) * CFrame.Angles(math.rad(180), math.rad(20), 0),
+        ["Left Shoulder"]  = CFrame.new(-1, 0.5, 0) * CFrame.Angles(0, math.rad(-30), 0),
+        ["Right Hip"]      = CFrame.new(0.6, -1, 0) * CFrame.Angles(0, math.rad(-20), 0),
+        ["Left Hip"]       = CFrame.new(-0.7, -1.1, 0) * CFrame.Angles(0, math.rad(-40), 0),
+        RootJoint          = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(-30), 0),
+    },
 }
 
 -- ============================================================

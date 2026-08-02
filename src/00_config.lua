@@ -780,7 +780,11 @@ UCam.Poses = {
         "Dab", "Superhero Landing", "Victoria", "Manos Arriba",
         "Meditando", "Acostado", "Recostado", "Durmiendo",
         "Zombie Walk", "Robot", "Bailando",
-        "Caída Dramática", "Pose de Acción", "Caminando"
+        "Caída Dramática", "Pose de Acción", "Caminando",
+        -- v7: poses creativas nuevas para videos
+        "Superman", "Kamehameha", "Saludo Militar", "Yoga Árbol",
+        "Spiderman", "Crucifixión", "Beso", "Cargando Poder",
+        "Plancha", "Bailarina", "Agachado Listo", "James Bond"
     },
     TransitionSpeed = 0.15,
     CustomPoses = {},           -- poses guardadas por el usuario
@@ -803,6 +807,7 @@ UCam.BodyColor = {
     },
     Accessories = { Color = nil, Material = nil, Transparency = 0 },
     SelectedPart = "Todo",
+    TargetSelectedPart = "Todo",   -- v7: parte seleccionada para colorear a otros jugadores
     PartOptions = { "Cabeza", "Torso", "Brazo Izq.", "Brazo Der.", "Pierna Izq.", "Pierna Der.", "Accesorios", "Todo" },
     Presets = {},               -- presets guardados por el usuario
     PresetOptions = { "Robot", "Fantasma", "Demonio", "Dorado", "Invisible", "Glitch" },

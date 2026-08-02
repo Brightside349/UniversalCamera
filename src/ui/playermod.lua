@@ -291,7 +291,7 @@ function UCam.build_playermod(Window)
                     return
                 end
                 
-                if UCam.applyPresetToPlayer(UCam.PlayerMod.TargetPlayer, preset.name) then
+                if UCam.applyModPresetToPlayer(UCam.PlayerMod.TargetPlayer, preset.name) then
                     UCam.initPlayerMod()
                     if UCam.initPoses then UCam.initPoses() end
                     UCam.notify("Mod Jugadores", "Preset '" .. preset.name .. "' aplicado")
@@ -325,7 +325,7 @@ function UCam.build_playermod(Window)
         Callback = function()
             local preset = UCam.resolveDropdownValue(selectedPresetDropdown.CurrentOption)
             if preset then
-                local count = UCam.applyPresetToAllPlayers(preset)
+                local count = UCam.applyModPresetToAllPlayers(preset)
                 if count > 0 then
                     UCam.initPlayerMod()
                     if UCam.initPoses then UCam.initPoses() end

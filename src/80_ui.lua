@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v6 · 80_ui
+-- Universal Camera Pro v7 · 80_ui
 -- Orquestador de la UI: crea la Window de Rayfield y delega cada
 -- pestaña al sub-builder correspondiente. Los sub-builders se
 -- registran en UCam.build_xxx y se cargan desde src/ui/*.lua

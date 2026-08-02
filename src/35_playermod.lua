@@ -453,13 +453,13 @@ UCam.PlayerModPresets = {
     },
 }
 
-function UCam.applyPresetToPlayer(player, presetName)
+function UCam.applyModPresetToPlayer(player, presetName)
     local preset = UCam.PlayerModPresets[presetName]
     if not preset then return false end
     return UCam.applyModToPlayer(player, preset)
 end
 
-function UCam.applyPresetToAllPlayers(presetName)
+function UCam.applyModPresetToAllPlayers(presetName)
     local preset = UCam.PlayerModPresets[presetName]
     if not preset then return 0 end
     return UCam.applyModToAllPlayers(preset)

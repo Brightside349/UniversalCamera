@@ -86,14 +86,24 @@ local ORDER = {
     "20_filters.lua",
     -- 3. Modulo Fun (montar, noclip, escala, poses, trail, disco, etc.)
     "30_fun.lua",
+    -- 3.1 v7: Coloreo de cuerpo por partes + presets + arcoíris
+    "32_bodycolor.lua",
+    -- 3.2 v7: Poses avanzadas (Motor6D) — base para playermod
+    "33_poses.lua",
+    -- 3.3 v7: Hub de modificación de otros jugadores (depende de 32/33)
+    "35_playermod.lua",
     -- 4. Bullet Time universal
     "40_slowmo.lua",
+    -- 4.1 v7: Control de Tiempo expandido (Time Ramp, Frame-by-Frame, FF)
+    "45_timecontrol.lua",
     -- 5. Espectador (9 modos + navegacion Q/E)
     "50_spectate.lua",
     -- 6. Director (waypoints + reproduccion)
     "60_director.lua",
     -- 7. Nucleo de camara (toggleFreeCam, CrashZoom, Shake, updateCamera, input)
     "70_camcore.lua",
+    -- 7.1 v7: Replay / grabación de cámara (depende de director + cámara)
+    "55_replay.lua",
     -- 8. Orquestador de la UI (solo arma la Window y delega)
     "80_ui.lua",
     -- 9. Sub-builders de cada pestana (registran UCam.build_xxx)
@@ -101,12 +111,17 @@ local ORDER = {
     "ui/camaras.lua",
     "ui/espectador.lua",
     "ui/slowmo.lua",
+    "ui/timecontrol.lua",   -- v7: pestaña ⏱️ Tiempo (Time Ramp, Frame-by-Frame)
     "ui/cinematic.lua",
     "ui/filters.lua",
     "ui/light.lua",
     "ui/estudio.lua",
     "ui/gimbal.lua",
     "ui/fun.lua",
+    "ui/bodycolor.lua",    -- v7: pestaña 🎨 Cuerpo (colores por partes)
+    "ui/poses.lua",        -- v7: pestaña 🧍 Poses
+    "ui/playermod.lua",    -- v7: pestaña 👥 Mod Jugadores
+    "ui/replay.lua",       -- v7: pestaña 🎬 Replay (grabación de cámara)
     "ui/config.lua",
     "ui/info.lua",
     -- 10. Init: llama a buildUI() y notifica "Listo"

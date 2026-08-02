@@ -236,6 +236,9 @@ function UCam.build_poses(Window)
 • Relajadas: Meditando, Acostado, Recostado, Durmiendo
 • Divertidas: Zombie Walk, Robot, Bailando
 • Cinemáticas: Caída Dramática, Pose de Acción, Caminando
+• Creativas v7 (para videos): Superman, Kamehameha, Saludo
+  Militar, Yoga Árbol, Spiderman, Crucifixión, Beso, Cargando
+  Poder, Plancha, Bailarina, Agachado Listo, James Bond
         ]]
     })
 end

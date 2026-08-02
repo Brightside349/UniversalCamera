@@ -42,7 +42,48 @@ function UCam.build_bodycolor(Window)
             end
         end,
     })
-    
+
+    -- v7: Campo de código HEX para uno mismo.
+    -- El callback se dispara al perder foco/Enter: aplica a la parte seleccionada.
+    -- Guardamos el último texto en lastBodyHex para que el botón "TODO el cuerpo" lo reutilice.
+    local lastBodyHex = nil
+    Tab:CreateInput({
+        Name = "Color por código HEX (#RRGGBB)",
+        PlaceholderText = "Ej: #FF5500 → aplica a la parte",
+        RemoveTextAfterFocusLost = false,
+        Flag = "BodyPartHexColor",
+        Callback = function(text)
+            if not text or text == "" then return end
+            lastBodyHex = text
+            local color = UCam.hexToColor(text)
+            if not color then
+                UCam.notify("Coloreo", "Código inválido. Usa #RRGGBB (ej. #3366FF)", 4)
+                return
+            end
+            local part = UCam.BodyColor.SelectedPart
+            if not part then return end
+            UCam.applyBodyColorToPart(part, color, nil, nil)
+            UCam.notify("Coloreo", string.format("HEX %s → %s", text, part))
+        end,
+    })
+
+    Tab:CreateButton({
+        Name = "Aplicar HEX a TODO el cuerpo",
+        Callback = function()
+            if not lastBodyHex or lastBodyHex == "" then
+                UCam.notify("Coloreo", "Primero escribe un código HEX arriba", 3)
+                return
+            end
+            local color = UCam.hexToColor(lastBodyHex)
+            if not color then
+                UCam.notify("Coloreo", "Código inválido: " .. lastBodyHex, 4)
+                return
+            end
+            UCam.applyBodyColorToPart("Todo", color, nil, nil)
+            UCam.notify("Coloreo", string.format("HEX %s → todo el cuerpo", lastBodyHex))
+        end,
+    })
+
     local materialDropdown = Tab:CreateDropdown({
         Name = "Material de Parte",
         Options = {"Plastic", "Neon", "Metal", "Glass", "Wood", "Slate", "Marble", "Granite", "Ice", "ForceField"},
@@ -208,7 +249,115 @@ function UCam.build_bodycolor(Window)
             UCam.notify("Coloreo", "Lista actualizada")
         end,
     })
-    
+
+    -- v7: COLOREO POR PARTES A OTRO JUGADOR (incluye HEX)
+    local targetPartDropdown = Tab:CreateDropdown({
+        Name = "Parte a colorear (otro jugador)",
+        Options = UCam.BodyColor.PartOptions,
+        CurrentOption = {"Todo"},
+        Flag = "TargetPlayerBodyPart",
+        Callback = function(opt)
+            local part = UCam.resolveDropdownValue(opt)
+            if part then
+                UCam.BodyColor.TargetSelectedPart = part
+            end
+        end,
+    })
+    UCam.BodyColor.TargetSelectedPart = UCam.BodyColor.TargetSelectedPart or "Todo"
+
+    local targetColorPicker = Tab:CreateColorPicker({
+        Name = "Color del otro jugador (parte)",
+        Color = Color3.fromRGB(255, 255, 255),
+        Flag = "TargetPlayerPartColor",
+        Callback = function(color)
+            -- Solo guarda; se aplica con el botón
+        end,
+    })
+
+    local lastTargetHex = nil
+    Tab:CreateInput({
+        Name = "HEX para el otro jugador (#RRGGBB)",
+        PlaceholderText = "Ej: #00AAFF",
+        RemoveTextAfterFocusLost = false,
+        Flag = "TargetPlayerHexColor",
+        Callback = function(text)
+            if not text or text == "" then return end
+            lastTargetHex = text
+        end,
+    })
+
+    Tab:CreateButton({
+        Name = "🎨 Aplicar Color → Parte del Jugador",
+        Callback = function()
+            if not UCam.PlayerMod.TargetPlayer then
+                UCam.notify("Coloreo", "Selecciona un jugador objetivo primero", 3)
+                return
+            end
+            local part = UCam.BodyColor.TargetSelectedPart or "Todo"
+            local color = targetColorPicker.Color
+            UCam.applyBodyColorToPlayer(UCam.PlayerMod.TargetPlayer, part, color, nil, nil)
+            UCam.notify("Coloreo", string.format("Color aplicado a %s → %s", part, UCam.PlayerMod.TargetPlayer.Name))
+        end,
+    })
+
+    Tab:CreateButton({
+        Name = "🎨 Aplicar HEX → Parte del Jugador",
+        Callback = function()
+            if not UCam.PlayerMod.TargetPlayer then
+                UCam.notify("Coloreo", "Selecciona un jugador objetivo primero", 3)
+                return
+            end
+            if not lastTargetHex or lastTargetHex == "" then
+                UCam.notify("Coloreo", "Escribe un código HEX arriba primero", 3)
+                return
+            end
+            local color = UCam.hexToColor(lastTargetHex)
+            if not color then
+                UCam.notify("Coloreo", "Código HEX inválido: " .. lastTargetHex, 4)
+                return
+            end
+            local part = UCam.BodyColor.TargetSelectedPart or "Todo"
+            UCam.applyBodyColorToPlayer(UCam.PlayerMod.TargetPlayer, part, color, nil, nil)
+            UCam.notify("Coloreo", string.format("HEX %s → %s de %s", lastTargetHex, part, UCam.PlayerMod.TargetPlayer.Name))
+        end,
+    })
+
+    local targetMaterialDropdown = Tab:CreateDropdown({
+        Name = "Material del otro jugador",
+        Options = {"Plastic", "Neon", "Metal", "Glass", "Wood", "Slate", "Marble", "Granite", "Ice", "ForceField"},
+        CurrentOption = {"Plastic"},
+        Flag = "TargetPlayerMaterial",
+        Callback = function(opt)
+            -- solo guarda
+        end,
+    })
+
+    Tab:CreateButton({
+        Name = "Aplicar Material → Parte del Jugador",
+        Callback = function()
+            if not UCam.PlayerMod.TargetPlayer then
+                UCam.notify("Coloreo", "Selecciona un jugador objetivo primero", 3)
+                return
+            end
+            local part = UCam.BodyColor.TargetSelectedPart or "Todo"
+            local material = UCam.resolveDropdownValue(targetMaterialDropdown.CurrentOption) or "Plastic"
+            UCam.applyBodyColorToPlayer(UCam.PlayerMod.TargetPlayer, part, nil, material, nil)
+            UCam.notify("Coloreo", string.format("Material %s → %s de %s", material, part, UCam.PlayerMod.TargetPlayer.Name))
+        end,
+    })
+
+    Tab:CreateButton({
+        Name = "Restaurar Jugador Seleccionado (colores)",
+        Callback = function()
+            if UCam.PlayerMod.TargetPlayer then
+                UCam.restorePlayerBodyColor(UCam.PlayerMod.TargetPlayer)
+                UCam.notify("Coloreo", "Colores restaurados de " .. UCam.PlayerMod.TargetPlayer.Name)
+            else
+                UCam.notify("Coloreo", "Selecciona un jugador primero", 3)
+            end
+        end,
+    })
+
     Tab:CreateButton({
         Name = "Copiar Mi Aspecto → Jugador",
         Callback = function()
@@ -377,8 +526,11 @@ function UCam.build_bodycolor(Window)
 • Coloreo independiente por parte del cuerpo
 • Control de transparencia por parte (0-100%)
 • Materiales por parte (10 opciones)
+• Color por código HEX (#RRGGBB) además del selector
 • 6 presets predefinidos de transformación
 • Efecto arcoíris animado configurable
+• Coloreo por PARTES a otros jugadores (cabeza azul, etc.)
+• Color HEX directo a otros jugadores
 • Aplicación local a otros jugadores
 • Guardar/cargar presets personalizados
         ]]

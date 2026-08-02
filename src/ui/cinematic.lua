@@ -256,7 +256,7 @@ function UCam.build_cinematic(Window)
         Callback = function()
             local str = UCam.directorSerializeRoute()
             if str and str ~= "" then
-                pcall(function() setclipboard and setclipboard(str) end)
+                pcall(function() local cb = rawget(_G, "setclipboard"); if cb then cb(str) end end)
                 UCam.notify("Director", string.format("Ruta copiada (%d chars). Pégala con Ctrl+V.", #str))
             else
                 UCam.notify("Director", "No hay waypoints para serializar.")
