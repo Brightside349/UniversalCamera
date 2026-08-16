@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v7 · 80_ui
+-- Universal Camera Pro v8 · 80_ui
 -- Orquestador de la UI: crea la Window de Rayfield y delega cada
 -- pestaña al sub-builder correspondiente. Los sub-builders se
 -- registran en UCam.build_xxx y se cargan desde src/ui/*.lua
@@ -11,10 +11,15 @@
 --   build_inicio, build_camaras, build_espectador, build_slowmo,
 --   build_cinematic, build_filters, build_light, build_estudio,
 --   build_gimbal, build_fun, build_config, build_info
+--
+-- v8: al terminar de construir, conecta un autosave que persiste
+-- la config en disco 3s despues del ultimo cambio de cualquier
+-- flag de Rayfield (05_persistence.lua).
 -- ============================================================
 local UCam = _G.UCam
 
 -- Tabla de sub-builders (v7: agregados bodycolor, poses, playermod, timecontrol, replay)
+-- v8: profiles, combos, macros, audioreactive, filterspro
 UCam._uiBuilders = {
     "inicio",
     "camaras",
@@ -31,12 +36,20 @@ UCam._uiBuilders = {
     "playermod",    -- v7: Modificar otros jugadores
     "timecontrol",  -- v7: Control de Tiempo (Time Ramp, Frame-by-Frame, Fast Forward)
     "replay",       -- v7: Grabación y Replay de cámara
+    "profiles",     -- v8: Perfiles completos
+    "combos",       -- v8: Secuencias automáticas de modos
+    "macros",       -- v8: Macros grabables/reproducibles
+    "audioreactive",-- v8: Beats → FOV/Shake/Flash
+    "filterspro",   -- v8: Efectos visuales avanzados
     "config",
     "info",
 }
 
 -- v7: Tabla de builders registrados dinámicamente (para plugins/extensiones)
 UCam._dynamicTabBuilders = {}
+-- v8 FIX: tabs dinámicos ya construidos (evita doble build cuando un plugin
+-- se registra en caliente mientras buildUI() está iterando _dynamicTabBuilders).
+UCam._builtDynamicTabs = {}
 
 -- v7: API para registro dinámico de tabs
 -- Permite que plugins externos agreguen pestañas personalizadas
@@ -67,6 +80,26 @@ function UCam.registerTabBuilder(name, builderFunction)
     
     UCam._dynamicTabBuilders[name] = builderFunction
     print(("[UCam] Tab dinámico '%s' registrado exitosamente"):format(name))
+
+    -- v8 FIX: si la UI ya se construyó (plugin registrado tarde, p.ej. en
+    -- caliente o desde un folder cargado después de buildUI), construir la
+    -- pestaña INMEDIATAMENTE con la Window guardada. Antes quedaba huérfano
+    -- en _dynamicTabBuilders y nunca se creaba.
+    if UCam._window then
+        task.defer(function()
+            -- Guard 1: si buildUI() ya construyó esta tab (loop de abajo), no
+            -- construirla dos veces (registro en caliente durante el propio loop).
+            if UCam._builtDynamicTabs[name] then return end
+            -- Guard 2: si Unload() destruyó la Window antes de que corra el defer
+            -- (recarga en el mismo frame), no construir sobre una UI muerta.
+            if not UCam._window then return end
+            UCam._builtDynamicTabs[name] = true
+            local ok, err = pcall(builderFunction, UCam._window)
+            if not ok then
+                warn(("[UCam] Tab dinámico tardío '%s' fallo: %s"):format(name, tostring(err)))
+            end
+        end)
+    end
     return true
 end
 
@@ -103,14 +136,17 @@ UCam.UISliders = {
 -- buildUI: arma la ventana y dispara los sub-builders en orden.
 function UCam.buildUI()
     local Window = UCam.Rayfield:CreateWindow({
-        Name                   = "Universal Camera Pro v7 By Cocoa Feliz",
+        Name                   = "Universal Camera Pro v8 By Cocoa Feliz",
         LoadingTitle           = "Universal Camera",
-        LoadingSubtitle        = "Cargando interfaz v7...",
+        LoadingSubtitle        = "Cargando interfaz v8...",
         Icon                   = 4483362458,
         ToggleUIKeybind        = Enum.KeyCode.Delete,
         DisableRayfieldPrompts = true,
-        ConfigurationSaving    = { Enabled = false },
+        ConfigurationSaving    = { Enabled = false }, -- v8 usa su propio sistema (05_persistence)
     })
+    -- v8 FIX: guardar la Window para que los tabs dinámicos registrados
+    -- DESPUÉS de buildUI() puedan construirse (ver registerTabBuilder).
+    UCam._window = Window
 
     for _, name in ipairs(UCam._uiBuilders) do
         local fn = UCam["build_" .. name]
@@ -127,10 +163,47 @@ function UCam.buildUI()
     -- v7: Procesar tabs dinámicos registrados
     for name, fn in pairs(UCam._dynamicTabBuilders) do
         if type(fn) == "function" then
+            -- v8 FIX: marcar como construida para que un task.defer pendiente
+            -- (registro en caliente durante este loop) no la reconstruya.
+            UCam._builtDynamicTabs[name] = true
             local ok, err = pcall(fn, Window)
             if not ok then
                 warn(("[UCam] Tab dinámico '%s' fallo: %s"):format(name, tostring(err)))
             end
         end
+    end
+
+    -- v8: AUTOSAVE — detecta cambios en los valores persistibles y
+    -- llama a scheduleSave() (debounce 3s dentro de 05_persistence).
+    -- Un heartbeat barato comparando un hash de los campos clave.
+    if UCam.scheduleSave and UCam.trackConnection then
+        local function snapNow()
+            local parts = {}
+            parts[#parts+1] = tostring(UCam.camMode)
+            parts[#parts+1] = tostring(UCam.currentSpeed)
+            parts[#parts+1] = tostring(UCam.MOUSE_SENSITIVITY)
+            parts[#parts+1] = tostring(UCam.currentFilterIndex)
+            parts[#parts+1] = tostring(UCam.Orbit and UCam.Orbit.Distance)
+            parts[#parts+1] = tostring(UCam.Follow and UCam.Follow.Distance)
+            parts[#parts+1] = tostring(UCam.Bloom and UCam.Bloom.Intensity)
+            parts[#parts+1] = tostring(UCam.DOF and UCam.DOF.FocusDistance)
+            parts[#parts+1] = tostring(UCam.SlowMo and UCam.SlowMo.Intensity)
+            parts[#parts+1] = tostring(UCam.Spectate and UCam.Spectate.Mode)
+            parts[#parts+1] = tostring(UCam.LightingTweaks and UCam.LightingTweaks.ClockTime)
+            parts[#parts+1] = tostring(UCam.Keybinds and UCam.Keybinds.Forward)
+            parts[#parts+1] = tostring(UCam.Keybinds and UCam.Keybinds.Sprint)
+            return table.concat(parts, "|")
+        end
+        local lastHash = snapNow()
+        UCam.trackConnection(
+            UCam.RunService.Heartbeat:Connect(function()
+                local h = snapNow()
+                if h ~= lastHash then
+                    lastHash = h
+                    UCam.scheduleSave()
+                end
+            end),
+            "Autosave:Watcher"
+        )
     end
 end

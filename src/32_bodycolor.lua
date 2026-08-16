@@ -225,6 +225,42 @@ function UCam.applyPreset(presetName)
                 end)
             end
         end
+    elseif preset.Parts then
+        -- v8.1 FIX: los presets CUSTOM tienen formato { Parts = {...},
+        -- Accessories = {...} } y NO tienen AllParts → antes no aplicaban nada.
+        for k, v in pairs(preset.Parts) do
+            local part = UCam.character:FindFirstChild(k, true)
+            if part and part:IsA("BasePart") then
+                pcall(function()
+                    if v.Color then part.Color = v.Color end
+                    if v.Material then
+                        local enumMat = Enum.Material[v.Material]
+                        if enumMat then part.Material = enumMat end
+                    end
+                    if v.Transparency ~= nil then part.Transparency = v.Transparency end
+                end)
+            end
+        end
+        -- Aplicar accesorios guardados
+        if preset.Accessories then
+            for _, acc in ipairs(UCam.character:GetChildren()) do
+                if acc:IsA("Accessory") then
+                    local handle = acc:FindFirstChild("Handle")
+                    if handle and handle:IsA("BasePart") then
+                        pcall(function()
+                            if preset.Accessories.Color then handle.Color = preset.Accessories.Color end
+                            if preset.Accessories.Material then
+                                local em = Enum.Material[preset.Accessories.Material]
+                                if em then handle.Material = em end
+                            end
+                            if preset.Accessories.Transparency ~= nil then
+                                handle.Transparency = preset.Accessories.Transparency
+                            end
+                        end)
+                    end
+                end
+            end
+        end
     else
         local parts = {}
         if preset.AllParts then
@@ -331,6 +367,40 @@ function UCam.applyPresetToPlayer(player, presetName)
                     )
                     part.Transparency = math.random(0, 100) / 100
                 end)
+            end
+        end
+    elseif preset.Parts then
+        -- v8.1 FIX: presets custom (formato Parts/Accessories) en otros jugadores
+        for k, v in pairs(preset.Parts) do
+            local part = character:FindFirstChild(k, true)
+            if part and part:IsA("BasePart") then
+                pcall(function()
+                    if v.Color then part.Color = v.Color end
+                    if v.Material then
+                        local em = Enum.Material[v.Material]
+                        if em then part.Material = em end
+                    end
+                    if v.Transparency ~= nil then part.Transparency = v.Transparency end
+                end)
+            end
+        end
+        if preset.Accessories then
+            for _, acc in ipairs(character:GetChildren()) do
+                if acc:IsA("Accessory") then
+                    local handle = acc:FindFirstChild("Handle")
+                    if handle and handle:IsA("BasePart") then
+                        pcall(function()
+                            if preset.Accessories.Color then handle.Color = preset.Accessories.Color end
+                            if preset.Accessories.Material then
+                                local em = Enum.Material[preset.Accessories.Material]
+                                if em then handle.Material = em end
+                            end
+                            if preset.Accessories.Transparency ~= nil then
+                                handle.Transparency = preset.Accessories.Transparency
+                            end
+                        end)
+                    end
+                end
             end
         end
     else

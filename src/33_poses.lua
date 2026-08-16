@@ -370,6 +370,25 @@ local function restoreJoints(snapshot)
     end
 end
 
+-- v8.1 FIX (R15): los Motor6D en R6 cuelgan de "Torso" y se llaman
+-- "Right Shoulder"/"Right Hip"; en R15 no hay Torso, cuelgan de
+-- UpperTorso/LowerTorso y se llaman "RightShoulder"/"RightHip".
+-- Este helper busca el joint por nombre en todo el personaje y
+-- normaliza los espacios, así sirve tanto para R6 como para R15.
+local function findPoseJoint(character, jointName)
+    if not character then return nil end
+    local normalized = jointName:gsub("%s", "")
+    for _, joint in ipairs(character:GetDescendants()) do
+        if joint:IsA("Motor6D") then
+            local name = joint.Name
+            if name == jointName or name:gsub("%s", "") == normalized then
+                return joint
+            end
+        end
+    end
+    return nil
+end
+
 -- ============================================================
 -- APLICAR POSE A PERSONAJE LOCAL
 -- ============================================================
@@ -491,15 +510,8 @@ function UCam.updateAdvPoses(dt)
         UCam.refreshCharacterRefs()
         if UCam.character then
             for jointName, targetCF in pairs(UCam.Poses._targetPose) do
-                local joint = UCam.character:FindFirstChild("Torso", true)
-                if joint then joint = joint:FindFirstChild(jointName) end
-                if not joint then
-                    -- Try HumanoidRootPart for RootJoint
-                    if jointName == "RootJoint" then
-                        local hrp = UCam.character:FindFirstChild("HumanoidRootPart")
-                        if hrp then joint = hrp:FindFirstChild("RootJoint") end
-                    end
-                end
+                -- v8.1 FIX: findPoseJoint soporta R6 y R15
+                local joint = findPoseJoint(UCam.character, jointName)
                 
                 if joint and joint:IsA("Motor6D") then
                     pcall(function()
@@ -515,12 +527,7 @@ function UCam.updateAdvPoses(dt)
         if player and player.Character and data.targetPose then
             local character = player.Character
             for jointName, targetCF in pairs(data.targetPose) do
-                local joint = character:FindFirstChild("Torso", true)
-                if joint then joint = joint:FindFirstChild(jointName) end
-                if not joint and jointName == "RootJoint" then
-                    local hrp = character:FindFirstChild("HumanoidRootPart")
-                    if hrp then joint = hrp:FindFirstChild("RootJoint") end
-                end
+                local joint = findPoseJoint(character, jointName)
                 
                 if joint and joint:IsA("Motor6D") then
                     pcall(function()

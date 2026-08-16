@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v6 · ui/info
+-- Universal Camera Pro v8 · ui/info
 -- Pestaña Info / Ayuda: documentacion de controles, modos y modulos.
 -- ============================================================
 local UCam = _G.UCam
@@ -12,14 +12,14 @@ function UCam.build_info(Window)
         "Clic derecho + mouse -> rotar camara\nRueda del mouse -> zoom (FOV)\nShift -> sprint (modo Libre / Handheld)\nWASD + Espacio / Ctrl -> movimiento\nDelete -> mostrar/ocultar UI\nF -> activar camara libre\nX -> dejar de espectar\nZ -> disparar Camera Shake\nE / Q -> Siguiente / Anterior jugador (Espectar)",
     })
     InfoTab:CreateParagraph({
-        Title   = "Modos de camara (14 modos)",
+        Title   = "Modos de camara (18 modos)",
         Content =
-        "Libre: WASD + rotacion con clic derecho.\nOrbita: gira alrededor del personaje.\nTripode: fijo, solo rotacion.\nCenital: vista de pajaro (top-down).\nLateral: side-scroller cinematico.\nDron: orbitas suaves (circulo o figura 8).\nFollow: chase cam estilo hombro.\nCrashZoom: dolly-in dramatico.\nDirector: ruta de waypoints para intros/outros.\nCrane: plano de grua (sube/baja con Space/Ctrl + giro opcional).\nDolly Glide: carril cinematico (lateral / forward / diagonal).\nHandheld: camara en mano con sacudida procedural.\nRoll Axis: rotacion continua sobre el eje forward (barrel roll).\nVertigo (NUEVO v6): dolly zoom Hitchcock - el FOV se compensa mientras la camara se acerca/aleja y el fondo se deforma.",
+        "Libre: WASD + rotacion con clic derecho.\nOrbita: gira alrededor del personaje.\nTripode: fijo, solo rotacion.\nCenital: vista de pajaro (top-down).\nLateral: side-scroller cinematico.\nDron: orbitas suaves (circulo o figura 8).\nFollow: chase cam estilo hombro.\nCrashZoom: dolly-in dramatico.\nDirector: ruta de waypoints para intros/outros.\nCrane: plano de grua (sube/baja con Space/Ctrl + giro opcional).\nDolly Glide: carril cinematico (lateral / forward / diagonal).\nHandheld: camara en mano con sacudida procedural.\nRoll Axis: rotacion continua sobre el eje forward (barrel roll).\nVertigo: dolly zoom Hitchcock - el FOV se compensa mientras la camara se acerca/aleja y el fondo se deforma.\nFPV Dron: drone acrobatico con inercia y roll extremo.\nSnorricam: camara atada al personaje mirando hacia su cara.\nCable Cam: camara restringida a una linea entre dos puntos.\nSecurity Cam: camara estatica con paneo automatico lento.",
     })
     InfoTab:CreateParagraph({
-        Title   = "Como esta organizada la UI (v6)",
+        Title   = "Como esta organizada la UI (v8)",
         Content =
-        "Inicio: camara libre, ocultar HUD/personaje, auto-HUD y acciones rapidas (captura, teletransporte, restablecer todo).\nCamaras: los 14 modos y todos sus parametros agrupados por modo.\nEspectador: jugadores, auto-ciclo, estilos y FOV.\nCamara Lenta: toggle + TODOS sus ajustes en un solo lugar.\nCinematografico: letterbox, vignette, shake, FOV pulse, director y post-procesado (bloom, DOF, sun rays).\nFiltros: 30 built-in + editor custom + tus presets.\nIluminacion / Estudio / Gimbal: modulos de ambiente y bloqueo.\nDiversion: montar, fisicas, tamano, poses, aspecto y efectos visuales.\nAjustes: solo las teclas.",
+        "Inicio: camara libre, ocultar HUD/personaje, auto-HUD y acciones rapidas (captura, teletransporte, restablecer todo).\nCamaras: los 18 modos y todos sus parametros agrupados por modo.\nEspectador: jugadores, auto-ciclo, estilos y FOV.\nCamara Lenta: toggle + TODOS sus ajustes en un solo lugar.\nTiempo: rampas de tiempo, frame-by-frame y fast-forward.\nReplay: graba/reproduce camara, marcadores con eventos, speed ramps y compartir rutas.\nCinematografico: letterbox, vignette, shake, FOV pulse, director y post-procesado (bloom, DOF, sun rays).\nFiltros: 30 built-in + editor custom + tus presets.\nFiltros Pro: grain, pixelify, scanlines, tilt-shift, radial blur y curvas de color.\nIluminacion / Estudio / Gimbal: modulos de ambiente y bloqueo.\nDiversion: montar, fisicas, tamano, poses, aspecto y efectos visuales.\nCuerpo / Poses / Jugadores: modifica aspecto de tu personaje y otros.\nPerfiles: guarda/carga setups completos.\nCombos / Macros / Audio Reactive: secuencias y efectos al ritmo.\nAjustes: teclas + idioma.\nPlugins: extensiones cargadas de la carpeta UniversalCamera/plugins.",
     })
     InfoTab:CreateParagraph({
         Title   = "Pestana Filtros",
@@ -42,7 +42,7 @@ function UCam.build_info(Window)
         "Funciona en todos los juegos. Ralentiza humanoides (mi personaje, otros jugadores, NPCs) via WalkSpeed/JumpPower localmente + objetos fisicos via CFrame-lerp con filtros seguros (no rompe joints). Modo Freeze = congela todo al maximo. Ahora tiene su propia pestaña con toggle + ajustes juntos.",
     })
     InfoTab:CreateParagraph({
-        Title   = "Diversion - Efectos visuales (v6)",
+        Title   = "Diversion - Efectos visuales (v8)",
         Content =
         "Invisibilidad: vuelve transparente a tu personaje (solo local).\nTrail: deja una estela de esferas neon con ancho, duracion y color RGB configurables.\nDisco floor: panel neon bajo tus pies que TE SIGUE a todas partes, con tamano y color RGB.\nMaterial: convierte tu cuerpo en Neon, Metal, Glass, ForceField, etc.",
     })

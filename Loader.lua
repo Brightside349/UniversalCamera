@@ -1,19 +1,50 @@
 -- ============================================================
 -- Universal Camera PRO · Loader
--- By Cocoa Feliz · v7 modular
+-- By Cocoa Feliz · v8.1 release
 --
 -- ESTE es el unico script que pegas en el juego.
 -- Descarga cada parte desde GitHub raw y la ejecuta inyectando el
 -- namespace compartido UCam (tabla global + upvalue).
+--
+-- v8:
+--  - Auto-unload: si _G.UCam ya existe de una ejecucion previa,
+--    llama UCam.Unload() antes de recargar (evita handlers duplicados).
+--  - Retry con backoff exponencial (3 intentos por parte).
+--  - Descarga paralela de todas las partes (task.spawn) y ejecucion
+--    en orden — mucho mas rapido en conexiones lentas.
+--  - Versionado: pin a un tag con VERSION para produccion.
 -- ============================================================
 
 -- ============================================================
 -- CONFIG: repo de GitHub para cargar las partes modularizadas
 -- ============================================================
-local BASE = "https://raw.githubusercontent.com/Brightside349/UniversalCamera/main/src/"
+local VERSION = "v8.1.0"   -- release tag de la versión actual
+
+local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 
 -- (Opcional) mirror de jsdelivr como fallback si GitHub esta caido
-local FALLBACK_BASE = "https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@main/src/"
+local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
+
+-- Reintentos por parte (con backoff exponencial: 0.5s, 1s, 2s)
+local MAX_RETRIES = 3
+
+-- ============================================================
+-- v8: AUTO-UNLOAD de instancia previa
+-- Si _G.UCam existe y tiene Unload(), lo llamamos para desconectar
+-- handlers/instancias del script anterior antes de recargar.
+-- ============================================================
+if _G.UCam then
+    if type(_G.UCam.Unload) == "function" then
+        local ok, err = pcall(_G.UCam.Unload)
+        if ok then
+            print("[UCam] Instancia previa descargada correctamente. Recargando...")
+        else
+            warn(("[UCam] Unload previo fallo: %s (continuando de todas formas)"):format(tostring(err)))
+        end
+    else
+        warn("[UCam] Instancia previa sin Unload() — puede haber handlers duplicados.")
+    end
+end
 
 -- ============================================================
 -- Namespace compartido entre TODAS las partes
@@ -22,34 +53,132 @@ local UCam = {}
 _G.UCam = UCam
 
 -- ============================================================
--- Cache opcional: si esta parte ya se descargo en esta sesion,
--- la re-ejecuta desde cache (ahorra HTTP en el mismo script).
+-- Orden estricto de carga.
+-- Cada parte solo puede usar UCam.* de las anteriores.
 -- ============================================================
-local cache = {}
+local ORDER = {
+    -- 0. Config + estado + servicios + Rayfield
+    "00_config.lua",
+    -- 0.5 v8: Persistencia (write/read config JSON, export/import)
+    "05_persistence.lua",
+    -- 0.6 v8: i18n multi-idioma (es/en/pt, UCam.T)
+    "06_i18n.lua",
+    -- 1. Utilidades de camara, personaje, path visualizer, croma
+    "10_utils.lua",
+    -- 2. Filtros built-in/custom, bloom, DOF, sunrays, vignette, letterbox
+    "20_filters.lua",
+    -- 2.5 v8: Filtros Pro (grain, pixelify, scanlines, tilt-shift, radial blur, color curves)
+    "25_filterspro.lua",
+    -- 3. Modulo Fun (montar, noclip, escala, poses, trail, disco, etc.)
+    "30_fun.lua",
+    -- 3.1 v7: Coloreo de cuerpo por partes + presets + arcoíris
+    "32_bodycolor.lua",
+    -- 3.2 v7: Poses avanzadas (Motor6D) — base para playermod
+    "33_poses.lua",
+    -- 3.3 v7: Hub de modificación de otros jugadores (depende de 32/33)
+    "35_playermod.lua",
+    -- 4. Bullet Time universal
+    "40_slowmo.lua",
+    -- 4.1 v7: Control de Tiempo expandido (Time Ramp, Frame-by-Frame, FF)
+    "45_timecontrol.lua",
+    -- 5. Espectador (9 modos + navegacion Q/E)
+    "50_spectate.lua",
+    -- 6. Director (waypoints + reproduccion)
+    "60_director.lua",
+    -- 7. Nucleo de camara (toggleFreeCam, CrashZoom, Shake, updateCamera, input)
+    "70_camcore.lua",
+    -- 7.1 v7: Replay / grabación de cámara (depende de director + cámara)
+    "55_replay.lua",
+    -- 7.2 v8: Perfiles completos (depende de 05_persistence)
+    "57_profiles.lua",
+    -- 7.3 v8: Combos de cámara — secuencias automáticas de modos
+    "58_combos.lua",
+    -- 7.4 v8: Macros — grabación/reproducción de acciones discretas
+    "65_macros.lua",
+    -- 7.5 v8: Audio Reactive — beat detection (FOV/shake/flash al ritmo)
+    "75_audioreactive.lua",
+    -- 8. Orquestador de la UI (solo arma la Window y delega)
+    "80_ui.lua",
+    -- 8.5 v8: Monitor de performance (opcional, debug)
+    "85_performance.lua",
+    -- 8.6 v8 FIX: Plugins ANTES de la UI — así sus tabs se construyen en
+    -- buildUI() via _dynamicTabBuilders (antes se cargaban después de 90_init
+    -- y sus pestañas nunca aparecían). Necesita registerTabBuilder (80_ui).
+    "85_plugins.lua",
+    -- 9. Sub-builders de cada pestana (registran UCam.build_xxx)
+    "ui/inicio.lua",
+    "ui/camaras.lua",
+    "ui/espectador.lua",
+    "ui/slowmo.lua",
+    "ui/timecontrol.lua",   -- v7: pestaña ⏱️ Tiempo (Time Ramp, Frame-by-Frame)
+    "ui/cinematic.lua",
+    "ui/filters.lua",
+    "ui/light.lua",
+    "ui/estudio.lua",
+    "ui/gimbal.lua",
+    "ui/fun.lua",
+    "ui/bodycolor.lua",    -- v7: pestaña 🎨 Cuerpo (colores por partes)
+    "ui/poses.lua",        -- v7: pestaña 🧍 Poses
+    "ui/playermod.lua",    -- v7: pestaña 👥 Mod Jugadores
+    "ui/replay.lua",       -- v7: pestaña 🎬 Replay (grabación de cámara)
+    "ui/profiles.lua",     -- v8: pestaña 📁 Perfiles
+    "ui/combos.lua",       -- v8: pestaña ⚡ Combos
+    "ui/macros.lua",       -- v8: pestaña 🎯 Macros
+    "ui/audioreactive.lua",-- v8: pestaña 🔊 Audio Reactive
+    "ui/filterspro.lua",   -- v8: pestaña ✨ Filtros Pro
+    "ui/config.lua",
+    "ui/info.lua",
+    -- 10. Init: llama a buildUI() y notifica "Listo"
+    "90_init.lua",
+}
 
 -- ============================================================
--- Carga una parte desde GitHub (o fallback) y la ejecuta.
--- Devuelve true si se cargo OK, false si fallo.
+-- v8: DESCARGA PARALELA
+-- Todas las partes se descargan a la vez (task.spawn) y se guardan
+-- en sources[name]. La ejecucion sigue siendo secuencial y en orden.
 -- ============================================================
-local function loadPart(name)
-    local sources = { BASE .. name, FALLBACK_BASE .. name }
+local sources = {}   -- [name] = source string (o nil si fallo)
+local pending = #ORDER
+local downloadDone = Instance.new("BindableEvent")
 
-    local src
-    for _, url in ipairs(sources) do
-        if cache[url] then
-            src = cache[url]
-            break
+local function fetchPart(name)
+    local urls = { BASE .. name, FALLBACK_BASE .. name }
+    for attempt = 1, MAX_RETRIES do
+        for _, url in ipairs(urls) do
+            local ok, body = pcall(function() return game:HttpGet(url) end)
+            if ok and type(body) == "string" and #body > 0 then
+                sources[name] = body
+                pending = pending - 1
+                if pending <= 0 then downloadDone:Fire() end
+                return
+            end
         end
-        local ok, body = pcall(function() return game:HttpGet(url) end)
-        if ok and type(body) == "string" and body ~= "" then
-            src = body
-            cache[url] = body
-            break
+        -- Backoff exponencial entre reintentos: 0.5s, 1s, 2s
+        if attempt < MAX_RETRIES then
+            task.wait(0.5 * (2 ^ (attempt - 1)))
         end
     end
+    warn(("[UCam] No se pudo descargar %s tras %d intentos."):format(name, MAX_RETRIES))
+    pending = pending - 1
+    if pending <= 0 then downloadDone:Fire() end
+end
 
+for _, part in ipairs(ORDER) do
+    task.spawn(fetchPart, part)
+end
+downloadDone.Event:Wait()
+downloadDone:Destroy()
+
+-- ============================================================
+-- EJECUCION EN ORDEN
+-- ============================================================
+local loaded     = 0
+local failed     = 0
+local failedList = {}
+
+local function execPart(name)
+    local src = sources[name]
     if not src then
-        warn(("[UCam] No se pudo descargar %s de ninguna URL."):format(name))
         return false
     end
 
@@ -73,70 +202,8 @@ local function loadPart(name)
     return true
 end
 
--- ============================================================
--- Orden estricto de carga.
--- Cada parte solo puede usar UCam.* de las anteriores.
--- ============================================================
-local ORDER = {
-    -- 0. Config + estado + servicios + Rayfield
-    "00_config.lua",
-    -- 1. Utilidades de camara, personaje, path visualizer, croma
-    "10_utils.lua",
-    -- 2. Filtros built-in/custom, bloom, DOF, sunrays, vignette, letterbox
-    "20_filters.lua",
-    -- 3. Modulo Fun (montar, noclip, escala, poses, trail, disco, etc.)
-    "30_fun.lua",
-    -- 3.1 v7: Coloreo de cuerpo por partes + presets + arcoíris
-    "32_bodycolor.lua",
-    -- 3.2 v7: Poses avanzadas (Motor6D) — base para playermod
-    "33_poses.lua",
-    -- 3.3 v7: Hub de modificación de otros jugadores (depende de 32/33)
-    "35_playermod.lua",
-    -- 4. Bullet Time universal
-    "40_slowmo.lua",
-    -- 4.1 v7: Control de Tiempo expandido (Time Ramp, Frame-by-Frame, FF)
-    "45_timecontrol.lua",
-    -- 5. Espectador (9 modos + navegacion Q/E)
-    "50_spectate.lua",
-    -- 6. Director (waypoints + reproduccion)
-    "60_director.lua",
-    -- 7. Nucleo de camara (toggleFreeCam, CrashZoom, Shake, updateCamera, input)
-    "70_camcore.lua",
-    -- 7.1 v7: Replay / grabación de cámara (depende de director + cámara)
-    "55_replay.lua",
-    -- 8. Orquestador de la UI (solo arma la Window y delega)
-    "80_ui.lua",
-    -- 9. Sub-builders de cada pestana (registran UCam.build_xxx)
-    "ui/inicio.lua",
-    "ui/camaras.lua",
-    "ui/espectador.lua",
-    "ui/slowmo.lua",
-    "ui/timecontrol.lua",   -- v7: pestaña ⏱️ Tiempo (Time Ramp, Frame-by-Frame)
-    "ui/cinematic.lua",
-    "ui/filters.lua",
-    "ui/light.lua",
-    "ui/estudio.lua",
-    "ui/gimbal.lua",
-    "ui/fun.lua",
-    "ui/bodycolor.lua",    -- v7: pestaña 🎨 Cuerpo (colores por partes)
-    "ui/poses.lua",        -- v7: pestaña 🧍 Poses
-    "ui/playermod.lua",    -- v7: pestaña 👥 Mod Jugadores
-    "ui/replay.lua",       -- v7: pestaña 🎬 Replay (grabación de cámara)
-    "ui/config.lua",
-    "ui/info.lua",
-    -- 10. Init: llama a buildUI() y notifica "Listo"
-    "90_init.lua",
-}
-
--- ============================================================
--- Carga. Si fallan 2 seguidas, aborta.
--- ============================================================
-local failed    = 0
-local loaded    = 0
-local failedList = {}
-
 for _, part in ipairs(ORDER) do
-    if loadPart(part) then
+    if execPart(part) then
         loaded = loaded + 1
         failed = 0
     else
@@ -149,8 +216,11 @@ for _, part in ipairs(ORDER) do
     end
 end
 
+-- Liberar memoria de las fuentes una vez ejecutadas
+table.clear(sources)
+
 if #failedList == 0 then
-    print(("[UCam] Universal Camera Pro v6 cargado OK (%d partes)."):format(loaded))
+    print(("[UCam] Universal Camera Pro v8 cargado OK (%d partes)."):format(loaded))
 else
     warn(("[UCam] Carga completada con %d errores. Fallaron: %s"):format(
         #failedList, table.concat(failedList, ", ")

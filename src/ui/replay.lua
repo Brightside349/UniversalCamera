@@ -9,6 +9,9 @@ local UCam = _G.UCam
 function UCam.build_replay(Window)
     local Tab = Window:CreateTab("🎬 Replay", "film")
 
+    -- v8: índice del marcador seleccionado para eliminar (closure, no _G)
+    local markerSelectedIdx = 1
+
     -- --------------------------------------------------------
     -- SECCIÓN: Grabación
     -- --------------------------------------------------------
@@ -67,7 +70,7 @@ function UCam.build_replay(Window)
     Tab:CreateButton({
         Name     = "▶  Play",
         Callback = function()
-            if UCam.Replay.Playing and not UCam.Replay._paused then
+            if UCam.Replay.Playing and not UCam.Replay.Paused then
                 UCam.notify("Replay", "Ya está reproduciendo.")
                 return
             end
@@ -317,6 +320,207 @@ function UCam.build_replay(Window)
         Callback = function()
             UCam.stopReplay()
             UCam.notify("Replay", "Todo detenido y grabación limpiada.")
+        end,
+    })
+
+    -- --------------------------------------------------------
+    -- v8: MARCADORES con eventos
+    -- --------------------------------------------------------
+    Tab:CreateSection("Marcadores con eventos")
+    Tab:CreateParagraph({
+        Title   = "¿Qué son?",
+        Content = "Un marcador dispara un evento cuando la reproducción lo cruza: shake de cámara, slow-mo, pulso de FOV, o un cambio drástico de velocidad. Útil para impactos y beats.",
+    })
+
+    local markerTime  = 0
+    local markerLabel = "Hit"
+    local markerAction = "shake"
+    local markerValue = "Impacto"
+
+    Tab:CreateSlider({
+        Name         = "Tiempo del marcador (segundos)",
+        Range        = { 0, 120 },
+        Increment    = 0.1,
+        Suffix       = "s",
+        CurrentValue = 0,
+        Callback     = function(v) markerTime = tonumber(v) or 0 end,
+    })
+
+    Tab:CreateInput({
+        Name        = "Label (texto)",
+        PlaceholderText = "Ej: Impacto, Beat 1, Grito…",
+        RemoveTextAfterFocusLost = false,
+        Callback    = function(v) markerLabel = tostring(v or "Marker") end,
+    })
+
+    Tab:CreateDropdown({
+        Name            = "Acción al cruzar",
+        Options         = { "shake", "slow", "fov", "speed", "none" },
+        CurrentOption   = { "shake" },
+        MultipleOptions = false,
+        Callback        = function(o)
+            local v = UCam.resolveDropdownValue(o)
+            if v then markerAction = v end
+        end,
+    })
+
+    Tab:CreateInput({
+        Name        = "Valor de la acción",
+        PlaceholderText = "shake=nombre | slow=0.3 | fov=+10 | speed=2.0",
+        RemoveTextAfterFocusLost = false,
+        Callback    = function(v) markerValue = tostring(v or "") end,
+    })
+
+    Tab:CreateButton({
+        Name     = "➕  Agregar marcador",
+        Callback = function()
+            local val
+            if markerAction == "shake" then
+                val = (markerValue ~= "") and markerValue or "Impacto"
+            else
+                val = tonumber(markerValue) or nil
+            end
+            UCam.addMarker(markerTime, markerLabel, markerAction, val)
+        end,
+    })
+
+    Tab:CreateSlider({
+        Name         = "Borrar marcador (índice 1-N)",
+        Range        = { 1, 20 },
+        Increment    = 1,
+        CurrentValue = 1,
+        Callback     = function(v) markerSelectedIdx = math.floor(v) end,
+    })
+
+    Tab:CreateButton({
+        Name     = "🗑️  Borrar marcador seleccionado",
+        Callback = function()
+            UCam.removeMarker(markerSelectedIdx)
+        end,
+    })
+
+    Tab:CreateButton({
+        Name     = "🧹  Limpiar todos los marcadores",
+        Callback = function()
+            UCam.clearMarkers()
+        end,
+    })
+
+    Tab:CreateToggle({
+        Name         = "Notificar al cruzar marcadores",
+        CurrentValue = UCam.Replay.ShowMarkerHUD,
+        Callback     = function(v)
+            UCam.Replay.ShowMarkerHUD = v
+            UCam.notify("Replay", v and "Notificaciones de marcadores ON." or "Notificaciones de marcadores OFF.")
+        end,
+    })
+
+    Tab:CreateButton({
+        Name     = "📋  Listar marcadores",
+        Callback = function()
+            local ms = UCam.Replay.Markers
+            if #ms == 0 then
+                UCam.notify("Replay", "No hay marcadores.")
+                return
+            end
+            local parts = {}
+            for i, m in ipairs(ms) do
+                parts[#parts+1] = string.format("%d) %s @ %s → %s",
+                    i, m.label, UCam.Replay.getFormattedTime(m.t), m.action)
+            end
+            UCam.notify("Replay — Marcadores", table.concat(parts, "\n"), 8)
+        end,
+    })
+
+    -- --------------------------------------------------------
+    -- v8: SPEED RAMPS (velocidad variable dentro del playback)
+    -- --------------------------------------------------------
+    Tab:CreateSection("Speed ramps (veloc. variable)")
+    Tab:CreateParagraph({
+        Title   = "¿Qué son?",
+        Content = "Define velocidades distintas en distintos momentos del replay. El playback interpola suavemente entre ellos: ej. lento durante el impacto, rápido en el travel.",
+    })
+
+    local rampTime  = 0
+    local rampSpeed = 1.0
+
+    Tab:CreateSlider({
+        Name         = "Tiempo del punto de rampa (s)",
+        Range        = { 0, 120 },
+        Increment    = 0.1,
+        Suffix       = "s",
+        CurrentValue = 0,
+        Callback     = function(v) rampTime = tonumber(v) or 0 end,
+    })
+
+    Tab:CreateSlider({
+        Name         = "Velocidad en ese punto",
+        Range        = { 0.1, 4 },
+        Increment    = 0.05,
+        Suffix       = "x",
+        CurrentValue = 1.0,
+        Callback     = function(v) rampSpeed = tonumber(v) or 1.0 end,
+    })
+
+    Tab:CreateButton({
+        Name     = "➕  Agregar punto de rampa",
+        Callback = function()
+            UCam.addSpeedRamp(rampTime, rampSpeed)
+        end,
+    })
+
+    Tab:CreateButton({
+        Name     = "🧹  Limpiar todos los ramps",
+        Callback = function()
+            UCam.clearSpeedRamps()
+        end,
+    })
+
+    Tab:CreateToggle({
+        Name         = "Speed ramps activos",
+        CurrentValue = UCam.Replay.SpeedRampEnabled,
+        Callback     = function(v)
+            UCam.Replay.SpeedRampEnabled = v
+            UCam.notify("Replay", v and "Ramps activados." or "Ramps desactivados (usa velocidad global).")
+        end,
+    })
+
+    Tab:CreateButton({
+        Name     = "📋  Listar ramps",
+        Callback = function()
+            local rs = UCam.Replay.SpeedRamps
+            if #rs == 0 then
+                UCam.notify("Replay", "No hay ramps definidos.")
+                return
+            end
+            local parts = {}
+            for i, r in ipairs(rs) do
+                parts[#parts+1] = string.format("%d) %s → %.2fx",
+                    i, UCam.Replay.getFormattedTime(r.t), r.speed)
+            end
+            UCam.notify("Replay — Speed ramps", table.concat(parts, "\n"), 8)
+        end,
+    })
+
+    -- --------------------------------------------------------
+    -- v8: COMPARTIR RUTA (web / externo)
+    -- --------------------------------------------------------
+    Tab:CreateSection("Compartir ruta (web)")
+    Tab:CreateParagraph({
+        Title   = "Subir a internet",
+        Content = "Serializa la ruta y la sube automáticamente a hastebin.rs (o pastebin si falla). Copia la URL resultante para compartirla.",
+    })
+
+    Tab:CreateButton({
+        Name     = "🌐  Subir ruta y compartir URL",
+        Callback = function()
+            local url = UCam.shareRoute()
+            if url then
+                local ok = pcall(function() setclipboard(url) end)
+                if ok then
+                    UCam.notify("Replay", "URL copiada al portapapeles:\n" .. url)
+                end
+            end
         end,
     })
 end

@@ -76,6 +76,7 @@ function UCam.build_espectador(Window)
     SpectateTab:CreateToggle({
         Name         = "Activar auto-ciclo",
         CurrentValue = UCam.AutoCycle.Enabled,
+        Flag         = "SpectateAutoCycle",
         Callback     = function(v) UCam.AutoCycle.Enabled = v end,
     })
 

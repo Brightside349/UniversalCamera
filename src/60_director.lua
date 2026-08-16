@@ -272,6 +272,17 @@ function UCam.directorTogglePlay(state)
             string.format("Reproduciendo ruta (curva: %s)...", UCam.Waypoint.CurveMode))
     else
         UCam.Director.Active = false
+        -- v8.1 FIX: pausar dejaba la cámara Scriptable congelada sin recuperación.
+        -- Restaurar al modo normal si no hay freecam activo.
+        if UCam.freeCamEnabled then
+            UCam.camera.CameraType = Enum.CameraType.Scriptable
+        else
+            UCam.camera.CameraType = Enum.CameraType.Custom
+            if UCam.humanoid then
+                UCam.camera.CameraSubject = UCam.humanoid
+            end
+            UCam.camera.FieldOfView = UCam.Saved.FOV or UCam.DEFAULT_FOV
+        end
         UCam.notify("Director", "Reproduccion detenida.")
     end
 end

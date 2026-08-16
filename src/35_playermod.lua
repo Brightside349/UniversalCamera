@@ -406,10 +406,10 @@ end
 -- INIT / STOP
 -- ============================================================
 function UCam.initPlayerMod()
-    if UCam.PlayerMod._connHeartbeat then return end
-    UCam.PlayerMod._connHeartbeat = UCam.RunService.Heartbeat:Connect(function(dt)
-        UCam.updatePlayerMods(dt)
-    end)
+    -- v9 FIX (fuga de memoria): se eliminó el Heartbeat permanente que llamaba
+    -- a updatePlayerMods() (función vacía). Las modificaciones son one-shot
+    -- y no requieren un loop por frame; mantenerlo era un gasto de CPU
+    -- constante sin ningún efecto.
 end
 
 function UCam.stopPlayerMod()

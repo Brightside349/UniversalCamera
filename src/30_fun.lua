@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v6 · 30_fun
+-- Universal Camera Pro v8 · 30_fun
 -- Modulo de Diversion (Fun) completo: montar, noclip, gravedad,
 -- escala, poses, rainbow, neon, trail, disco, material, invisibilidad.
 -- Se aplica localmente (no se envia al server).
@@ -207,9 +207,9 @@ end
 -- v7: Optimizado con cache
 local function funUpdateNoclip()
     if not UCam.Fun.Noclip.Enabled then return end
-    UCam.refreshCharacterRefs()
+    -- v8: refs cacheadas por eventos en 10_utils (no llamar refresh aquí)
     if not UCam.character then return end
-    
+
     -- v7: Usar cache en vez de GetDescendants()
     for _, part in ipairs(UCam.Fun._cachedBaseParts) do
         pcall(function() part.CanCollide = false end)
@@ -218,7 +218,7 @@ end
 
 local function funUpdateMount(dt)
     if not UCam.Fun.Mount.Enabled or not UCam.Fun.Mount.Target then return end
-    UCam.refreshCharacterRefs()
+    -- v8: refs cacheadas por eventos; no refrescar cada frame
     if not UCam.rootPart or not UCam.humanoid then return end
     local targetChar = UCam.Fun.Mount.Target.Character
     if not targetChar then return end
@@ -257,7 +257,7 @@ end
 
 local function funUpdateGravity(dt)
     if not UCam.Fun.Gravity.Enabled or UCam.Fun.Gravity.Mode == "Normal" then return end
-    UCam.refreshCharacterRefs()
+    -- v8: refs cacheadas por eventos en 10_utils (no refresh aquí)
     if not UCam.rootPart then return end
     local mode = UCam.Fun.Gravity.Mode
     pcall(function()
@@ -609,6 +609,9 @@ end
 
 -- ============================================================
 -- UPDATE MAESTRO + START/STOP
+-- v8: mantenemos el chequeo por if (compatibilidad) — cada función
+-- ya tiene fast-return. Ahora los refreshCharacterRefs() redundantes
+-- se eliminan donde las refs se actualizan en eventos.
 -- ============================================================
 function UCam.funUpdate(dt)
     funUpdateNoclip()
@@ -954,7 +957,8 @@ local function funUpdateFly()
     if UCam.isKeybindDown("Up") then
         moveVector = moveVector + Vector3.new(0, 1, 0)
     end
-    if UCam.isKeybindDown("Sprint") then
+    -- v8.1 FIX: antes usaba Sprint (LeftShift) para bajar; ahora Down (Ctrl)
+    if UCam.isKeybindDown("Down") then
         moveVector = moveVector - Vector3.new(0, 1, 0)
     end
 
@@ -1046,6 +1050,27 @@ function UCam.FunV7.updateTrail(dt)
                 else
                     entry.part.Color = UCam.Fun.Trail.Color
                 end
+            end
+        end
+    else
+        -- v9 FIX (fuga de memoria): el modo painting dejaba acumular partes en
+        -- workspace sin destruirlas nunca. Ahora se mantiene un tope (300) y se
+        -- destruyen las más antiguas cuando se supera, además de limpiar las
+        -- huérfanas (destruidas por otra vía).
+        local MAX_PAINT_PARTS = 300
+        local i = #UCam.Fun.Trail._parts
+        while i >= 1 do
+            local entry = UCam.Fun.Trail._parts[i]
+            if not (entry.part and entry.part.Parent) then
+                pcall(function() entry.part:Destroy() end)
+                table.remove(UCam.Fun.Trail._parts, i)
+            end
+            i = i - 1
+        end
+        while #UCam.Fun.Trail._parts > MAX_PAINT_PARTS do
+            local entry = table.remove(UCam.Fun.Trail._parts, 1)
+            if entry and entry.part then
+                pcall(function() entry.part:Destroy() end)
             end
         end
     end

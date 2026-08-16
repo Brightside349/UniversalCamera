@@ -36,6 +36,7 @@ function UCam.build_cinematic(Window)
     CinematicTab:CreateToggle({
         Name = "Activar Vignette",
         CurrentValue = UCam.Vignette.Enabled,
+        Flag = "CamVignette",
         Callback = function(v)
             UCam.Vignette.Enabled = v
             UCam.applyVignette()
@@ -68,6 +69,7 @@ function UCam.build_cinematic(Window)
     CinematicTab:CreateToggle({
         Name = "Activar Camera Shake",
         CurrentValue = UCam.Shake.Enabled,
+        Flag = "CamShake",
         Callback = function(v)
             UCam.Shake.Enabled = v
             if v then UCam.notify("Camera Shake", "Activado. Patron: " .. UCam.Shake.Pattern) end
@@ -111,6 +113,7 @@ function UCam.build_cinematic(Window)
     CinematicTab:CreateToggle({
         Name = "Activar FOV Pulse",
         CurrentValue = UCam.FovPulse.Enabled,
+        Flag = "CamFovPulse",
         Callback = function(v) UCam.FovPulse.Enabled = v end,
     })
     CinematicTab:CreateSlider({
@@ -375,6 +378,7 @@ function UCam.build_cinematic(Window)
     CinematicTab:CreateToggle({
         Name = "Auto-Focus DOF (Sujeto)",
         CurrentValue = UCam.AutoFocusDOF.Enabled,
+        Flag = "CamAutoFocusDOF",
         Callback = function(v)
             UCam.AutoFocusDOF.Enabled = v
         end,

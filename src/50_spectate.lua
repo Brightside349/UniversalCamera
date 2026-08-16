@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v6 · 50_spectate
+-- Universal Camera Pro v8 · 50_spectate
 -- Modo espectador: 9 estilos de camara sobre el objetivo, auto-ciclo
 -- y navegacion rapida Q/E.
 --
@@ -653,13 +653,19 @@ end
 local _pipWheelConn = nil
 function UCam.enableSpectateZoomScroll()
     if _pipWheelConn then return end
-    _pipWheelConn = UCam.UserInputService.InputChanged:Connect(function(input)
-        if not UCam.Spectate.Active or not UCam.Spectate.ZoomScroll then return end
-        if input.UserInputType == Enum.UserInputType.MouseWheel then
-            local delta = input.Position.Z > 0 and -1 or 1
-            UCam.Spectate.Distance = UCam.clamp(UCam.Spectate.Distance + delta * 1.5, 1.5, 60)
-        end
-    end)
+    -- v9 FIX (fuga de memoria): la rueda del mouse quedaba conectada para
+    -- siempre sin pasar por trackConnection. Ahora cleanupConnections() la
+    -- desconecta en cada Unload/recarga.
+    _pipWheelConn = UCam.trackConnection(
+        UCam.UserInputService.InputChanged:Connect(function(input)
+            if not UCam.Spectate.Active or not UCam.Spectate.ZoomScroll then return end
+            if input.UserInputType == Enum.UserInputType.MouseWheel then
+                local delta = input.Position.Z > 0 and -1 or 1
+                UCam.Spectate.Distance = UCam.clamp(UCam.Spectate.Distance + delta * 1.5, 1.5, 60)
+            end
+        end),
+        "spectate.pipWheel"
+    )
 end
 
 UCam.enableSpectateZoomScroll()

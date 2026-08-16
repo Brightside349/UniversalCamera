@@ -1,34 +1,36 @@
 -- ============================================================
--- Universal Camera Pro v6 · ui/inicio
+-- Universal Camera Pro v8 · ui/inicio
 -- Pestaña Inicio: camara libre, ocultar HUD/personaje, auto-HUD,
 -- captura de pantalla, teletransporte y "Restablecer todos los valores".
+-- v8: migrado a i18n (UCam.T).
 -- ============================================================
 local UCam = _G.UCam
 
 function UCam.build_inicio(Window)
-    local InicioTab = Window:CreateTab("🎬 Inicio", "home")
-    InicioTab:CreateSection("Camara Libre")
+    local T = UCam.T
+    local InicioTab = Window:CreateTab(T("tab_inicio"), "home")
+    InicioTab:CreateSection(T("inicio_section1"))
 
     InicioTab:CreateButton({
-        Name     = "Activar / Desactivar Camara",
+        Name     = T("inicio_toggle_cam"),
         Callback = UCam.toggleFreeCam,
     })
 
     InicioTab:CreateToggle({
-        Name         = "Ocultar HUD",
+        Name         = T("inicio_hide_hud"),
         CurrentValue = false,
         Callback     = UCam.setHudHidden,
     })
 
     InicioTab:CreateToggle({
-        Name         = "Ocultar Mi Personaje",
+        Name         = T("inicio_hide_char"),
         CurrentValue = false,
         Callback     = UCam.setCharacterHidden,
     })
 
     -- v6: auto-ocultar el HUD al activar la camara libre
     InicioTab:CreateToggle({
-        Name         = "Auto-ocultar HUD con camara libre (NUEVO v6)",
+        Name         = T("inicio_auto_hud"),
         CurrentValue = UCam.AutoHUD.Enabled,
         Callback     = function(v)
             UCam.AutoHUD.Enabled = v
@@ -37,10 +39,10 @@ function UCam.build_inicio(Window)
         end,
     })
 
-    InicioTab:CreateSection("Acciones rapidas")
+    InicioTab:CreateSection(T("inicio_quick"))
 
     InicioTab:CreateButton({
-        Name     = "Captura de pantalla (ocultar UI 3s)",
+        Name     = T("inicio_screenshot"),
         Callback = function()
             if not UCam.freeCamEnabled and not UCam.Spectate.Active then
                 UCam.notify("Info", "Activa la camara primero.")
@@ -67,7 +69,7 @@ function UCam.build_inicio(Window)
     })
 
     InicioTab:CreateButton({
-        Name     = "Teletransportar camara al personaje",
+        Name     = T("inicio_tp_cam"),
         Callback = function()
             if not UCam.freeCamEnabled then
                 UCam.notify("Info", "Activa la camara libre primero.")
@@ -83,9 +85,9 @@ function UCam.build_inicio(Window)
         end,
     })
 
-    -- v6: "Restablecer todos los valores" movido aqui desde Ajustes
+    -- v8: "Restablecer todos los valores"
     InicioTab:CreateButton({
-        Name     = "Restablecer todos los valores",
+        Name     = T("inicio_reset_all"),
         Callback = function()
             UCam.currentSpeed                                      = UCam.DEFAULTS.currentSpeed
             UCam.MOVEMENT_SMOOTHING                                = UCam.DEFAULTS.movementSmoothing
@@ -145,6 +147,21 @@ function UCam.build_inicio(Window)
             UCam.AutoFocusDOF.Enabled                              = false
             UCam.AutoCycle.Enabled                                 = false
             UCam.destroyVignetteGui()
+
+            -- v9 FIX (bug UI): sincronizar los toggles visuales de Rayfield con el
+            -- estado reseteado. Antes la UI seguía mostrando los toggles en ON aunque
+            -- el estado interno quedaba OFF (Vignette, Shake, FOV Pulse, etc.).
+            local function syncToggle(flag, value)
+                pcall(function()
+                    local el = UCam.Rayfield.Flags and UCam.Rayfield.Flags[flag]
+                    if el and el.Set then el:Set(value) end
+                end)
+            end
+            syncToggle("CamVignette", false)
+            syncToggle("CamShake", false)
+            syncToggle("CamFovPulse", false)
+            syncToggle("CamAutoFocusDOF", false)
+            syncToggle("SpectateAutoCycle", false)
 
             UCam.applyFilter(UCam.currentFilterIndex)
             UCam.applyBloom()

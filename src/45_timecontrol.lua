@@ -191,19 +191,68 @@ end
 
 -- ============================================================
 -- AUDIO SLOW-MO
+-- v8: cache de Sounds mantenido por listeners — NO hace
+-- GetDescendants() cada vez. Se construye una vez al cargar el
+-- módulo y se mantiene al día con DescendantAdded/Removing.
+-- En mapas con 10k+ instancias esto elimina el costo por tick.
 -- ============================================================
-function UCam.applyAudioSlowMo(speedScale)
-    UCam.TimeControl._originalSounds = {}
 
-    -- Buscar sonidos en el workspace cercanos al personaje
+-- Lista viva de todos los Sounds del workspace (sound instance -> true)
+local _soundRegistry = {}
+local _soundListeners = {}
+
+local function addSound(inst)
+    if inst:IsA("Sound") then _soundRegistry[inst] = true end
+end
+local function removeSound(inst)
+    _soundRegistry[inst] = nil
+end
+
+-- Inicialización perezosa del registro (llamado la primera vez que se necesita)
+local _registryBuilt = false
+local function buildSoundRegistry()
+    if _registryBuilt then return end
+    _registryBuilt = true
+
+    -- Población inicial (una sola vez)
+    pcall(function()
+        for _, d in ipairs(workspace:GetDescendants()) do
+            addSound(d)
+        end
+    end)
+
+    -- Listeners persistentes para mantener el registro vivo
+    table.insert(_soundListeners, UCam.trackConnection(
+        workspace.DescendantAdded:Connect(function(inst)
+            pcall(addSound, inst)
+        end),
+        "SoundRegistry:Added"
+    ))
+    table.insert(_soundListeners, UCam.trackConnection(
+        workspace.DescendantRemoving:Connect(function(inst)
+            removeSound(inst)
+            -- Limpiar el estado guardado si el sonido muere
+            if UCam.TimeControl._originalSounds then
+                UCam.TimeControl._originalSounds[inst] = nil
+            end
+        end),
+        "SoundRegistry:Removed"
+    ))
+end
+
+function UCam.applyAudioSlowMo(speedScale)
+    buildSoundRegistry()
+    UCam.TimeControl._originalSounds = UCam.TimeControl._originalSounds or {}
+
+    -- Punto de referencia para el filtro de proximidad
     UCam.refreshCharacterRefs()
     local searchRoot = UCam.rootPart
         and UCam.rootPart.Position
         or (workspace.CurrentCamera and workspace.CurrentCamera.CFrame.Position)
         or Vector3.zero
 
-    for _, sound in ipairs(workspace:GetDescendants()) do
-        if sound:IsA("Sound") and sound.Playing then
+    for sound in pairs(_soundRegistry) do
+        if sound and sound.Parent and sound.Playing then
             local ok, pos = pcall(function()
                 local p = sound.Parent
                 if p and p:IsA("BasePart") then return p.Position end
@@ -212,19 +261,29 @@ function UCam.applyAudioSlowMo(speedScale)
             if ok and pos then
                 local dist = (pos - searchRoot).Magnitude
                 if dist <= 150 then
-                    UCam.TimeControl._originalSounds[sound] = sound.PlaybackSpeed
-                    pcall(function() sound.PlaybackSpeed = sound.PlaybackSpeed * speedScale end)
+                    if UCam.TimeControl._originalSounds[sound] == nil then
+                        UCam.TimeControl._originalSounds[sound] = sound.PlaybackSpeed
+                    end
+                    pcall(function() sound.PlaybackSpeed = UCam.TimeControl._originalSounds[sound] * speedScale end)
                 end
             elseif not pos then
                 -- Sonido sin posición (música ambiental)
-                UCam.TimeControl._originalSounds[sound] = sound.PlaybackSpeed
-                pcall(function() sound.PlaybackSpeed = sound.PlaybackSpeed * speedScale end)
+                if UCam.TimeControl._originalSounds[sound] == nil then
+                    UCam.TimeControl._originalSounds[sound] = sound.PlaybackSpeed
+                end
+                pcall(function() sound.PlaybackSpeed = UCam.TimeControl._originalSounds[sound] * speedScale end)
             end
         end
     end
 end
 
 function UCam.restoreAudioSlowMo()
+    -- v8.1 FIX (crítico #5): _originalSounds puede ser nil si se
+    -- desactiva el control de tiempo sin haber aplicado audio slow-mo.
+    if not UCam.TimeControl._originalSounds then
+        UCam.TimeControl._originalSounds = {}
+        return
+    end
     for sound, originalSpeed in pairs(UCam.TimeControl._originalSounds) do
         if sound and sound.Parent then
             pcall(function() sound.PlaybackSpeed = originalSpeed end)
@@ -324,6 +383,12 @@ function UCam.updateTimeControl(dt)
             scale = math.clamp(scale, 0.1, 1.0)
             UCam.applyAudioSlowMo(scale)
         end
+    end
+    -- v8.1 FIX: si AudioSlowMo estaba activo pero Bullet Time se apagó por
+    -- cualquier vía (macros, otra opción, etc.), restaurar los sonidos para
+    -- que no queden clavados a 0.1x para siempre.
+    if UCam.TimeControl.AudioSlowMo and not UCam.SlowMo.BulletTime then
+        UCam.restoreAudioSlowMo()
     end
 end
 

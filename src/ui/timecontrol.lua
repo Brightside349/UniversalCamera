@@ -69,7 +69,7 @@ function UCam.build_timecontrol(Window)
     })
 
     Tab:CreateButton({
-        Name     = "⏭  Avanzar un frame (tecla N)",
+        Name     = "⏭  Avanzar un frame",
         Callback = function()
             if not UCam.TimeControl.FrameByFrame then
                 UCam.notify("Frame-by-Frame", "Activa el modo Frame-by-Frame primero.")
@@ -80,8 +80,8 @@ function UCam.build_timecontrol(Window)
     })
 
     Tab:CreateParagraph({
-        Title   = "Tip de teclado",
-        Content = "Con Frame-by-Frame activo: N = avanzar un frame. Funciona solo si lo mapeas manualmente desde Configuración → Keybinds (próximamente).",
+        Title   = "Tip",
+        Content = "Con Frame-by-Frame activo, usa el botón de arriba para avanzar un cuadro a la vez.",
     })
 
     -- --------------------------------------------------------

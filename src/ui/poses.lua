@@ -192,7 +192,10 @@ function UCam.build_poses(Window)
     Tab:CreateButton({
         Name = "💾 Guardar Pose Actual",
         Callback = function()
-            local name = customPoseName.CurrentValue
+            -- v9 FIX (bug UI): leer el valor vía UCam.Rayfield.Flags. El objeto
+            -- del Input no expone .CurrentValue → antes siempre "Escribe un nombre".
+            local flag = UCam.Rayfield.Flags and UCam.Rayfield.Flags["CustomPoseName"]
+            local name = flag and (flag.CurrentValue or flag.Value) or ""
             if not name or name == "" then
                 UCam.notify("Poses", "Escribe un nombre para la pose", 3)
                 return

@@ -1,6 +1,8 @@
 -- ============================================================
--- Universal Camera Pro v6 · 10_utils
+-- Universal Camera Pro v8 · 10_utils
 -- Utilidades de camara, personaje y visualizador de path.
+-- v8: registry central de conexiones/instancias para cleanup
+-- seguro al recargar el script.
 --
 -- Dependencias: 00_config
 -- Expone (UCam.*):
@@ -12,12 +14,85 @@
 --   applyCameraRotation, getKeyboardDirection, moveCamera,
 --   clearPathVisualizer, drawPathVisualizer,
 --   destroyGreenScreen, getActiveSpawnPositions,
---   pickClearDirection, updateGreenScreen, applyLightingTweaks
+--   pickClearDirection, updateGreenScreen, applyLightingTweaks,
+--   trackConnection, untrackConnection, cleanupConnections,   <- v8
+--   trackInstance, untrackInstance, cleanupInstances          <- v8
 -- ============================================================
 local UCam = _G.UCam
 
 -- ============================================================
+-- v8: REGISTRY CENTRAL DE CONEXIONES E INSTANCIAS
+-- Problema v7: BindToRenderStep, InputBegan, Heartbeat, etc. se
+-- conectaban sin guardarse en variables; al recargar el script
+-- se duplicaban los handlers causando fugas y comportamiento
+-- inconsistente. Ahora TODO se registra en UCam._connections o
+-- UCam._instances, y UCam.Unload() los limpia completamente.
+-- ============================================================
+UCam._connections = UCam._connections or {}
+UCam._instances   = UCam._instances   or {}
+
+--- Registra una conexion RBXScriptConnection para desconectarla luego.
+-- @param conn RBXScriptConnection
+-- @param tag string opcional para debugging
+function UCam.trackConnection(conn, tag)
+    if not conn then return end
+    table.insert(UCam._connections, { conn = conn, tag = tag or "unknown" })
+    return conn
+end
+
+--- Desconecta y remueve una conexion especifica del registry.
+function UCam.untrackConnection(conn)
+    for i = #UCam._connections, 1, -1 do
+        local entry = UCam._connections[i]
+        if entry.conn == conn then
+            pcall(function() entry.conn:Disconnect() end)
+            table.remove(UCam._connections, i)
+            return true
+        end
+    end
+    return false
+end
+
+--- Desconecta TODAS las conexiones registradas. Llamado desde Unload().
+function UCam.cleanupConnections()
+    -- Iterar en reversa para evitar problemas al remover
+    for i = #UCam._connections, 1, -1 do
+        local entry = UCam._connections[i]
+        pcall(function() entry.conn:Disconnect() end)
+    end
+    table.clear(UCam._connections)
+end
+
+--- Registra una instancia (part, gui, etc.) para destruirla luego.
+function UCam.trackInstance(obj, tag)
+    if not obj then return end
+    table.insert(UCam._instances, { obj = obj, tag = tag or "unknown" })
+    return obj
+end
+
+--- Remueve una instancia del registry SIN destruirla (ya destruida o se quiere preservar).
+function UCam.untrackInstance(obj)
+    for i = #UCam._instances, 1, -1 do
+        if UCam._instances[i].obj == obj then
+            table.remove(UCam._instances, i)
+            return true
+        end
+    end
+    return false
+end
+
+--- Destruye TODAS las instancias registradas. Llamado desde Unload().
+function UCam.cleanupInstances()
+    for i = #UCam._instances, 1, -1 do
+        pcall(function() UCam._instances[i].obj:Destroy() end)
+    end
+    table.clear(UCam._instances)
+end
+
+-- ============================================================
 -- REFRESCAR REFERENCIAS AL PERSONAJE
+-- v8: Esta función YA NO debe llamarse cada frame. Se llama
+-- una vez aquí y desde CharacterAdded / CharacterRemoving.
 -- ============================================================
 function UCam.refreshCharacterRefs()
     UCam.character = UCam.player.Character
@@ -30,6 +105,20 @@ function UCam.refreshCharacterRefs()
     end
 end
 UCam.refreshCharacterRefs()
+
+-- Registrar el listener central que mantiene refs actualizadas.
+-- 70_camcore ya no necesita llamar refreshCharacterRefs() en cada modo.
+UCam.trackConnection(UCam.player.CharacterAdded:Connect(function(char)
+    UCam.character = char
+    UCam.humanoid  = char:WaitForChild("Humanoid", 5)
+    UCam.rootPart  = char:WaitForChild("HumanoidRootPart", 5)
+end), "CharacterAdded")
+
+UCam.trackConnection(UCam.player.CharacterRemoving:Connect(function()
+    UCam.character = nil
+    UCam.humanoid  = nil
+    UCam.rootPart  = nil
+end), "CharacterRemoving")
 
 -- ============================================================
 -- CONTROLES DEL PERSONAJE
@@ -169,7 +258,49 @@ function UCam.getEasingFn(name)
         return function(t) return t end
     elseif name == "Sin" then
         return function(t) return 0.5 - 0.5 * math.cos(t * math.pi) end
+    elseif name == "Expo" then
+        -- easeInOutExpo: arranque y frenada muy lentos, centro veloz
+        return function(t)
+            t = UCam.clamp(t, 0, 1)
+            if t <= 0.5 then return 0.5 * 2 ^ (10 * (t - 1)) end
+            return 0.5 * (2 - 2 ^ (-10 * (t - 0.5)))
+        end
+    elseif name == "Bounce" then
+        -- easeOutBounce: rebote físico al final
+        return function(t)
+            t = UCam.clamp(t, 0, 1)
+            local n1, d1 = 7.5625, 2.75
+            if t < 1 / d1 then
+                return n1 * t * t
+            elseif t < 2 / d1 then
+                t = t - 1.5 / d1
+                return n1 * t * t + 0.75
+            elseif t < 2.5 / d1 then
+                t = t - 2.25 / d1
+                return n1 * t * t + 0.9375
+            else
+                t = t - 2.625 / d1
+                return n1 * t * t + 0.984375
+            end
+        end
+    elseif name == "Elastic" then
+        -- easeOutElastic: oscilación elástica con overshoot
+        return function(t)
+            t = UCam.clamp(t, 0, 1)
+            if t == 0 or t == 1 then return t end
+            local c4 = (2 * math.pi) / 3
+            return 2 ^ (-10 * t) * math.sin((t * 10 - 0.75) * c4) + 1
+        end
+    elseif name == "Back" then
+        -- easeOutBack: overshoot con retroceso suave
+        return function(t)
+            t = UCam.clamp(t, 0, 1)
+            local c1, c3 = 1.70158, 2.70158
+            local u = t - 1
+            return 1 + c3 * u ^ 3 + c1 * u ^ 2
+        end
     else
+        -- Smooth (smoothstep por defecto, retrocompatibilidad)
         return function(t) return t * t * (3 - 2 * t) end
     end
 end
@@ -456,6 +587,11 @@ function UCam.applyLightingTweaks()
             UCam.Lighting.Brightness           = UCam.OriginalLighting.Brightness
             -- v7: restaurar sombras y skybox
             UCam.Lighting.GlobalShadows        = UCam.OriginalLighting.GlobalShadows
+            pcall(function()
+                if UCam.OriginalLighting.ShadowSoftness ~= nil then
+                    UCam.Lighting.ShadowSoftness = UCam.OriginalLighting.ShadowSoftness
+                end
+            end)
             UCam.destroyCustomSky()
         end)
         return
@@ -470,10 +606,17 @@ function UCam.applyLightingTweaks()
         UCam.Lighting.OutdoorAmbient       = UCam.LightingTweaks.OutdoorAmbient
         UCam.Lighting.Ambient              = UCam.LightingTweaks.Ambient
         UCam.Lighting.Brightness           = UCam.LightingTweaks.Brightness
-        -- v7: sombras (intensidad 0..1 mapeada a 0..1, toggle)
+        -- v7/v8 FIX: GlobalShadows es BOOLEAN (asignar un número como
+        -- ShadowIntensity triggeraba warnings y sanity-checks anti-cheat).
+        -- El slider de intensidad se mapea a ShadowSoftness (0..1).
         if UCam.LightingTweaks.ShadowsEnabled ~= nil then
-            UCam.Lighting.GlobalShadows = UCam.LightingTweaks.ShadowsEnabled and UCam.LightingTweaks.ShadowIntensity
-                or UCam.OriginalLighting.GlobalShadows
+            UCam.Lighting.GlobalShadows = UCam.LightingTweaks.ShadowsEnabled
+            pcall(function()
+                if UCam.LightingTweaks.ShadowsEnabled
+                    and UCam.LightingTweaks.ShadowIntensity ~= nil then
+                    UCam.Lighting.ShadowSoftness = UCam.clamp(UCam.LightingTweaks.ShadowIntensity, 0, 1)
+                end
+            end)
         end
         -- v7: skybox override
         UCam.applyCustomSky()

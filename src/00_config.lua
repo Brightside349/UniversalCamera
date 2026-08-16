@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v6 · 00_config
+-- Universal Camera Pro v8 · 00_config
 -- Servicios, Rayfield, notify y TODAS las tablas de estado.
 -- Esta parte NO define logica; solo crea el namespace UCam y
 -- expone lo que el resto de archivos necesita.
@@ -331,7 +331,8 @@ UCam.Waypoint = {
     Duration    = 6,
     Loop        = false,
     Easing      = "Smooth",
-    Easings     = { "Linear", "Smooth", "Sin" },
+    -- v8 FIX: easing ampliado — Expo, Bounce, Elastic, Back (getEasingFn)
+    Easings     = { "Linear", "Smooth", "Sin", "Expo", "Bounce", "Elastic", "Back" },
     UseFOV      = false,
     FOV         = 70,         -- FOV global por defecto (si un waypoint no tiene fov)
     UseRoll     = false,      -- v7: usar roll por waypoint
@@ -545,6 +546,7 @@ UCam.OriginalLighting = {
     Brightness           = UCam.Lighting.Brightness,
     -- v7: snapshot de sombras y skybox originales
     GlobalShadows        = UCam.Lighting.GlobalShadows,
+    ShadowSoftness       = UCam.Lighting.ShadowSoftness,   -- v8: para restaurar
     SkyInstance           = UCam.Lighting:FindFirstChildOfClass("Sky"),
 }
 
@@ -561,7 +563,7 @@ UCam.LightingTweaks = {
     -- v7: sombras
     ShadowsEnabled       = true,
     ShadowIntensity      = 0.7,           -- unmapeado a (0..1) de GlobalShadows
-    -- v7: skybox override (asset Sky, 6 caras vacías = sin override + (nil preserva el del juego)
+    -- v7: skybox override (asset Sky, 6 caras). nil preserva el del juego.
     SkyboxAssetId        = nil,
     -- Snapshots originales del juego (para restaurar al desactivar)
     _orig                = nil,
@@ -853,6 +855,7 @@ UCam.TimeControl = {
 UCam.Replay = {
     Recording = false,
     Playing = false,
+    Paused = false,              -- v8: estado de pausa (leído por la UI de Replay)
     Frames = {},                -- { CFrame, FOV, timestamp }
     MaxDuration = 60,
     CurrentTime = 0,
@@ -860,15 +863,124 @@ UCam.Replay = {
     Loop = false,
     SavedRoutes = {},           -- hasta 3 rutas guardadas
     _recordStartTime = 0,
+    -- v8: marcadores con eventos (texto/shake/slow/fov/speed)
+    Markers = {},               -- { { t, label, action, val, fired }, ... }
+    ShowMarkerHUD = true,
+    _markersFiredIdx = {},
+    -- v8: speed ramps keyframados
+    SpeedRamps = {},            -- { { t, speed }, ... } ordenados
+    SpeedRampEnabled = false,
+}
+
+-- v8: Perfiles completos (modo + filtros + lighting + slowmo + fun)
+UCam.Profiles = {
+    Slots      = {},
+    QuickSlots = {},
+    MaxSlots   = 8,
+    MaxQuick   = 3,
+}
+
+-- v8: i18n (es/en/pt)
+UCam.Locale = "es"
+
+-- ============================================================
+-- v8 FASE 3: COMBOS DE CÁMARA (secuencia automática de modos)
+-- ============================================================
+UCam.Combos = {
+    Enabled      = false,
+    Playing      = false,
+    Steps        = {},      -- { { camMode="Orbita", duration=4, fov=70, extra={...} }, ... }
+    CurrentStep  = 0,
+    StepStartAt  = 0,
+    Loop         = false,
+    SavedCombos  = {},      -- nombre → steps
+    _conn        = nil,
+}
+
+-- ============================================================
+-- v8 FASE 3: MACROS (secuencia grabada de acciones discretas)
+-- ============================================================
+UCam.Macros = {
+    Recording     = false,
+    RecordingName = "Macro",
+    RecordStart   = 0,
+    _actions      = {},     -- { { t=dt, kind="toggle"/"mode"/"intensity", path="UCam.X", value=any }, ... }
+
+    Playing       = false,
+    PlaySpeed     = 1.0,
+    CurrentMacro  = nil,   -- referencia a SavedMacros[name] mientras reproduce
+    SavedMacros   = {},    -- nombre → { actions, savedAt }
+
+    _conn         = nil,
+    _playhead     = 0,
+    _startedAt    = 0,
+}
+
+-- ============================================================
+-- v8 FASE 3: AUDIO REACTIVE (FOV/shake/filter al beat)
+-- ============================================================
+UCam.AudioReactive = {
+    Enabled       = false,
+    TargetSound   = nil,        -- Sound instance seleccionado (o nil → auto-detectar el más fuerte)
+    AutoDetect    = true,
+
+    -- Efectos a disparar en cada beat:
+    FovPulse      = false,
+    FovAmount     = 8,          -- grados a pulsar
+    ShakeOnBeat   = false,
+    ShakePattern  = "Pulso",
+    FilterFlash   = false,      -- flash blanco rápido
+
+    -- Parámetros de detección
+    Sensitivity   = 0.35,       -- umbral de loudness
+    Cooldown      = 0.25,       -- segundos entre beats
+    _lastBeatAt   = 0,
+    _conn         = nil,
+}
+
+-- ============================================================
+-- v8 FASE 3: FILTROS PRO (efectos avanzados visuales extra)
+-- ============================================================
+UCam.FiltersPro = {
+    Enabled      = false,       -- toggle maestro
+
+    FilmGrain    = { Enabled = false, Amount = 0.4, Speed = 24 },      -- ruido de película
+    Pixelify     = { Enabled = false, BlockSize = 8 },                  -- pixel-art / 8-bit
+    Scanlines    = { Enabled = false, Density = 120, Opacity = 0.4 },   -- CRT / VHS
+    TiltShift    = { Enabled = false, FocusHeight = 0.5, Blur = 0.6 },  -- efecto miniatura
+    RadialBlur   = { Enabled = false, Amount = 0.5 },                   -- blur radial de movimiento
+    ColorCurves  = { Enabled = false, Preset = "Neutral",               -- curvas de color rápidas
+                     Presets = { "Neutral", "Filmic", "Retro", "Neon Noir", "Pastel Dream",
+                                "Golden Hour", "Cool Breeze", "Moody" } },
+
+    _grainGui     = nil,
+    _scanlinesGui = nil,
+    _tiltshiftGui = nil,
+    _pixelGui     = nil,
+    _radialGui    = nil,
+    _grainConn    = nil,
 }
 
 -- ============================================================
 -- PlayerModule controls (para disableControls / enableControls)
--- ============================================================
+-- v8.1 FIX (crítico #4): timeout de 5 s. Si el juego no tiene
+-- PlayerModule, WaitForChild colgaría la carga para siempre dentro
+-- del pcall (que no aborta un WaitForChild).
 local controls = nil
 pcall(function()
-    local PlayerModule = require(UCam.player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
-    controls = PlayerModule:GetControls()
+    local playerScripts = UCam.player:WaitForChild("PlayerScripts")
+    local module = nil
+    local deadline = 0
+    repeat
+        module = playerScripts:FindFirstChild("PlayerModule")
+        if module then break end
+        task.wait()
+        deadline = deadline + (30 / 60)
+    until deadline >= 5  -- 5 segundos de timeout
+    if module then
+        local PlayerModule = require(module)
+        controls = PlayerModule:GetControls()
+    end
 end)
 UCam.controls = controls
 
@@ -876,6 +988,9 @@ UCam.controls = controls
 -- DEFAULTS (para el boton "Restablecer todos los valores")
 -- ============================================================
 UCam.DEFAULTS = {
+    -- v8: persistencia de idioma (i18n)
+    Locale               = "es",
+
     currentSpeed         = 50,
     movementSmoothing    = 8,
     mouseSensitivity     = 0.35,
@@ -939,5 +1054,5 @@ function UCam.resolveDropdownValue(options)
     return nil
 end
 
-notify("Universal Camera Pro v6 By Cocoa Feliz",
+notify("Universal Camera Pro v8 By Cocoa Feliz",
     "Cargando partes modulares...")

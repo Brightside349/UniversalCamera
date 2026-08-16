@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v6 · 20_filters
+-- Universal Camera Pro v8 · 20_filters
 -- Color correction, filtros built-in/custom, bloom, DOF, sun rays,
 -- vignette (overlay GUI) y letterbox (barras 21:9).
 --
@@ -280,12 +280,19 @@ end
 -- v7: listener de resize del viewport para re-ajustar el letterbox y la
 -- viñeta radial cuando el jugador cambia el tamaño de ventana / pantalla.
 -- Sin esto, las barras y la viñeta quedan desalineadas al redimensionar.
-UCam._viewportResizeConn = UCam.camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-    pcall(function()
-        if UCam.Letterbox.Enabled then UCam.applyLetterbox() end
-        if UCam.Vignette.Enabled then UCam.applyVignette() end
-    end)
-end)
+-- v9 FIX (fuga de memoria): trackear la conexion del viewport resize en el
+-- registry de UCam para que cleanupConnections() la desconecte en cada Unload.
+-- Antes se asignaba a UCam._viewportResizeConn sin trackearla, asi que cada
+-- recarga del modulo dejaba una conexion fantasma acumulada en el viewport.
+UCam._viewportResizeConn = UCam.trackConnection(
+    UCam.camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+        pcall(function()
+            if UCam.Letterbox.Enabled then UCam.applyLetterbox() end
+            if UCam.Vignette.Enabled then UCam.applyVignette() end
+        end)
+    end),
+    "filters.viewportResize"
+)
 
 -- FIX v6 (B5): destroy centralizado de Letterbox/Vignette.
 -- Antes el GUI se destruia en 3 sitios distintos (toggle, toggleFreeCam,

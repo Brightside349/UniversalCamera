@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v6 · 70_camcore
+-- Universal Camera Pro v8 · 70_camcore
 -- Nucleo de camara: toggleFreeCam, CrashZoom, Camera Shake (con
 -- patrones), Dutch roll, FOV Pulse, updateCamera (per-frame, 14 modos),
 -- enforceCameraState (3 capas), input handler y auto-apply filtros.
@@ -94,7 +94,40 @@ end
 -- ============================================================
 -- FREECAM: TOGGLE
 -- ============================================================
+-- v8: Debounce para evitar double-toggle cuando se spamea la tecla
+local _toggleDebounce = 0
+local TOGGLE_DEBOUNCE_SECS = 0.18
+
+-- v8.1 FIX: restauración forzada de la cámara/personaje SIN pasar por
+-- el debounce de toggleFreeCam. Unload dentro del debounce dejaba la
+-- cámara Scriptable y el personaje anclado (crítico informe).
+function UCam.forceRestoreCamera()
+    if UCam.freeCamEnabled then
+        UCam.refreshCharacterRefs()
+        UCam.camera.CameraType = Enum.CameraType.Custom
+        if UCam.humanoid then UCam.camera.CameraSubject = UCam.humanoid end
+        UCam.camera.FieldOfView             = UCam.Saved.FOV
+        UCam.rightMouseHeld                 = false
+        UCam.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        UCam.unfreezeCharacter()
+        if UCam.Hud.Hidden then UCam.setHudHidden(false) end
+        UCam.Saved._hudHiddenBeforeFreeCam = false
+        if UCam.Hud.CharacterHidden then UCam.setCharacterHidden(false) end
+        if UCam.SlowMo.BulletTime then UCam.toggleBulletTime(false) end
+        UCam.destroyLetterbox()
+        UCam.destroyVignetteGui()
+        UCam.freeCamEnabled = false
+        -- Reiniciar debounce para evitar toggles fantasma tras Unload
+        _toggleDebounce = 0
+    end
+end
+
 function UCam.toggleFreeCam()
+    -- v8: debounce — evita toggles accidentales por doble-pulsación
+    local now = tick()
+    if now - _toggleDebounce < TOGGLE_DEBOUNCE_SECS then return end
+    _toggleDebounce = now
+
     if UCam.Spectate.Active then
         UCam.stopSpectate()
         return
@@ -296,9 +329,18 @@ end
 
 -- ============================================================
 -- AUTO-FOCUS DOF
+-- v8: throttle a 10 Hz — antes hacía un raycast de 500 studs
+-- cada frame (60 raycasts/seg), ahora 6 raycasts/seg.
 -- ============================================================
-local function updateAutoFocus()
+local AUTOFOCUS_INTERVAL = 0.1  -- segundos entre raycasts
+local autoFocusAccum = 0
+
+local function updateAutoFocus(deltaTime)
     if not UCam.DOF.Enabled or not UCam.AutoFocusDOF.Enabled then return end
+    autoFocusAccum = autoFocusAccum + (deltaTime or 0)
+    if autoFocusAccum < AUTOFOCUS_INTERVAL then return end
+    autoFocusAccum = 0
+
     local targetPos
     if UCam.Spectate.Active and UCam.Spectate.Target and UCam.Spectate.Target.Character then
         local root = UCam.getCharacterRoot(UCam.Spectate.Target.Character)
@@ -315,7 +357,7 @@ local function updateAutoFocus()
                 return
             end
         else
-            UCam.refreshCharacterRefs()
+            -- v8: refs cacheadas — rootPart puede ser nil si el char murió
             local pivot = UCam.Saved.RootCFrame and UCam.Saved.RootCFrame.Position or (UCam.rootPart and UCam.rootPart.Position)
             if pivot then targetPos = pivot end
         end
@@ -364,7 +406,7 @@ function UCam.updateCamera(deltaTime)
                 UCam.CameraTransition.Active = false
             end
         end
-        updateAutoFocus()
+        updateAutoFocus(deltaTime)
         return
     end
 
@@ -381,7 +423,7 @@ function UCam.updateCamera(deltaTime)
                 UCam.CameraTransition.Active = false
             end
         end
-        updateAutoFocus()
+        updateAutoFocus(deltaTime)
         return
     end
 
@@ -393,7 +435,7 @@ function UCam.updateCamera(deltaTime)
         UCam.holdCharacterPosition()
         UCam.camera.CFrame = UCam.applyDutchRoll(UCam.camCFrame)
     elseif UCam.camMode == "Orbita" then
-        UCam.refreshCharacterRefs()
+        -- v8: refs cacheadas (mantenidas por CharacterAdded/Removing en 10_utils)
         local pivot = UCam.Saved.RootCFrame and UCam.Saved.RootCFrame.Position
             or (UCam.rootPart and UCam.rootPart.Position)
         if pivot then
@@ -415,7 +457,6 @@ function UCam.updateCamera(deltaTime)
         UCam.holdCharacterPosition()
         UCam.camera.CFrame = UCam.applyDutchRoll(UCam.camCFrame)
     elseif UCam.camMode == "Cenital" then
-        UCam.refreshCharacterRefs()
         local pivot = UCam.Saved.RootCFrame and UCam.Saved.RootCFrame.Position
             or (UCam.rootPart and UCam.rootPart.Position)
         if pivot then
@@ -433,7 +474,6 @@ function UCam.updateCamera(deltaTime)
             UCam.camera.CFrame = UCam.applyDutchRoll(UCam.camCFrame)
         end
     elseif UCam.camMode == "Lateral" then
-        UCam.refreshCharacterRefs()
         local pivot = UCam.Saved.RootCFrame and UCam.Saved.RootCFrame.Position
             or (UCam.rootPart and UCam.rootPart.Position)
         if pivot then
@@ -452,7 +492,6 @@ function UCam.updateCamera(deltaTime)
             UCam.camera.CFrame = UCam.applyDutchRoll(UCam.camCFrame)
         end
     elseif UCam.camMode == "Dron" then
-        UCam.refreshCharacterRefs()
         local pivot = UCam.Saved.RootCFrame and UCam.Saved.RootCFrame.Position
             or (UCam.rootPart and UCam.rootPart.Position)
         if pivot then
@@ -481,7 +520,6 @@ function UCam.updateCamera(deltaTime)
             UCam.camera.CFrame = UCam.applyDutchRoll(UCam.camCFrame)
         end
     elseif UCam.camMode == "Follow" then
-        UCam.refreshCharacterRefs()
         local pivotCF = UCam.Saved.RootCFrame or (UCam.rootPart and UCam.rootPart.CFrame)
         if pivotCF then
             local back    = -pivotCF.LookVector
@@ -498,7 +536,6 @@ function UCam.updateCamera(deltaTime)
     elseif UCam.camMode == "CrashZoom" then
         UCam.updateCrashZoom()
     elseif UCam.camMode == "Vertigo" then
-        UCam.refreshCharacterRefs()
         local pivot = UCam.Saved.RootCFrame and UCam.Saved.RootCFrame.Position
             or (UCam.rootPart and UCam.rootPart.Position)
         if pivot then
@@ -523,7 +560,6 @@ function UCam.updateCamera(deltaTime)
             UCam.camera.FieldOfView = UCam.clamp(fov, UCam.MIN_FOV, UCam.MAX_FOV)
         end
     elseif UCam.camMode == "Crane" then
-        UCam.refreshCharacterRefs()
         local pivot = UCam.Saved.RootCFrame and UCam.Saved.RootCFrame.Position
             or (UCam.rootPart and UCam.rootPart.Position)
         if pivot then
@@ -551,7 +587,6 @@ function UCam.updateCamera(deltaTime)
             UCam.camera.CFrame = UCam.applyDutchRoll(UCam.camCFrame)
         end
     elseif UCam.camMode == "Dolly Glide" then
-        UCam.refreshCharacterRefs()
         if not UCam.Dolly.Center then
             UCam.Dolly.Center = (UCam.rootPart and UCam.rootPart.Position) or UCam.camCFrame.Position
         end
@@ -619,8 +654,7 @@ function UCam.updateCamera(deltaTime)
         local roll = UCam.clamp(-yawDelta * (UCam.FPVDrone.RollSpeed or 120), -rollRad, rollRad)
         UCam.camera.CFrame = UCam.camCFrame * CFrame.Angles(0, 0, roll + UCam.dutchRoll)
     elseif UCam.camMode == "Snorricam" then
-        -- v7: cámara atada al personaje, mirando hacia su cara
-        UCam.refreshCharacterRefs()
+        -- v8: refs cacheadas por eventos (10_utils), no reconsultar cada frame
         UCam.holdCharacterPosition()
         if UCam.rootPart then
             local dist = UCam.Snorricam.Distance or 3
@@ -695,18 +729,27 @@ function UCam.updateCamera(deltaTime)
 
     -- v7: Auto-exposure — ajusta el brillo del ColorCorrection según la
     -- luminosidad promedio mirada (raycast hacia el centro de la pantalla).
+    -- v8: throttle a 10 Hz — antes raycast de 200 studs cada frame (60/s).
     if UCam.CamCore.AutoExposure then
-        local rayParams = RaycastParams.new()
-        rayParams.FilterType = Enum.RaycastFilterType.Exclude
-        rayParams.FilterDescendantsInstances = { UCam.character, UCam.camera }
-        local r = workspace:Raycast(UCam.camera.CFrame.Position, UCam.camera.CFrame.LookVector * 200, rayParams)
-        if r and r.Instance and r.Instance:IsA("BasePart") then
-            -- Heurística simple: partes oscuras (grises bajos) suben el brillo
-            local c = r.Instance.Color
-            local luminance = (c.R + c.G + c.B) / 3
-            local target = UCam.clamp((0.5 - luminance) * 0.3, UCam.CamCore.ExposureRange.min, UCam.CamCore.ExposureRange.max)
+        UCam.CamCore._exposureAccum = (UCam.CamCore._exposureAccum or 0) + deltaTime
+        if UCam.CamCore._exposureAccum >= 0.1 then
+            UCam.CamCore._exposureAccum = 0
+            local rayParams = RaycastParams.new()
+            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+            rayParams.FilterDescendantsInstances = { UCam.character, UCam.camera }
+            local r = workspace:Raycast(UCam.camera.CFrame.Position, UCam.camera.CFrame.LookVector * 200, rayParams)
+            if r and r.Instance and r.Instance:IsA("BasePart") then
+                -- Heurística simple: partes oscuras (grises bajos) suben el brillo
+                local c = r.Instance.Color
+                local luminance = (c.R + c.G + c.B) / 3
+                local target = UCam.clamp((0.5 - luminance) * 0.3, UCam.CamCore.ExposureRange.min, UCam.CamCore.ExposureRange.max)
+                UCam.CamCore._exposureTarget = target
+            end
+        end
+        -- Lerp suave hacia el target muestreado (cada frame es barato)
+        if UCam.CamCore._exposureTarget then
             local cc = UCam.getColorEffect()
-            cc.Brightness = UCam.lerpNum(cc.Brightness or 0, target, UCam.clamp(deltaTime * 3, 0, 1))
+            cc.Brightness = UCam.lerpNum(cc.Brightness or 0, UCam.CamCore._exposureTarget, UCam.clamp(deltaTime * 3, 0, 1))
             cc.Enabled = true
         end
     end
@@ -714,15 +757,27 @@ function UCam.updateCamera(deltaTime)
     -- v7: Motion blur simulado — sobrescribe el FOV levemente o usa la viñeta
     -- existente como overlay. Aquí solo engrosamos la viñeta si MB está activo.
     -- (Implementación ligera: no crea GUIs extra para no competir con la viñeta.)
+    -- v8.1 FIX: antes solo SUMABA FOV (subía monótonamente hasta MAX_FOV).
+    -- Ahora guarda el FOV base y lerp de vuelta al FOV base cuando no hay giro.
     if UCam.CamCore.MotionBlur and not UCam.Spectate.Active then
-        -- Utiliza deriva del Dutch roll previo para detectar giro rápido y aplicar FOV jitter sutil
+        if UCam.CamCore._mbBaseFOV == nil then
+            UCam.CamCore._mbBaseFOV = UCam.camera.FieldOfView
+        end
         local delta = UCam.cameraYaw - (UCam.CamCore._prevYaw or UCam.cameraYaw)
         UCam.CamCore._prevYaw = UCam.cameraYaw
         if math.abs(delta) > 0.02 and UCam.CamCore.MBAmount > 0 then
-            UCam.camera.FieldOfView = UCam.clamp(
-                UCam.camera.FieldOfView + math.abs(delta) * UCam.CamCore.MBAmount * 5,
-                UCam.MIN_FOV, UCam.MAX_FOV)
+            local tmp = UCam.CamCore._mbBaseFOV + math.abs(delta) * UCam.CamCore.MBAmount * 5
+            UCam.camera.FieldOfView = UCam.clamp(tmp, UCam.MIN_FOV, UCam.MAX_FOV)
+        else
+            -- Restaurar suavemente al FOV base (lerp de vuelta)
+            local cur = UCam.camera.FieldOfView
+            local base = UCam.CamCore._mbBaseFOV
+            if math.abs(cur - base) > 0.05 then
+                UCam.camera.FieldOfView = UCam.lerpNum(cur, base, UCam.clamp(deltaTime * 6, 0, 1))
+            end
         end
+    else
+        UCam.CamCore._mbBaseFOV = nil
     end
 
     if UCam.CameraTransition.Active then
@@ -765,7 +820,7 @@ function UCam.updateCamera(deltaTime)
         end
     end
 
-    updateAutoFocus()
+    updateAutoFocus(deltaTime)
 end
 
 -- ============================================================
@@ -787,48 +842,70 @@ end
 
 -- ============================================================
 -- BIND RENDER STEPS + ENFORCEMENT
+-- v8: todas las conexiones se trackean en UCam._connections
+-- para que Unload() pueda limpiarlas (antes quedaban huérfanas
+-- y recargar el script duplicaba handlers).
 -- ============================================================
+UCam.trackConnection({ Disconnect = function()
+    UCam.RunService:UnbindFromRenderStep("UCamRender")
+end }, "BindRender:UCamRender")
 UCam.RunService:BindToRenderStep("UCamRender",  Enum.RenderPriority.Camera.Value + 1, UCam.updateCamera)
+
+UCam.trackConnection({ Disconnect = function()
+    UCam.RunService:UnbindFromRenderStep("UCamEnforce")
+end }, "BindRender:UCamEnforce")
 UCam.RunService:BindToRenderStep("UCamEnforce", Enum.RenderPriority.Last.Value,         UCam.enforceCameraState)
 
 -- Slow-mo corre en Heartbeat (no RenderStepped) para no chocar con el render.
 do
     local lastTick = 0
-    UCam.RunService.Heartbeat:Connect(function(dt)
-        if not UCam.SlowMo.BulletTime then return end
-        local interval = 1 / math.max(15, UCam.SlowMo.TickRate or 30)
-        lastTick = lastTick + dt
-        if lastTick < interval then return end
-        while lastTick >= interval do lastTick = lastTick - interval end
-        UCam.updateSlowMo(interval)
-    end)
+    UCam._slowmoHeartbeat = UCam.trackConnection(
+        UCam.RunService.Heartbeat:Connect(function(dt)
+            if not UCam.SlowMo.BulletTime then return end
+            local interval = 1 / math.max(15, UCam.SlowMo.TickRate or 30)
+            lastTick = lastTick + dt
+            if lastTick < interval then return end
+            while lastTick >= interval do lastTick = lastTick - interval end
+            UCam.updateSlowMo(interval)
+        end),
+        "Heartbeat:SlowMo"
+    )
 end
 
-UCam.camera:GetPropertyChangedSignal("CameraSubject"):Connect(function()
-    if not (UCam.freeCamEnabled or UCam.Spectate.Active or UCam.Director.Active) then return end
-    if UCam.camera.CameraSubject ~= nil then UCam.camera.CameraSubject = nil end
-end)
-
-UCam.camera:GetPropertyChangedSignal("CameraType"):Connect(function()
-    if not (UCam.freeCamEnabled or UCam.Spectate.Active or UCam.Director.Active) then return end
-    if UCam.camera.CameraType ~= Enum.CameraType.Scriptable then
-        UCam.camera.CameraType = Enum.CameraType.Scriptable
-    end
-end)
-
-UCam.RunService.RenderStepped:Connect(function()
-    if not (UCam.freeCamEnabled or UCam.Spectate.Active or UCam.Director.Active) then return end
-    task.defer(function()
+UCam.trackConnection(
+    UCam.camera:GetPropertyChangedSignal("CameraSubject"):Connect(function()
         if not (UCam.freeCamEnabled or UCam.Spectate.Active or UCam.Director.Active) then return end
-        pcall(function()
-            if UCam.camera.CameraType ~= Enum.CameraType.Scriptable then
-                UCam.camera.CameraType = Enum.CameraType.Scriptable
-            end
-            if UCam.camera.CameraSubject ~= nil then UCam.camera.CameraSubject = nil end
-            if UCam.camCFrame then UCam.camera.CFrame = UCam.camCFrame end
+        if UCam.camera.CameraSubject ~= nil then UCam.camera.CameraSubject = nil end
+    end),
+    "PropChange:CameraSubject"
+)
+
+UCam.trackConnection(
+    UCam.camera:GetPropertyChangedSignal("CameraType"):Connect(function()
+        if not (UCam.freeCamEnabled or UCam.Spectate.Active or UCam.Director.Active) then return end
+        if UCam.camera.CameraType ~= Enum.CameraType.Scriptable then
+            UCam.camera.CameraType = Enum.CameraType.Scriptable
+        end
+    end),
+    "PropChange:CameraType"
+)
+
+UCam.trackConnection(
+    UCam.RunService.RenderStepped:Connect(function()
+        if not (UCam.freeCamEnabled or UCam.Spectate.Active or UCam.Director.Active) then return end
+        task.defer(function()
+            if not (UCam.freeCamEnabled or UCam.Spectate.Active or UCam.Director.Active) then return end
+            pcall(function()
+                if UCam.camera.CameraType ~= Enum.CameraType.Scriptable then
+                    UCam.camera.CameraType = Enum.CameraType.Scriptable
+                end
+                if UCam.camera.CameraSubject ~= nil then UCam.camera.CameraSubject = nil end
+                if UCam.camCFrame then UCam.camera.CFrame = UCam.camCFrame end
+            end)
         end)
-    end)
-end)
+    end),
+    "RenderStepped:Enforce"
+)
 
 -- ============================================================
 -- v7: GUARDAR / CARGAR POSICIONES DE CÁMARA (5 slots)
@@ -859,59 +936,77 @@ end
 
 -- ============================================================
 -- INPUT: MouseButton2 (rotacion), MouseWheel (FOV)
+-- v8: conexiones trackeadas en UCam._connections
 -- ============================================================
-UCam.UserInputService.InputBegan:Connect(function(input, gpe)
-    if input.UserInputType ~= Enum.UserInputType.MouseButton2 then return end
-    local canRotate = UCam.freeCamEnabled
-        or (UCam.Spectate.Active and UCam.Spectate.Mode ~= "Primera persona")
-    if not canRotate then return end
-    UCam.rightMouseHeld = true
-    UCam.UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
-end)
+UCam.trackConnection(
+    UCam.UserInputService.InputBegan:Connect(function(input, gpe)
+        -- v9 FIX (bug UI): ignorar el input si Rayfield ya lo procesó (click
+        -- derecho sobre la UI de Rayfield ya no rota la cámara).
+        if gpe then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseButton2 then return end
+        local canRotate = UCam.freeCamEnabled
+            or (UCam.Spectate.Active and UCam.Spectate.Mode ~= "Primera persona")
+        if not canRotate then return end
+        UCam.rightMouseHeld = true
+        UCam.UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+    end),
+    "Input:MouseB2Began"
+)
 
-UCam.UserInputService.InputEnded:Connect(function(input, gpe)
-    if input.UserInputType ~= Enum.UserInputType.MouseButton2 then return end
-    UCam.rightMouseHeld = false
-    if UCam.freeCamEnabled or UCam.Spectate.Active then
-        UCam.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-    end
-end)
+UCam.trackConnection(
+    UCam.UserInputService.InputEnded:Connect(function(input, gpe)
+        if input.UserInputType ~= Enum.UserInputType.MouseButton2 then return end
+        UCam.rightMouseHeld = false
+        if UCam.freeCamEnabled or UCam.Spectate.Active then
+            UCam.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        end
+    end),
+    "Input:MouseB2Ended"
+)
 
-UCam.UserInputService.InputChanged:Connect(function(input)
-    if not (UCam.freeCamEnabled or UCam.Spectate.Active) then return end
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        if UCam.rightMouseHeld then
-            local sens = UCam.MOUSE_SENSITIVITY * 0.005
-            if UCam.Spectate.Active then
-                if UCam.Spectate.Mode ~= "Primera persona" then
-                    UCam.Spectate.Yaw   = UCam.Spectate.Yaw - input.Delta.X * sens
-                    UCam.Spectate.Pitch = UCam.clamp(
-                        UCam.Spectate.Pitch - input.Delta.Y * sens,
-                        math.rad(-60), math.rad(60)
-                    )
+UCam.trackConnection(
+    UCam.UserInputService.InputChanged:Connect(function(input, gpe)
+        -- v9 FIX (bug UI): ignorar el input si Rayfield lo procesó (la rueda
+        -- sobre la UI ya no cambia el FOV ni rota la cámara).
+        if gpe then return end
+        if not (UCam.freeCamEnabled or UCam.Spectate.Active) then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            if UCam.rightMouseHeld then
+                local sens = UCam.MOUSE_SENSITIVITY * 0.005
+                if UCam.Spectate.Active then
+                    if UCam.Spectate.Mode ~= "Primera persona" then
+                        UCam.Spectate.Yaw   = UCam.Spectate.Yaw - input.Delta.X * sens
+                        UCam.Spectate.Pitch = UCam.clamp(
+                            UCam.Spectate.Pitch - input.Delta.Y * sens,
+                            math.rad(-60), math.rad(60)
+                        )
+                    end
+                else
+                    UCam.applyCameraRotation(input.Delta)
                 end
+            end
+        elseif input.UserInputType == Enum.UserInputType.MouseWheel then
+            local current = UCam.CamCore.TargetFOV or UCam.camera.FieldOfView
+            local newFov = current - (input.Position.Z * 3)
+            newFov = UCam.clamp(newFov, UCam.MIN_FOV, UCam.MAX_FOV)
+            if UCam.CamCore.SmoothZoom then
+                -- Smooth zoom: solo actualiza el target; el lerp ocurre en updateCamera
+                UCam.CamCore.TargetFOV = newFov
             else
-                UCam.applyCameraRotation(input.Delta)
+                UCam.camera.FieldOfView = newFov
+                UCam.CamCore.TargetFOV = nil
             end
         end
-    elseif input.UserInputType == Enum.UserInputType.MouseWheel then
-        local current = UCam.CamCore.TargetFOV or UCam.camera.FieldOfView
-        local newFov = current - (input.Position.Z * 3)
-        newFov = UCam.clamp(newFov, UCam.MIN_FOV, UCam.MAX_FOV)
-        if UCam.CamCore.SmoothZoom then
-            -- Smooth zoom: solo actualiza el target; el lerp ocurre en updateCamera
-            UCam.CamCore.TargetFOV = newFov
-        else
-            UCam.camera.FieldOfView = newFov
-            UCam.CamCore.TargetFOV = nil
-        end
-    end
-end)
+    end),
+    "Input:InputChanged"
+)
 
 -- ============================================================
 -- RESPAWN: limpia todo al respawnear
+-- v8: conexión trackeada para cleanup en Unload
 -- ============================================================
-UCam.player.CharacterAdded:Connect(function(newCharacter)
+UCam.trackConnection(
+    UCam.player.CharacterAdded:Connect(function(newCharacter)
     if UCam.freeCamEnabled then
         UCam.freeCamEnabled     = false
         UCam.camera.CameraType  = Enum.CameraType.Custom
@@ -946,6 +1041,15 @@ UCam.player.CharacterAdded:Connect(function(newCharacter)
     -- v4.2: limpiar efectos de diversion al respawnear
     pcall(function() UCam.stopFun() end)
 
+    -- v8 FIX: resetear modificaciones locales aplicadas a OTROS jugadores.
+    -- Sin esto, _playerTargets / _snapshots seguían apuntando a personajes
+    -- muertos tras el respawn (informe §4) y los efectos no se revertían.
+    pcall(function()
+        if UCam.restoreAllPlayerPoses then UCam.restoreAllPlayerPoses() end
+        if UCam.restoreAllPlayerBodyColors then UCam.restoreAllPlayerBodyColors() end
+        if UCam.restoreAllPlayers then UCam.restoreAllPlayers() end
+    end)
+
     UCam.character                      = newCharacter
     UCam.humanoid                       = nil
     UCam.rootPart                       = nil
@@ -955,4 +1059,6 @@ UCam.player.CharacterAdded:Connect(function(newCharacter)
         if UCam.humanoid then UCam.camera.CameraSubject = UCam.humanoid end
         if UCam.SlowMo.BulletTime then UCam.rebuildSlowMoTargets() end
     end)
-end)
+end),
+    "CharacterAdded:Cleanup"
+)

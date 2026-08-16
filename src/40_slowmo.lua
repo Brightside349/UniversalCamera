@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v6 · 40_slowmo
+-- Universal Camera Pro v8 · 40_slowmo
 -- Bullet Time universal: ralentiza humanoides (WalkSpeed/JumpPower
 -- locales) y objetos fisicos (CFrame-lerp con filtros que no rompen
 -- joints). throttling por TickRate + batch rotativo para no lagear.
@@ -181,6 +181,13 @@ function UCam.rebuildSlowMoTargets()
 end
 
 function UCam.stopSlowMoTracking()
+    -- v8.1 FIX: restaurar el CFrame real de cada parte ANTES de limpiar.
+    -- Antes las partes quedaban congeladas en su posición "renderizada".
+    for part, realCF in pairs(UCam.SlowMo.RealPositions) do
+        if part and part.Parent then
+            pcall(function() part.CFrame = realCF end)
+        end
+    end
     table.clear(UCam.SlowMo.Parts)
     table.clear(UCam.SlowMo.OriginalCF)
     table.clear(UCam.SlowMo.RealPositions)
@@ -189,6 +196,8 @@ function UCam.stopSlowMoTracking()
     table.clear(UCam.SlowMo.PartKeys)
     UCam.SlowMo.BatchIndex = 0
     UCam.SlowMo.TickAccum  = 0
+    -- v8.1 FIX: reset del TickClock (antes seguía acumulando entre sesiones)
+    UCam.SlowMo.TickClock  = 0
     if UCam.SlowMo.DescendantConn then
         UCam.SlowMo.DescendantConn:Disconnect()
         UCam.SlowMo.DescendantConn = nil
@@ -196,6 +205,18 @@ function UCam.stopSlowMoTracking()
     if UCam.SlowMo.CharacterAdded then
         UCam.SlowMo.CharacterAdded:Disconnect()
         UCam.SlowMo.CharacterAdded = nil
+    end
+    if UCam.SlowMo.PlayerRemovingConn then
+        UCam.SlowMo.PlayerRemovingConn:Disconnect()
+        UCam.SlowMo.PlayerRemovingConn = nil
+    end
+    -- v8 FIX: desconectar las conexiones internas plr.CharacterAdded
+    -- que antes quedaban huérfanas (fuga del informe §2)
+    if UCam.SlowMo._playerCharConns then
+        for _, conn in pairs(UCam.SlowMo._playerCharConns) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(UCam.SlowMo._playerCharConns)
     end
     restoreAllHumanoids()
     table.clear(UCam.SlowMo.Humanoids)
@@ -225,8 +246,16 @@ function UCam.startSlowMoTracking()
     end)
 
     if UCam.SlowMo.CharacterAdded then UCam.SlowMo.CharacterAdded:Disconnect() end
+    if UCam.SlowMo.PlayerRemovingConn then UCam.SlowMo.PlayerRemovingConn:Disconnect() end
+    -- v8 FIX: guardar las conexiones internas para poder desconectarlas
+    -- en stopSlowMoTracking (antes eran huérfanas → fuga por jugador).
+    UCam.SlowMo._playerCharConns = UCam.SlowMo._playerCharConns or {}
+    for _, conn in pairs(UCam.SlowMo._playerCharConns) do
+        pcall(function() conn:Disconnect() end)
+    end
+    table.clear(UCam.SlowMo._playerCharConns)
     UCam.SlowMo.CharacterAdded = UCam.Players.PlayerAdded:Connect(function(plr)
-        plr.CharacterAdded:Connect(function(char)
+        local conn = plr.CharacterAdded:Connect(function(char)
             if not UCam.SlowMo.BulletTime then return end
             task.defer(function()
                 local h = char and char:FindFirstChildOfClass("Humanoid")
@@ -245,6 +274,18 @@ function UCam.startSlowMoTracking()
                 end
             end)
         end)
+        -- Se guarda para desconectarla en stopSlowMoTracking / al re-iniciar
+        UCam.SlowMo._playerCharConns[plr] = conn
+    end)
+    -- v9 FIX (fuga de memoria): al salir un jugador, desconectar su conexión
+    -- plr.CharacterAdded. Antes quedaba huérfana en _playerCharConns hasta el
+    -- próximo stopSlowMoTracking, acumulando una conexión por jugador.
+    UCam.SlowMo.PlayerRemovingConn = UCam.Players.PlayerRemoving:Connect(function(plr)
+        local conn = UCam.SlowMo._playerCharConns and UCam.SlowMo._playerCharConns[plr]
+        if conn then
+            pcall(function() conn:Disconnect() end)
+            UCam.SlowMo._playerCharConns[plr] = nil
+        end
     end)
     for _, plr in ipairs(UCam.Players:GetPlayers()) do
         if plr.Character then
@@ -269,16 +310,33 @@ local function slowLerpAlpha()
     return UCam.clamp(t, 0, 1)
 end
 
-local function isLocalPlayerHumanoid(h)
-    local char = h.Parent
-    return char and UCam.Players:GetPlayerFromCharacter(char) == UCam.player
-end
+-- v8: Cache de clasificación de humanoides — GetPlayerFromCharacter
+-- se llama UNA SOLA VEZ por humanoide (cuando entra al registry),
+-- no en cada tick. El player raramente cambia (solo al respawnear).
+-- Invalidación: cuando el humanoide sale del registry.
+local _humanoidKindCache = setmetatable({}, { __mode = "k" })  -- weak keys: limpieza automática
 
-local function isOtherPlayerHumanoid(h)
+-- Clasifica un humanoide una sola vez y cachea:
+--   "local"  → jugador local
+--   "other"  → otro jugador
+--   "npc"    → NPC o sin jugador asociado
+local function classifyHumanoid(h)
+    if not h or not h.Parent then return "npc" end
+    local cached = _humanoidKindCache[h]
+    if cached then return cached end
+
     local char = h.Parent
-    if not char then return false end
-    local p = UCam.Players:GetPlayerFromCharacter(char)
-    return p ~= nil and p ~= UCam.player
+    local kind = "npc"
+    pcall(function()
+        local plr = UCam.Players:GetPlayerFromCharacter(char)
+        if plr == UCam.player then
+            kind = "local"
+        elseif plr ~= nil then
+            kind = "other"
+        end
+    end)
+    _humanoidKindCache[h] = kind
+    return kind
 end
 
 function UCam.updateSlowMo(deltaTime)
@@ -292,10 +350,12 @@ function UCam.updateSlowMo(deltaTime)
     local toRestore = {}
     if scale < 1 then
         for h in pairs(UCam.SlowMo.Humanoids) do
+            -- v8: un solo lookup por humanoide por tick, en vez de 2
+            local kind = classifyHumanoid(h)
             local skip = false
-            if isLocalPlayerHumanoid(h) and not UCam.SlowMo.AffectsLocal then skip = true end
-            if isOtherPlayerHumanoid(h) and not UCam.SlowMo.AffectsOther then skip = true end
-            if (not isLocalPlayerHumanoid(h) and not isOtherPlayerHumanoid(h)) and not UCam.SlowMo.AffectsNPC then skip = true end
+            if kind == "local" and not UCam.SlowMo.AffectsLocal then skip = true end
+            if kind == "other" and not UCam.SlowMo.AffectsOther then skip = true end
+            if kind == "npc"   and not UCam.SlowMo.AffectsNPC   then skip = true end
             if UCam.SlowMo.Scope == "Fisico" then skip = true end
             if not skip then
                 applyHumanoidScale(h, scale)

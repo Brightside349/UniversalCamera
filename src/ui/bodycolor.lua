@@ -143,21 +143,23 @@ function UCam.build_bodycolor(Window)
         Content = "Transformaciones completas del aspecto de tu personaje."
     })
     
+    -- v9 FIX (bug UI): antes se iteraba un hash con pairs() → los botones salían
+    -- en orden aleatorio en cada carga. Ahora es un array ordenado con ipairs().
     local presetButtons = {
-        ["Robot"] = "🤖 Robot (Metal plateado)",
-        ["Fantasma"] = "👻 Fantasma (Transparente)",
-        ["Demonio"] = "😈 Demonio (Neon rojo)",
-        ["Dorado"] = "⭐ Dorado (Mármol dorado)",
-        ["Invisible"] = "👁️ Invisible Total",
-        ["Glitch"] = "⚡ Glitch (Colores aleatorios)",
+        { name = "Robot",     label = "🤖 Robot (Metal plateado)" },
+        { name = "Fantasma",  label = "👻 Fantasma (Transparente)" },
+        { name = "Demonio",   label = "😈 Demonio (Neon rojo)" },
+        { name = "Dorado",    label = "⭐ Dorado (Mármol dorado)" },
+        { name = "Invisible", label = "👁️ Invisible Total" },
+        { name = "Glitch",    label = "⚡ Glitch (Colores aleatorios)" },
     }
-    
-    for presetName, displayName in pairs(presetButtons) do
+
+    for _, preset in ipairs(presetButtons) do
         Tab:CreateButton({
-            Name = displayName,
+            Name = preset.label,
             Callback = function()
-                UCam.applyPreset(presetName)
-                UCam.notify("Coloreo", "Preset aplicado: " .. presetName)
+                UCam.applyPreset(preset.name)
+                UCam.notify("Coloreo", "Preset aplicado: " .. preset.name)
             end,
         })
     end
@@ -464,7 +466,10 @@ function UCam.build_bodycolor(Window)
     Tab:CreateButton({
         Name = "💾 Guardar Preset Actual",
         Callback = function()
-            local name = customPresetName.CurrentValue
+            -- v9 FIX (bug UI): leer el valor vía UCam.Rayfield.Flags. El objeto
+            -- del Input no expone .CurrentValue → antes siempre "Escribe un nombre".
+            local flag = UCam.Rayfield.Flags and UCam.Rayfield.Flags["CustomPresetName"]
+            local name = flag and (flag.CurrentValue or flag.Value) or ""
             if not name or name == "" then
                 UCam.notify("Coloreo", "Escribe un nombre para el preset", 3)
                 return
