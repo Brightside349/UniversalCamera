@@ -93,7 +93,7 @@ function UCam.build_inicio(Window)
             UCam.MOVEMENT_SMOOTHING                                = UCam.DEFAULTS.movementSmoothing
             UCam.MOUSE_SENSITIVITY                                 = UCam.DEFAULTS.mouseSensitivity
             UCam.SPRINT_MULTIPLIER                                 = UCam.DEFAULTS.sprintMultiplier
-            UCam.SlowMo.Intensity                                  = UCam.DEFAULTS.slowMoIntensity
+            -- v8.1: slowMoIntensity eliminado
             UCam.camMode                                           = UCam.DEFAULTS.camMode
             UCam.currentFilterIndex                                = UCam.DEFAULTS.filterIndex
             UCam.Orbit.Distance                                    = UCam.DEFAULTS.orbitDistance
@@ -172,7 +172,7 @@ function UCam.build_inicio(Window)
 
             local s = UCam.UISliders
             pcall(function() s.speedSlider:Set(UCam.currentSpeed) end)
-            pcall(function() s.slowMoIntensitySlider:Set(UCam.SlowMo.Intensity) end)
+            -- v8.1: slowMoIntensitySlider eliminado
             pcall(function() s.smoothSlider:Set(UCam.MOVEMENT_SMOOTHING) end)
             pcall(function() s.sensSlider:Set(UCam.MOUSE_SENSITIVITY) end)
             pcall(function() s.sprintSlider:Set(UCam.SPRINT_MULTIPLIER) end)

@@ -35,11 +35,8 @@ function UCam.build_bodycolor(Window)
         Color = Color3.fromRGB(255, 255, 255),
         Flag = "BodyPartColor",
         Callback = function(color)
-            local part = UCam.BodyColor.SelectedPart
-            if part then
-                UCam.applyBodyColorToPart(part, color, nil, nil)
-                UCam.notify("Coloreo", "Color aplicado a " .. part)
-            end
+            -- v8.1: No notificar aquí, solo guardar el color seleccionado.
+            -- El usuario aplicará con el botón "Aplicar a Todo el Cuerpo"
         end,
     })
 
@@ -90,12 +87,8 @@ function UCam.build_bodycolor(Window)
         CurrentOption = {"Plastic"},
         Flag = "BodyPartMaterial",
         Callback = function(opt)
-            local material = UCam.resolveDropdownValue(opt)
-            local part = UCam.BodyColor.SelectedPart
-            if material and part then
-                UCam.applyBodyColorToPart(part, nil, material, nil)
-                UCam.notify("Coloreo", "Material " .. material .. " aplicado a " .. part)
-            end
+            -- v8.1: No notificar aquí, solo guardar la selección.
+            -- El usuario aplicará con el botón "Aplicar a Todo el Cuerpo"
         end,
     })
     
@@ -106,10 +99,25 @@ function UCam.build_bodycolor(Window)
         CurrentValue = 0,
         Flag = "BodyPartTransparency",
         Callback = function(value)
+            -- v8.1: No aplicar automáticamente para evitar spam.
+            -- El usuario aplicará con el botón "Aplicar a Todo el Cuerpo"
+        end,
+    })
+    
+    Tab:CreateButton({
+        Name = "Aplicar a Parte Seleccionada",
+        Callback = function()
             local part = UCam.BodyColor.SelectedPart
-            if part then
-                UCam.applyBodyColorToPart(part, nil, nil, value)
+            if not part then
+                UCam.notify("Coloreo", "Selecciona una parte primero", 3)
+                return
             end
+            local color = colorPicker.Color
+            local material = UCam.resolveDropdownValue(materialDropdown.CurrentOption)
+            local transparency = transparencySlider.CurrentValue
+            
+            UCam.applyBodyColorToPart(part, color, material, transparency)
+            UCam.notify("Coloreo", "Configuración aplicada a " .. part)
         end,
     })
     
@@ -272,7 +280,7 @@ function UCam.build_bodycolor(Window)
         Color = Color3.fromRGB(255, 255, 255),
         Flag = "TargetPlayerPartColor",
         Callback = function(color)
-            -- Solo guarda; se aplica con el botón
+            -- v8.1: Solo guarda; se aplica con el botón para evitar spam
         end,
     })
 

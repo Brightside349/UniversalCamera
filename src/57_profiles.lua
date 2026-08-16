@@ -97,21 +97,8 @@ local function captureState()
     S.FilterCombine    = { Enabled=UCam.FilterCombine.Enabled, IndexA=UCam.FilterCombine.IndexA,
                            IndexB=UCam.FilterCombine.IndexB, Mix=UCam.FilterCombine.Mix }
 
-    -- Slow-mo
-    S.SlowMo = {
-        Intensity=UCam.SlowMo.Intensity, Freeze=UCam.SlowMo.Freeze,
-        AffectsLocal=UCam.SlowMo.AffectsLocal, AffectsNPC=UCam.SlowMo.AffectsNPC,
-        AffectsOther=UCam.SlowMo.AffectsOther, AffectsPhysics=UCam.SlowMo.AffectsPhysics,
-        Scope=UCam.SlowMo.Scope, TickRate=UCam.SlowMo.TickRate,
-    }
-
-    -- TimeControl
-    S.TimeControl = {
-        RampEnabled=UCam.TimeControl.RampEnabled, RampPreset=UCam.TimeControl.RampPreset,
-        RampDuration=UCam.TimeControl.RampDuration, FastForwardSpeed=UCam.TimeControl.FastForwardSpeed,
-        AudioSlowMo=UCam.TimeControl.AudioSlowMo, VFXOnBulletTime=UCam.TimeControl.VFXOnBulletTime,
-    }
-
+    -- v8.1: Módulos eliminados (SlowMo, TimeControl) ya no se guardan en perfiles
+    
     -- Espectador
     S.Spectate = {
         Mode=UCam.Spectate.Mode, Smoothing=UCam.Spectate.Smoothing, Distance=UCam.Spectate.Distance,
@@ -240,9 +227,7 @@ local function applyState(S)
     mergeTable(UCam.FilterTransition, S.FilterTransition)
     mergeTable(UCam.FilterCombine,    S.FilterCombine)
 
-    -- Slow-mo / TimeControl
-    mergeTable(UCam.SlowMo,      S.SlowMo)
-    mergeTable(UCam.TimeControl, S.TimeControl)
+    -- v8.1: SlowMo / TimeControl eliminados — ya no se restauran en perfiles
 
     -- Espectador
     mergeTable(UCam.Spectate,    S.Spectate)

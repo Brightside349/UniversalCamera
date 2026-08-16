@@ -145,12 +145,22 @@ function UCam.ensureVignetteGui()
 
     UCam.Vignette.Gui            = gui
 
+    -- v8.1 FIX: Asegurar que Color sea un Color3 válido antes de usar.
+    local vignetteColor = UCam.Vignette.Color
+    if type(vignetteColor) == "table" and vignetteColor.R and vignetteColor.G and vignetteColor.B then
+        vignetteColor = Color3.new(vignetteColor.R, vignetteColor.G, vignetteColor.B)
+        UCam.Vignette.Color = vignetteColor
+    elseif type(vignetteColor) ~= "userdata" then
+        vignetteColor = Color3.new(0, 0, 0)
+        UCam.Vignette.Color = vignetteColor
+    end
+
     -- Borde radial: un Frame por cada lado, con gradient que va
     -- de "centro transparente" en el borde interior a "oscuro" en el borde exterior.
     local function makeEdge(name, size, pos, anchor, gradRotation)
         local edge = Instance.new("Frame")
         edge.Name             = name
-        edge.BackgroundColor3 = UCam.Vignette.Color or Color3.new(0, 0, 0)
+        edge.BackgroundColor3 = vignetteColor
         edge.BorderSizePixel  = 0
         edge.AnchorPoint       = anchor
         edge.Position          = pos
@@ -184,6 +194,13 @@ function UCam.applyVignette()
     if UCam.Vignette.Enabled then
         local g = UCam.ensureVignetteGui()
         if not g then return end
+        
+        -- v8.1 FIX: Verificar que _edges existe (el GUI se creó correctamente)
+        if not UCam.Vignette._edges or #UCam.Vignette._edges ~= 4 then
+            warn("[UCam] Vignette._edges no inicializado correctamente")
+            return
+        end
+        
         local intensity = UCam.clamp(UCam.Vignette.Intensity, 0, 1)
         local smooth    = UCam.clamp(UCam.Vignette.Smoothness, 0.05, 0.95)
         -- opacidad máxima en los bordes exteriores (0 = totalmente opaco, 1 = transparente)
@@ -214,8 +231,21 @@ function UCam.applyVignette()
         for _, grad in ipairs(UCam.Vignette._grads) do
             grad.Transparency = keys
         end
+        
+        -- v8.1 FIX: Asegurar que Color sea un Color3 válido.
+        -- Si es una tabla (ej. desde persistencia: {R=0, G=0, B=0}), convertir.
+        local vignetteColor = UCam.Vignette.Color
+        if type(vignetteColor) == "table" and vignetteColor.R and vignetteColor.G and vignetteColor.B then
+            vignetteColor = Color3.new(vignetteColor.R, vignetteColor.G, vignetteColor.B)
+            UCam.Vignette.Color = vignetteColor  -- Actualizar para siguientes llamadas
+        elseif type(vignetteColor) ~= "userdata" then
+            -- Si no es Color3 ni tabla válida, usar negro por defecto
+            vignetteColor = Color3.new(0, 0, 0)
+            UCam.Vignette.Color = vignetteColor
+        end
+        
         for _, edge in ipairs(edges) do
-            edge.BackgroundColor3 = UCam.Vignette.Color or Color3.new(0, 0, 0)
+            edge.BackgroundColor3 = vignetteColor
         end
         g.Enabled = true
     else

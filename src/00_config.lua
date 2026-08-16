@@ -11,7 +11,7 @@
 --         UCam.Orbit, UCam.DronePath, UCam.Lateral, UCam.Follow,
 --         UCam.CrashZoom, UCam.Vertigo, UCam.Crane, UCam.Dolly,
 --         UCam.Handheld, UCam.RollAxis, UCam.Waypoint, UCam.Director,
---         UCam.SlowMo, UCam.Letterbox, UCam.Bloom, UCam.DOF,
+--         UCam.Letterbox, UCam.Bloom, UCam.DOF,
 --         UCam.SunRays, UCam.Vignette, UCam.Shake, UCam.FovPulse,
 --         UCam.Spectate, UCam.CameraTransition, UCam.AutoFocusDOF,
 --         UCam.AutoCycle, UCam.UIRefs, UCam.AutoHUD, UCam.LookAtLock,
@@ -350,38 +350,6 @@ UCam.Director = {
     PlayStartFOV = nil,
     PlayStartRoll = 0,        -- v7: roll inicial para interpolar
     SavedRoutes  = {},        -- v7: rutas serializadas guardadas (strings)
-}
-
--- Slow-mo (bullet time) v3
-UCam.SlowMo = {
-    BulletTime        = false,
-    Intensity         = 50,
-    Freeze            = false,
-    AffectsLocal      = true,
-    AffectsNPC        = true,
-    AffectsOther      = true,
-    AffectsPhysics    = true,
-    Scope             = "Mundo",
-    Scopes            = { "Mundo", "Personajes", "Jugadores", "Fisico" },
-    Parts             = {},
-    OriginalCF        = {},
-    Humanoids         = {},
-    DescendantConn    = nil,
-    CharacterAdded    = nil,
-    LastRebuild       = 0,
-    RebuildInterval   = 2,
-    RealPositions     = {},
-    LastSetCFrame     = {},
-    PrevRealPositions = {},
-    MaxParts          = 400,
-    ProcessingRadius  = 250,
-    BatchSize         = 120,
-    TickStep          = 1,
-    TickAccum         = 0,
-    BatchIndex        = 0,
-    PartKeys          = {},
-    TickRate          = 30,
-    TickClock         = 0,
 }
 
 -- Nombres de efectos post-procesado
@@ -833,29 +801,13 @@ UCam.PlayerMod = {
 }
 
 -- ============================================================
--- MÓDULO CONTROL DE TIEMPO (v7) — 45_timecontrol.lua
--- ============================================================
-UCam.TimeControl = {
-    RampEnabled = false,
-    RampPreset = "Impacto",
-    RampPresets = { "Impacto", "Gradual", "Matrix Bullet" },
-    RampDuration = 2.0,
-    RampStartTime = 0,
-    FrameByFrame = false,
-    FastForward = false,
-    FastForwardSpeed = 2.0,
-    AudioSlowMo = false,
-    VFXOnBulletTime = false,
-    _originalSounds = {},
-}
-
--- ============================================================
--- MÓDULO REPLAY / GRABACIÓN (v7) — 55_replay.lua
+-- MÓDULO REPLAY / GRABACIÓN (v8.1 REMASTERIZADO) — 55_replay.lua
+-- v8.1: Simplificado, solo funciona con cámara libre, sin marcadores/ramps
 -- ============================================================
 UCam.Replay = {
     Recording = false,
     Playing = false,
-    Paused = false,              -- v8: estado de pausa (leído por la UI de Replay)
+    Paused = false,
     Frames = {},                -- { CFrame, FOV, timestamp }
     MaxDuration = 60,
     CurrentTime = 0,
@@ -863,13 +815,6 @@ UCam.Replay = {
     Loop = false,
     SavedRoutes = {},           -- hasta 3 rutas guardadas
     _recordStartTime = 0,
-    -- v8: marcadores con eventos (texto/shake/slow/fov/speed)
-    Markers = {},               -- { { t, label, action, val, fired }, ... }
-    ShowMarkerHUD = true,
-    _markersFiredIdx = {},
-    -- v8: speed ramps keyframados
-    SpeedRamps = {},            -- { { t, speed }, ... } ordenados
-    SpeedRampEnabled = false,
 }
 
 -- v8: Perfiles completos (modo + filtros + lighting + slowmo + fun)
@@ -882,84 +827,6 @@ UCam.Profiles = {
 
 -- v8: i18n (es/en/pt)
 UCam.Locale = "es"
-
--- ============================================================
--- v8 FASE 3: COMBOS DE CÁMARA (secuencia automática de modos)
--- ============================================================
-UCam.Combos = {
-    Enabled      = false,
-    Playing      = false,
-    Steps        = {},      -- { { camMode="Orbita", duration=4, fov=70, extra={...} }, ... }
-    CurrentStep  = 0,
-    StepStartAt  = 0,
-    Loop         = false,
-    SavedCombos  = {},      -- nombre → steps
-    _conn        = nil,
-}
-
--- ============================================================
--- v8 FASE 3: MACROS (secuencia grabada de acciones discretas)
--- ============================================================
-UCam.Macros = {
-    Recording     = false,
-    RecordingName = "Macro",
-    RecordStart   = 0,
-    _actions      = {},     -- { { t=dt, kind="toggle"/"mode"/"intensity", path="UCam.X", value=any }, ... }
-
-    Playing       = false,
-    PlaySpeed     = 1.0,
-    CurrentMacro  = nil,   -- referencia a SavedMacros[name] mientras reproduce
-    SavedMacros   = {},    -- nombre → { actions, savedAt }
-
-    _conn         = nil,
-    _playhead     = 0,
-    _startedAt    = 0,
-}
-
--- ============================================================
--- v8 FASE 3: AUDIO REACTIVE (FOV/shake/filter al beat)
--- ============================================================
-UCam.AudioReactive = {
-    Enabled       = false,
-    TargetSound   = nil,        -- Sound instance seleccionado (o nil → auto-detectar el más fuerte)
-    AutoDetect    = true,
-
-    -- Efectos a disparar en cada beat:
-    FovPulse      = false,
-    FovAmount     = 8,          -- grados a pulsar
-    ShakeOnBeat   = false,
-    ShakePattern  = "Pulso",
-    FilterFlash   = false,      -- flash blanco rápido
-
-    -- Parámetros de detección
-    Sensitivity   = 0.35,       -- umbral de loudness
-    Cooldown      = 0.25,       -- segundos entre beats
-    _lastBeatAt   = 0,
-    _conn         = nil,
-}
-
--- ============================================================
--- v8 FASE 3: FILTROS PRO (efectos avanzados visuales extra)
--- ============================================================
-UCam.FiltersPro = {
-    Enabled      = false,       -- toggle maestro
-
-    FilmGrain    = { Enabled = false, Amount = 0.4, Speed = 24 },      -- ruido de película
-    Pixelify     = { Enabled = false, BlockSize = 8 },                  -- pixel-art / 8-bit
-    Scanlines    = { Enabled = false, Density = 120, Opacity = 0.4 },   -- CRT / VHS
-    TiltShift    = { Enabled = false, FocusHeight = 0.5, Blur = 0.6 },  -- efecto miniatura
-    RadialBlur   = { Enabled = false, Amount = 0.5 },                   -- blur radial de movimiento
-    ColorCurves  = { Enabled = false, Preset = "Neutral",               -- curvas de color rápidas
-                     Presets = { "Neutral", "Filmic", "Retro", "Neon Noir", "Pastel Dream",
-                                "Golden Hour", "Cool Breeze", "Moody" } },
-
-    _grainGui     = nil,
-    _scanlinesGui = nil,
-    _tiltshiftGui = nil,
-    _pixelGui     = nil,
-    _radialGui    = nil,
-    _grainConn    = nil,
-}
 
 -- ============================================================
 -- PlayerModule controls (para disableControls / enableControls)
@@ -995,7 +862,6 @@ UCam.DEFAULTS = {
     movementSmoothing    = 8,
     mouseSensitivity     = 0.35,
     sprintMultiplier     = 2.5,
-    slowMoIntensity      = 50,
     camMode              = "Libre",
     filterIndex          = 1,
     orbitDistance        = 15,

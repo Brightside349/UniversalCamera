@@ -102,7 +102,7 @@ local SCHEMA = {
     SunRays = { Intensity = nil, Spread = nil },
     Vignette = {
         Intensity = nil, Smoothness = nil,
-        Color = serColor3,
+        Color = desColor3,  -- v8.1 FIX: usar desColor3 para deserializar {r,g,b} → Color3
     },
     Shake = { Intensity = nil, Pattern = nil },
     FovPulse = { Amplitude = nil, Speed = nil },
@@ -122,8 +122,8 @@ local SCHEMA = {
     -- Lighting
     LightingTweaks = {
         ClockTime = nil, ExposureCompensation = nil,
-        FogColor = serColor3, FogStart = nil, FogEnd = nil,
-        OutdoorAmbient = serColor3, Ambient = serColor3,
+        FogColor = desColor3, FogStart = nil, FogEnd = nil,  -- v8.1 FIX
+        OutdoorAmbient = desColor3, Ambient = desColor3,      -- v8.1 FIX
         Brightness = nil, ShadowsEnabled = nil, ShadowIntensity = nil,
         SkyboxAssetId = nil,
     },
@@ -137,13 +137,6 @@ local SCHEMA = {
     FilterCombine = { Enabled = nil, IndexA = nil, IndexB = nil, Mix = nil },
     -- CustomFilters NO va aquí: se serializa con funciones especiales
     -- (un schema vacío {} haría que serializeValue devuelva {} siempre)
-
-    -- Slow-mo
-    SlowMo = {
-        Intensity = nil, Freeze = nil,
-        AffectsLocal = nil, AffectsNPC = nil, AffectsOther = nil, AffectsPhysics = nil,
-        Scope = nil, TickRate = nil, MaxParts = nil, ProcessingRadius = nil,
-    },
 
     -- Espectador
     Spectate = {
@@ -166,19 +159,16 @@ local SCHEMA = {
         SpeedBoost = { WalkSpeed = nil },
         BodySpin = { Speed = nil, Axis = nil },
         Rainbow = { Speed = nil },
-        Trail = { Width = nil, Duration = nil, Color = serColor3, Type = nil, Rainbow = nil, Painting = nil },
-        Disco = { Size = nil, Color = serColor3, Shape = nil, AnimatedLights = nil, Mirror = nil },
-        Particles = { Type = nil, Intensity = nil, Color = serColor3 },
+        Trail = { Width = nil, Duration = nil, Color = desColor3, Type = nil, Rainbow = nil, Painting = nil },  -- v8.1 FIX
+        Disco = { Size = nil, Color = desColor3, Shape = nil, AnimatedLights = nil, Mirror = nil },            -- v8.1 FIX
+        Particles = { Type = nil, Intensity = nil, Color = desColor3 },                                       -- v8.1 FIX
         Fly = { Speed = nil },
     },
 
     -- Replay (SavedRoutes se serializa aparte — cada frame tiene CFrame)
+    -- v8.1: Simplificado, sin marcadores ni ramps
     Replay = {
         MaxDuration = nil, PlaybackSpeed = nil, Loop = nil,
-        ShowMarkerHUD = nil, SpeedRampEnabled = nil,
-        -- v8: markers y ramps DENTRO de Replay (aunque también van en routes)
-        Markers    = nil,
-        SpeedRamps = nil,
     },
 
     -- v8: Perfiles (Slots se serializa aparte por su tamaño)
@@ -206,40 +196,8 @@ local SCHEMA = {
     },
 
     -- TimeControl
-    TimeControl = {
-        RampEnabled = nil, RampPreset = nil, RampDuration = nil,
-        FastForwardSpeed = nil, AudioSlowMo = nil, VFXOnBulletTime = nil,
-    },
-
-    -- v8 Fase 3: Combos de cámara
-    Combos = {
-        Loop = nil,
-        SavedCombos = nil,     -- { name → steps[] }; steps son datos puros
-    },
-
-    -- v8 Fase 3: Macros
-    Macros = {
-        PlaySpeed = nil,
-        SavedMacros = nil,     -- { name → { actions[], savedAt } }
-    },
-
-    -- v8 Fase 3: Audio Reactive
-    AudioReactive = {
-        Sensitivity = nil, Cooldown = nil,
-        FovPulse = nil, FovAmount = nil,
-        ShakeOnBeat = nil, ShakePattern = nil,
-        FilterFlash = nil, AutoDetect = nil,
-    },
-
-    -- v8 Fase 3: Filtros Pro
-    FiltersPro = {
-        FilmGrain   = { Amount = nil, Speed = nil },
-        Pixelify    = { BlockSize = nil },
-        Scanlines   = { Density = nil, Opacity = nil },
-        TiltShift   = { FocusHeight = nil, Blur = nil },
-        RadialBlur  = { Amount = nil },
-        ColorCurves = { Preset = nil },
-    },
+    -- v8.1: Módulos eliminados (SlowMo, TimeControl, Combos, Macros, AudioReactive, FiltersPro)
+    -- Ya no se persisten
 }
 
 -- ============================================================

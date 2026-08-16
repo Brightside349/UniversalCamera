@@ -116,7 +116,8 @@ local function installHooks()
         return function(dt)
             local t0 = os.clock()
             local ok, res = pcall(orig, dt)
-            UCam.perfRecord("timecontrol.updateTimeControl", (os.clock() - t0) * 1000)
+            -- v8.1: timecontrol.updateTimeControl eliminado
+            UCam.perfRecord("camcore.updateCamera", (os.clock() - t0) * 1000)
             if not ok then error(res) end
             return res
         end

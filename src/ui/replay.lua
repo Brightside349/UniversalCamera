@@ -1,44 +1,54 @@
 -- ============================================================
--- Universal Camera Pro v7 · ui/replay
--- Pestaña Replay / Grabación: grabar sesión de cámara,
+-- Universal Camera Pro v8.1 · ui/replay REMASTERIZADO
+-- Pestaña Replay / Grabación: grabar recorrido de cámara LIBRE,
 -- reproducir con scrubbing, velocidad variable, guardar hasta
 -- 3 rutas y exportar/importar por string.
+--
+-- SIMPLIFICADO: Sin marcadores, sin speed ramps, sin compartir web.
 -- ============================================================
 local UCam = _G.UCam
 
 function UCam.build_replay(Window)
     local Tab = Window:CreateTab("🎬 Replay", "film")
 
-    -- v8: índice del marcador seleccionado para eliminar (closure, no _G)
-    local markerSelectedIdx = 1
+    -- --------------------------------------------------------
+    -- SECCIÓN: Introducción
+    -- --------------------------------------------------------
+    Tab:CreateSection("Replay de Cámara Libre")
+    Tab:CreateParagraph({
+        Title   = "¿Qué es Replay?",
+        Content = "Graba tu recorrido con la CÁMARA LIBRE activada. El sistema captura tu movimiento manual y lo puede reproducir después de forma suave, como una alternativa al modo Director pero sin waypoints.",
+    })
+    
+    Tab:CreateParagraph({
+        Title   = "⚠️ Importante",
+        Content = "Debes tener la CÁMARA LIBRE activada para poder grabar. Si se desactiva durante la grabación, esta se detendrá automáticamente.",
+    })
 
     -- --------------------------------------------------------
     -- SECCIÓN: Grabación
     -- --------------------------------------------------------
-    Tab:CreateSection("Grabación de cámara")
-    Tab:CreateParagraph({
-        Title   = "¿Cómo funciona?",
-        Content = "Graba la posición y FOV de tu cámara a 30fps. Luego puedes reproducir, pausar, hacer scrubbing y guardar la ruta para usarla después. Funciona en cualquier modo de cámara.",
-    })
+    Tab:CreateSection("Grabación")
 
     Tab:CreateDropdown({
         Name            = "Duración máxima",
-        Options         = { "30s", "60s", "120s" },
+        Options         = { "30s", "60s", "120s", "180s" },
         CurrentOption   = { "60s" },
         MultipleOptions = false,
+        Flag            = "ReplayMaxDuration",
         Callback        = function(o)
             local v = UCam.resolveDropdownValue(o)
             if not v then return end
-            local map = { ["30s"] = 30, ["60s"] = 60, ["120s"] = 120 }
+            local map = { ["30s"] = 30, ["60s"] = 60, ["120s"] = 120, ["180s"] = 180 }
             UCam.Replay.MaxDuration = map[v] or 60
         end,
     })
 
     Tab:CreateButton({
-        Name     = "⏺  Grabar",
+        Name     = "⏺  Iniciar Grabación",
         Callback = function()
             if UCam.Replay.Recording then
-                UCam.notify("Replay", "Ya está grabando. Detén la grabación primero.")
+                UCam.notify("Replay", "Ya está grabando. Detén la grabación primero.", 3)
                 return
             end
             UCam.startRecording()
@@ -46,20 +56,19 @@ function UCam.build_replay(Window)
     })
 
     Tab:CreateButton({
-        Name     = "⏹  Detener grabación",
+        Name     = "⏹  Detener Grabación",
         Callback = function()
             if not UCam.Replay.Recording then
-                UCam.notify("Replay", "No hay grabación activa.")
+                UCam.notify("Replay", "No hay grabación activa.", 3)
                 return
             end
             UCam.stopRecording()
         end,
     })
 
-    -- Indicador de frames grabados (se actualiza con un label)
     Tab:CreateParagraph({
-        Title   = "Estado de grabación",
-        Content = "Usa los botones Grabar / Detener. Cuando detengas verás cuántos frames se capturaron y la duración total.",
+        Title   = "Estado",
+        Content = "Cuando detengas la grabación verás cuántos frames se capturaron y la duración total del recorrido.",
     })
 
     -- --------------------------------------------------------
@@ -68,10 +77,10 @@ function UCam.build_replay(Window)
     Tab:CreateSection("Reproducción")
 
     Tab:CreateButton({
-        Name     = "▶  Play",
+        Name     = "▶  Reproducir",
         Callback = function()
             if UCam.Replay.Playing and not UCam.Replay.Paused then
-                UCam.notify("Replay", "Ya está reproduciendo.")
+                UCam.notify("Replay", "Ya está reproduciendo.", 3)
                 return
             end
             if UCam.Replay.Playing then
@@ -87,7 +96,7 @@ function UCam.build_replay(Window)
         Name     = "⏸  Pausa / Reanudar",
         Callback = function()
             if not UCam.Replay.Playing then
-                UCam.notify("Replay", "No hay reproducción activa.")
+                UCam.notify("Replay", "No hay reproducción activa.", 3)
                 return
             end
             UCam.pausePlayback()
@@ -95,7 +104,7 @@ function UCam.build_replay(Window)
     })
 
     Tab:CreateButton({
-        Name     = "⏹  Detener reproducción",
+        Name     = "⏹  Detener Reproducción",
         Callback = function()
             UCam.stopPlayback()
         end,
@@ -104,31 +113,31 @@ function UCam.build_replay(Window)
     Tab:CreateToggle({
         Name         = "Loop (repetir en bucle)",
         CurrentValue = UCam.Replay.Loop,
+        Flag         = "ReplayLoop",
         Callback     = function(v)
             UCam.Replay.Loop = v
-            UCam.notify("Replay", v and "Loop activado." or "Loop desactivado.")
         end,
     })
 
     -- --------------------------------------------------------
-    -- SECCIÓN: Scrubbing / Timeline
+    -- SECCIÓN: Timeline (Scrubbing)
     -- --------------------------------------------------------
-    Tab:CreateSection("Timeline (scrubbing)")
+    Tab:CreateSection("Timeline (Navegación)")
     Tab:CreateParagraph({
-        Title   = "Saltar a un punto",
-        Content = "Mueve el slider para ir directamente a cualquier momento de la grabación. Funciona tanto en pausa como durante la reproducción.",
+        Title   = "Scrubbing",
+        Content = "Mueve el slider para saltar a cualquier momento de la grabación. Funciona tanto en pausa como durante la reproducción.",
     })
 
-    -- Slider de progreso: 0–120 segundos (se adapta a la duración real al usarlo)
     Tab:CreateSlider({
-        Name         = "Posición en la grabación",
+        Name         = "Posición en el recorrido",
         Range        = { 0, 120 },
         Increment    = 0.5,
         Suffix       = "s",
         CurrentValue = 0,
+        Flag         = "ReplaySeekPosition",
         Callback     = function(v)
             if #UCam.Replay.Frames < 2 then
-                UCam.notify("Replay", "No hay grabación cargada.")
+                UCam.notify("Replay", "No hay grabación cargada.", 3)
                 return
             end
             local maxT = UCam.Replay.Frames[#UCam.Replay.Frames].t
@@ -138,47 +147,49 @@ function UCam.build_replay(Window)
     })
 
     -- --------------------------------------------------------
-    -- SECCIÓN: Velocidad de reproducción
+    -- SECCIÓN: Velocidad
     -- --------------------------------------------------------
-    Tab:CreateSection("Velocidad de reproducción")
+    Tab:CreateSection("Velocidad de Reproducción")
 
     Tab:CreateDropdown({
         Name            = "Velocidad",
-        Options         = { "0.25x", "0.5x", "1x", "2x", "4x" },
+        Options         = { "0.25x", "0.5x", "0.75x", "1x", "1.5x", "2x", "4x" },
         CurrentOption   = { "1x" },
         MultipleOptions = false,
+        Flag            = "ReplayPlaybackSpeed",
         Callback        = function(o)
             local v = UCam.resolveDropdownValue(o)
             if not v then return end
             local map = {
                 ["0.25x"] = 0.25,
                 ["0.5x"]  = 0.5,
+                ["0.75x"] = 0.75,
                 ["1x"]    = 1.0,
+                ["1.5x"]  = 1.5,
                 ["2x"]    = 2.0,
                 ["4x"]    = 4.0,
             }
             local speed = map[v] or 1.0
             UCam.setPlaybackSpeed(speed)
-            UCam.notify("Replay", "Velocidad: " .. v)
         end,
     })
 
     -- --------------------------------------------------------
-    -- SECCIÓN: Rutas guardadas
+    -- SECCIÓN: Rutas Guardadas
     -- --------------------------------------------------------
-    Tab:CreateSection("Rutas guardadas (hasta 3)")
+    Tab:CreateSection("Rutas Guardadas")
     Tab:CreateParagraph({
-        Title   = "Guardar y cargar rutas",
-        Content = "Guarda la grabación actual en una ranura (1, 2 o 3) para no perderla. Carga una ranura para que la grabación activa sea esa ruta. Útil para comparar ángulos.",
+        Title   = "Gestión de Rutas",
+        Content = "Guarda tu grabación actual en una de las 3 ranuras disponibles. Carga una ranura para hacer ese recorrido la grabación activa.",
     })
 
-    -- Ranura seleccionada
     local selectedSlot = 1
     Tab:CreateDropdown({
-        Name            = "Ranura activa",
+        Name            = "Ranura",
         Options         = { "Ranura 1", "Ranura 2", "Ranura 3" },
         CurrentOption   = { "Ranura 1" },
         MultipleOptions = false,
+        Flag            = "ReplaySelectedSlot",
         Callback        = function(o)
             local v = UCam.resolveDropdownValue(o)
             if not v then return end
@@ -188,28 +199,28 @@ function UCam.build_replay(Window)
     })
 
     Tab:CreateButton({
-        Name     = "💾  Guardar en ranura seleccionada",
+        Name     = "💾  Guardar en Ranura",
         Callback = function()
             UCam.saveCurrentRoute(selectedSlot)
         end,
     })
 
     Tab:CreateButton({
-        Name     = "📂  Cargar ranura seleccionada",
+        Name     = "📂  Cargar Ranura",
         Callback = function()
             UCam.loadRoute(selectedSlot)
         end,
     })
 
     Tab:CreateButton({
-        Name     = "🗑️  Eliminar ranura seleccionada",
+        Name     = "🗑️  Eliminar Ranura",
         Callback = function()
             UCam.deleteRoute(selectedSlot)
         end,
     })
 
     Tab:CreateButton({
-        Name     = "ℹ️  Ver info de ranuras",
+        Name     = "ℹ️  Ver Info de Ranuras",
         Callback = function()
             local lines = {}
             for i = 1, 3 do
@@ -224,65 +235,64 @@ function UCam.build_replay(Window)
                     table.insert(lines, string.format("Ranura %d: vacía", i))
                 end
             end
-            UCam.notify("Replay — Ranuras", table.concat(lines, "\n"))
+            UCam.notify("Replay — Ranuras", table.concat(lines, "\n"), 6)
         end,
     })
 
     -- --------------------------------------------------------
-    -- SECCIÓN: Exportar / Importar ruta
+    -- SECCIÓN: Exportar / Importar
     -- --------------------------------------------------------
-    Tab:CreateSection("Exportar / Importar ruta")
+    Tab:CreateSection("Exportar / Importar")
     Tab:CreateParagraph({
-        Title   = "Compartir rutas de cámara",
-        Content = "Serializa la grabación a un string compacto. Cópialo al portapapeles para compartir. Pega un string de otra persona en el campo de importación para cargar su ruta.",
+        Title   = "Compartir Recorridos",
+        Content = "Exporta tu recorrido a un string compacto para compartirlo. Importa un string de otra persona para cargar su ruta.",
     })
 
     Tab:CreateButton({
-        Name     = "📋  Copiar ruta al portapapeles",
+        Name     = "📋  Copiar Ruta al Portapapeles",
         Callback = function()
             if #UCam.Replay.Frames < 2 then
-                UCam.notify("Replay", "No hay grabación activa para exportar.")
+                UCam.notify("Replay", "No hay grabación activa para exportar.", 3)
                 return
             end
             local str = UCam.serializeRoute()
             if str == "" then
-                UCam.notify("Replay", "Error al serializar la ruta.")
+                UCam.notify("Replay", "Error al serializar la ruta.", 3)
                 return
             end
-            -- Copiar al portapapeles usando setclipboard (ejecutor de exploits)
             local ok = pcall(function() setclipboard(str) end)
             if ok then
                 UCam.notify("Replay",
-                    string.format("Ruta copiada (%d chars). Pégala donde quieras.", #str))
+                    string.format("Ruta copiada (%d caracteres).", #str))
             else
                 UCam.notify("Replay",
-                    "setclipboard no disponible en este ejecutor. String generado en consola.")
+                    "setclipboard no disponible. String en consola.", 3)
                 print("[UCam Replay] Ruta serializada:\n" .. str)
             end
         end,
     })
 
-    -- Input de importación
     local importStr = ""
     Tab:CreateInput({
-        Name        = "Pegar ruta importada aquí",
-        PlaceholderText = "Pega el string de la ruta...",
+        Name        = "Pegar String de Ruta",
+        PlaceholderText = "Pega el string aquí...",
         RemoveTextAfterFocusLost = false,
+        Flag        = "ReplayImportString",
         Callback    = function(v)
             importStr = v or ""
         end,
     })
 
     Tab:CreateButton({
-        Name     = "📥  Importar ruta pegada",
+        Name     = "📥  Importar Ruta",
         Callback = function()
             if not importStr or importStr == "" then
-                UCam.notify("Replay", "El campo de importación está vacío.")
+                UCam.notify("Replay", "El campo de importación está vacío.", 3)
                 return
             end
             local frames = UCam.deserializeRoute(importStr)
             if not frames then
-                UCam.notify("Replay", "String inválido o demasiado corto.")
+                UCam.notify("Replay", "String inválido o demasiado corto.", 3)
                 return
             end
             table.clear(UCam.Replay.Frames)
@@ -298,12 +308,12 @@ function UCam.build_replay(Window)
     })
 
     -- --------------------------------------------------------
-    -- SECCIÓN: Acciones globales
+    -- SECCIÓN: Acciones
     -- --------------------------------------------------------
-    Tab:CreateSection("Acciones globales")
+    Tab:CreateSection("Acciones Globales")
 
     Tab:CreateButton({
-        Name     = "🗑️  Limpiar grabación actual",
+        Name     = "🗑️  Limpiar Grabación Actual",
         Callback = function()
             if UCam.Replay.Recording or UCam.Replay.Playing then
                 UCam.stopReplay()
@@ -316,211 +326,28 @@ function UCam.build_replay(Window)
     })
 
     Tab:CreateButton({
-        Name     = "⏹  Detener TODO (replay)",
+        Name     = "⏹  Detener TODO",
         Callback = function()
             UCam.stopReplay()
             UCam.notify("Replay", "Todo detenido y grabación limpiada.")
         end,
     })
-
+    
     -- --------------------------------------------------------
-    -- v8: MARCADORES con eventos
+    -- SECCIÓN: Info
     -- --------------------------------------------------------
-    Tab:CreateSection("Marcadores con eventos")
+    Tab:CreateSection("Información")
     Tab:CreateParagraph({
-        Title   = "¿Qué son?",
-        Content = "Un marcador dispara un evento cuando la reproducción lo cruza: shake de cámara, slow-mo, pulso de FOV, o un cambio drástico de velocidad. Útil para impactos y beats.",
-    })
+        Title   = "¿Cómo usar Replay?",
+        Content = [[
+1. Activa la CÁMARA LIBRE (F)
+2. Presiona "Iniciar Grabación"
+3. Muévete libremente por el escenario
+4. Presiona "Detener Grabación"
+5. Presiona "Reproducir" para ver tu recorrido
+6. Guarda en una ranura para no perderlo
 
-    local markerTime  = 0
-    local markerLabel = "Hit"
-    local markerAction = "shake"
-    local markerValue = "Impacto"
-
-    Tab:CreateSlider({
-        Name         = "Tiempo del marcador (segundos)",
-        Range        = { 0, 120 },
-        Increment    = 0.1,
-        Suffix       = "s",
-        CurrentValue = 0,
-        Callback     = function(v) markerTime = tonumber(v) or 0 end,
-    })
-
-    Tab:CreateInput({
-        Name        = "Label (texto)",
-        PlaceholderText = "Ej: Impacto, Beat 1, Grito…",
-        RemoveTextAfterFocusLost = false,
-        Callback    = function(v) markerLabel = tostring(v or "Marker") end,
-    })
-
-    Tab:CreateDropdown({
-        Name            = "Acción al cruzar",
-        Options         = { "shake", "slow", "fov", "speed", "none" },
-        CurrentOption   = { "shake" },
-        MultipleOptions = false,
-        Callback        = function(o)
-            local v = UCam.resolveDropdownValue(o)
-            if v then markerAction = v end
-        end,
-    })
-
-    Tab:CreateInput({
-        Name        = "Valor de la acción",
-        PlaceholderText = "shake=nombre | slow=0.3 | fov=+10 | speed=2.0",
-        RemoveTextAfterFocusLost = false,
-        Callback    = function(v) markerValue = tostring(v or "") end,
-    })
-
-    Tab:CreateButton({
-        Name     = "➕  Agregar marcador",
-        Callback = function()
-            local val
-            if markerAction == "shake" then
-                val = (markerValue ~= "") and markerValue or "Impacto"
-            else
-                val = tonumber(markerValue) or nil
-            end
-            UCam.addMarker(markerTime, markerLabel, markerAction, val)
-        end,
-    })
-
-    Tab:CreateSlider({
-        Name         = "Borrar marcador (índice 1-N)",
-        Range        = { 1, 20 },
-        Increment    = 1,
-        CurrentValue = 1,
-        Callback     = function(v) markerSelectedIdx = math.floor(v) end,
-    })
-
-    Tab:CreateButton({
-        Name     = "🗑️  Borrar marcador seleccionado",
-        Callback = function()
-            UCam.removeMarker(markerSelectedIdx)
-        end,
-    })
-
-    Tab:CreateButton({
-        Name     = "🧹  Limpiar todos los marcadores",
-        Callback = function()
-            UCam.clearMarkers()
-        end,
-    })
-
-    Tab:CreateToggle({
-        Name         = "Notificar al cruzar marcadores",
-        CurrentValue = UCam.Replay.ShowMarkerHUD,
-        Callback     = function(v)
-            UCam.Replay.ShowMarkerHUD = v
-            UCam.notify("Replay", v and "Notificaciones de marcadores ON." or "Notificaciones de marcadores OFF.")
-        end,
-    })
-
-    Tab:CreateButton({
-        Name     = "📋  Listar marcadores",
-        Callback = function()
-            local ms = UCam.Replay.Markers
-            if #ms == 0 then
-                UCam.notify("Replay", "No hay marcadores.")
-                return
-            end
-            local parts = {}
-            for i, m in ipairs(ms) do
-                parts[#parts+1] = string.format("%d) %s @ %s → %s",
-                    i, m.label, UCam.Replay.getFormattedTime(m.t), m.action)
-            end
-            UCam.notify("Replay — Marcadores", table.concat(parts, "\n"), 8)
-        end,
-    })
-
-    -- --------------------------------------------------------
-    -- v8: SPEED RAMPS (velocidad variable dentro del playback)
-    -- --------------------------------------------------------
-    Tab:CreateSection("Speed ramps (veloc. variable)")
-    Tab:CreateParagraph({
-        Title   = "¿Qué son?",
-        Content = "Define velocidades distintas en distintos momentos del replay. El playback interpola suavemente entre ellos: ej. lento durante el impacto, rápido en el travel.",
-    })
-
-    local rampTime  = 0
-    local rampSpeed = 1.0
-
-    Tab:CreateSlider({
-        Name         = "Tiempo del punto de rampa (s)",
-        Range        = { 0, 120 },
-        Increment    = 0.1,
-        Suffix       = "s",
-        CurrentValue = 0,
-        Callback     = function(v) rampTime = tonumber(v) or 0 end,
-    })
-
-    Tab:CreateSlider({
-        Name         = "Velocidad en ese punto",
-        Range        = { 0.1, 4 },
-        Increment    = 0.05,
-        Suffix       = "x",
-        CurrentValue = 1.0,
-        Callback     = function(v) rampSpeed = tonumber(v) or 1.0 end,
-    })
-
-    Tab:CreateButton({
-        Name     = "➕  Agregar punto de rampa",
-        Callback = function()
-            UCam.addSpeedRamp(rampTime, rampSpeed)
-        end,
-    })
-
-    Tab:CreateButton({
-        Name     = "🧹  Limpiar todos los ramps",
-        Callback = function()
-            UCam.clearSpeedRamps()
-        end,
-    })
-
-    Tab:CreateToggle({
-        Name         = "Speed ramps activos",
-        CurrentValue = UCam.Replay.SpeedRampEnabled,
-        Callback     = function(v)
-            UCam.Replay.SpeedRampEnabled = v
-            UCam.notify("Replay", v and "Ramps activados." or "Ramps desactivados (usa velocidad global).")
-        end,
-    })
-
-    Tab:CreateButton({
-        Name     = "📋  Listar ramps",
-        Callback = function()
-            local rs = UCam.Replay.SpeedRamps
-            if #rs == 0 then
-                UCam.notify("Replay", "No hay ramps definidos.")
-                return
-            end
-            local parts = {}
-            for i, r in ipairs(rs) do
-                parts[#parts+1] = string.format("%d) %s → %.2fx",
-                    i, UCam.Replay.getFormattedTime(r.t), r.speed)
-            end
-            UCam.notify("Replay — Speed ramps", table.concat(parts, "\n"), 8)
-        end,
-    })
-
-    -- --------------------------------------------------------
-    -- v8: COMPARTIR RUTA (web / externo)
-    -- --------------------------------------------------------
-    Tab:CreateSection("Compartir ruta (web)")
-    Tab:CreateParagraph({
-        Title   = "Subir a internet",
-        Content = "Serializa la ruta y la sube automáticamente a hastebin.rs (o pastebin si falla). Copia la URL resultante para compartirla.",
-    })
-
-    Tab:CreateButton({
-        Name     = "🌐  Subir ruta y compartir URL",
-        Callback = function()
-            local url = UCam.shareRoute()
-            if url then
-                local ok = pcall(function() setclipboard(url) end)
-                if ok then
-                    UCam.notify("Replay", "URL copiada al portapapeles:\n" .. url)
-                end
-            end
-        end,
+El Replay funciona como un Director sin waypoints: graba tu movimiento manual y lo reproduce suavemente.
+        ]]
     })
 end

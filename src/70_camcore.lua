@@ -113,7 +113,7 @@ function UCam.forceRestoreCamera()
         if UCam.Hud.Hidden then UCam.setHudHidden(false) end
         UCam.Saved._hudHiddenBeforeFreeCam = false
         if UCam.Hud.CharacterHidden then UCam.setCharacterHidden(false) end
-        if UCam.SlowMo.BulletTime then UCam.toggleBulletTime(false) end
+        -- v8.1: SlowMo/BulletTime eliminado
         UCam.destroyLetterbox()
         UCam.destroyVignetteGui()
         UCam.freeCamEnabled = false
@@ -166,7 +166,7 @@ function UCam.toggleFreeCam()
         if UCam.Hud.Hidden then UCam.setHudHidden(false) end
         UCam.Saved._hudHiddenBeforeFreeCam = false
         if UCam.Hud.CharacterHidden then UCam.setCharacterHidden(false) end
-        if UCam.SlowMo.BulletTime then UCam.toggleBulletTime(false) end
+        -- v8.1: SlowMo/BulletTime eliminado
         UCam.destroyLetterbox()
         UCam.destroyVignetteGui()
         UCam.notify("Universal Camera", "Camara libre desactivada.")
@@ -381,13 +381,9 @@ local function applyTransitionBlend()
 end
 
 function UCam.updateCamera(deltaTime)
-    -- v7: Control de Tiempo (Time Ramp / Frame-by-Frame / Fast Forward) se actualiza
-    -- en cada frame sin importar el modo de cámara, para que el ramp se propague
-    -- siempre (incluso mientras se espectea). updateReplay no necesita tick global
+    -- v7: updateReplay no necesita tick global
     -- porque usa su propio Heartbeat en startPlayback/startRecording.
-    if UCam.updateTimeControl then
-        pcall(UCam.updateTimeControl, deltaTime)
-    end
+    -- v8.1: updateTimeControl eliminado — ya no se tickea en cada frame.
     -- v7: transiciones de filtro / temporal / chromatic aberration
     if UCam.updateFilters then
         pcall(UCam.updateFilters, deltaTime)
@@ -856,21 +852,7 @@ UCam.trackConnection({ Disconnect = function()
 end }, "BindRender:UCamEnforce")
 UCam.RunService:BindToRenderStep("UCamEnforce", Enum.RenderPriority.Last.Value,         UCam.enforceCameraState)
 
--- Slow-mo corre en Heartbeat (no RenderStepped) para no chocar con el render.
-do
-    local lastTick = 0
-    UCam._slowmoHeartbeat = UCam.trackConnection(
-        UCam.RunService.Heartbeat:Connect(function(dt)
-            if not UCam.SlowMo.BulletTime then return end
-            local interval = 1 / math.max(15, UCam.SlowMo.TickRate or 30)
-            lastTick = lastTick + dt
-            if lastTick < interval then return end
-            while lastTick >= interval do lastTick = lastTick - interval end
-            UCam.updateSlowMo(interval)
-        end),
-        "Heartbeat:SlowMo"
-    )
-end
+-- v8.1: SlowMo/BulletTime eliminado — el heartbeat dedicado ya no existe.
 
 UCam.trackConnection(
     UCam.camera:GetPropertyChangedSignal("CameraSubject"):Connect(function()
@@ -1014,7 +996,7 @@ UCam.trackConnection(
         if UCam.Hud.Hidden then UCam.setHudHidden(false) end
         UCam.Saved._hudHiddenBeforeFreeCam = false
         if UCam.Hud.CharacterHidden then UCam.setCharacterHidden(false) end
-        if UCam.SlowMo.BulletTime then UCam.toggleBulletTime(false) end
+        -- v8.1: SlowMo/BulletTime eliminado
     end
     if UCam.Spectate.Active then
         UCam.Spectate.Active    = false
@@ -1057,7 +1039,7 @@ UCam.trackConnection(
     task.defer(function()
         UCam.refreshCharacterRefs()
         if UCam.humanoid then UCam.camera.CameraSubject = UCam.humanoid end
-        if UCam.SlowMo.BulletTime then UCam.rebuildSlowMoTargets() end
+        -- v8.1: rebuildSlowMoTargets eliminado
     end)
 end),
     "CharacterAdded:Cleanup"

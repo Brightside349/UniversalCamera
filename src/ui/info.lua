@@ -19,7 +19,7 @@ function UCam.build_info(Window)
     InfoTab:CreateParagraph({
         Title   = "Como esta organizada la UI (v8)",
         Content =
-        "Inicio: camara libre, ocultar HUD/personaje, auto-HUD y acciones rapidas (captura, teletransporte, restablecer todo).\nCamaras: los 18 modos y todos sus parametros agrupados por modo.\nEspectador: jugadores, auto-ciclo, estilos y FOV.\nCamara Lenta: toggle + TODOS sus ajustes en un solo lugar.\nTiempo: rampas de tiempo, frame-by-frame y fast-forward.\nReplay: graba/reproduce camara, marcadores con eventos, speed ramps y compartir rutas.\nCinematografico: letterbox, vignette, shake, FOV pulse, director y post-procesado (bloom, DOF, sun rays).\nFiltros: 30 built-in + editor custom + tus presets.\nFiltros Pro: grain, pixelify, scanlines, tilt-shift, radial blur y curvas de color.\nIluminacion / Estudio / Gimbal: modulos de ambiente y bloqueo.\nDiversion: montar, fisicas, tamano, poses, aspecto y efectos visuales.\nCuerpo / Poses / Jugadores: modifica aspecto de tu personaje y otros.\nPerfiles: guarda/carga setups completos.\nCombos / Macros / Audio Reactive: secuencias y efectos al ritmo.\nAjustes: teclas + idioma.\nPlugins: extensiones cargadas de la carpeta UniversalCamera/plugins.",
+        "Inicio: camara libre, ocultar HUD/personaje, auto-HUD y acciones rapidas (captura, teletransporte, restablecer todo).\nCamaras: los 18 modos y todos sus parametros agrupados por modo.\nEspectador: jugadores, auto-ciclo, estilos y FOV.\nReplay: graba el recorrido con camara libre y lo reproduce suavemente (alternativa al Director sin waypoints).\nCinematografico: letterbox, vignette, shake, FOV pulse, director y post-procesado (bloom, DOF, sun rays).\nFiltros: 30 built-in + editor custom + tus presets.\nIluminacion / Estudio / Gimbal: modulos de ambiente y bloqueo.\nDiversion: montar, fisicas, tamano, poses, aspecto y efectos visuales.\nCuerpo / Poses / Jugadores: modifica aspecto de tu personaje y otros.\nPerfiles: guarda/carga setups completos.\nAjustes: teclas + idioma.\nPlugins: extensiones cargadas de la carpeta UniversalCamera/plugins.",
     })
     InfoTab:CreateParagraph({
         Title   = "Pestana Filtros",
@@ -35,11 +35,6 @@ function UCam.build_info(Window)
         Title   = "Espectador Mejorado (9 modos)",
         Content =
         "Primera persona = ojos del jugador.\nTercera persona = detras del jugador (clic derecho para orbitar).\nCinematico = orbita automatica.\nSobre hombro = estilo shooter.\nDron aereo: vista de drone con bobbing.\nContrapicado: angulo bajo dramatico.\nDolly lateral: camara en riel lateral con sway.\nOrbita dinamica: orbita auto con cambios de distancia/altura.\nSteadicam: seguimiento suave detras del personaje.\n\nAuto-ciclo: cambia de jugador automaticamente cada N segundos.\nNavegacion rapida: teclas Q/E cambian de jugador instantaneamente.\nRotacion con Mouse: activado en todos los modos (excepto 1ra persona).",
-    })
-    InfoTab:CreateParagraph({
-        Title   = "Camara Lenta (Universal)",
-        Content =
-        "Funciona en todos los juegos. Ralentiza humanoides (mi personaje, otros jugadores, NPCs) via WalkSpeed/JumpPower localmente + objetos fisicos via CFrame-lerp con filtros seguros (no rompe joints). Modo Freeze = congela todo al maximo. Ahora tiene su propia pestaña con toggle + ajustes juntos.",
     })
     InfoTab:CreateParagraph({
         Title   = "Diversion - Efectos visuales (v8)",

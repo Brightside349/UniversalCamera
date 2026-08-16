@@ -29,7 +29,6 @@ function UCam.Unload()
         if UCam.stopBodyColor then UCam.stopBodyColor() end
         if UCam.stopPlayerMod then UCam.stopPlayerMod() end
         if UCam.restoreAllPlayers then UCam.restoreAllPlayers() end
-        if UCam.stopTimeControl then UCam.stopTimeControl() end
         if UCam.stopReplay then UCam.stopReplay() end
         if UCam.destroyGreenScreen then UCam.destroyGreenScreen() end
         if UCam.destroyLetterbox then UCam.destroyLetterbox() end
@@ -50,15 +49,6 @@ function UCam.Unload()
         if UCam.Spectate and UCam.Spectate.Active and UCam.stopSpectate then UCam.stopSpectate() end
         -- v8: detener todos los plugins (llama a su stop() si lo tienen)
         if UCam.stopAllPlugins then UCam.stopAllPlugins() end
-        -- v8 FIX: stopSlowMoTracking desconecta también las conexiones
-        -- internas plr.CharacterAdded (_playerCharConns) que solo él conoce.
-        -- Sin esto, recargar con Bullet Time activo seguía fugando conexiones.
-        if UCam.stopSlowMoTracking then UCam.stopSlowMoTracking() end
-        -- v8: detener los nuevos módulos de la Fase 3
-        if UCam.stopCombos then UCam.stopCombos() end
-        if UCam.stopMacros then UCam.stopMacros() end
-        if UCam.stopAudio then UCam.stopAudio() end
-        if UCam.stopFiltersPro then UCam.stopFiltersPro(false) end
         -- v8 fase 4: detener el monitor de performance
         if UCam.stopPerformance then UCam.stopPerformance() end
 
@@ -82,14 +72,6 @@ function UCam.Unload()
         if UCam._viewportResizeConn then
             pcall(function() UCam._viewportResizeConn:Disconnect() end)
             UCam._viewportResizeConn = nil
-        end
-        if UCam.SlowMo.DescendantConn then
-            pcall(function() UCam.SlowMo.DescendantConn:Disconnect() end)
-            UCam.SlowMo.DescendantConn = nil
-        end
-        if UCam.SlowMo.CharacterAdded then
-            pcall(function() UCam.SlowMo.CharacterAdded:Disconnect() end)
-            UCam.SlowMo.CharacterAdded = nil
         end
 
         -- v8: limpieza TOTAL via registry central
@@ -142,10 +124,10 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v8 By Cocoa Feliz",
-        "v8: Persistencia + Perfiles + Plugins + i18n + Replay 2.0 • Auto-limpieza. Presiona Delete para UI."
+        "Universal Camera Pro v8.1.1 By Cocoa Feliz",
+        "v8.1: Módulos simplificados, Replay remasterizado, bugs corregidos. Presiona Delete para UI."
     )
-    print("[UCam] Universal Camera Pro v8 cargado OK. Módulos nuevos: Persistencia, i18n, Perfiles, Replay 2.0, Plugins.")
+    print("[UCam] Universal Camera Pro v8.1.1 cargado OK. Pre-v9.0 cleanup: módulos obsoletos eliminados, Replay remasterizado.")
 else
     warn("[UCam] Error al construir la UI: " .. tostring(err))
 end

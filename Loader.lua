@@ -18,7 +18,7 @@
 -- ============================================================
 -- CONFIG: repo de GitHub para cargar las partes modularizadas
 -- ============================================================
-local VERSION = "v8.1.0"   -- release tag de la versión actual
+local VERSION = "v8.1.1"   -- pre-v9.0 cleanup release
 
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 
@@ -67,8 +67,6 @@ local ORDER = {
     "10_utils.lua",
     -- 2. Filtros built-in/custom, bloom, DOF, sunrays, vignette, letterbox
     "20_filters.lua",
-    -- 2.5 v8: Filtros Pro (grain, pixelify, scanlines, tilt-shift, radial blur, color curves)
-    "25_filterspro.lua",
     -- 3. Modulo Fun (montar, noclip, escala, poses, trail, disco, etc.)
     "30_fun.lua",
     -- 3.1 v7: Coloreo de cuerpo por partes + presets + arcoíris
@@ -77,26 +75,16 @@ local ORDER = {
     "33_poses.lua",
     -- 3.3 v7: Hub de modificación de otros jugadores (depende de 32/33)
     "35_playermod.lua",
-    -- 4. Bullet Time universal
-    "40_slowmo.lua",
-    -- 4.1 v7: Control de Tiempo expandido (Time Ramp, Frame-by-Frame, FF)
-    "45_timecontrol.lua",
     -- 5. Espectador (9 modos + navegacion Q/E)
     "50_spectate.lua",
     -- 6. Director (waypoints + reproduccion)
     "60_director.lua",
     -- 7. Nucleo de camara (toggleFreeCam, CrashZoom, Shake, updateCamera, input)
     "70_camcore.lua",
-    -- 7.1 v7: Replay / grabación de cámara (depende de director + cámara)
+    -- 7.1 v8.1: Replay REMASTERIZADO — grabación de cámara libre sin waypoints
     "55_replay.lua",
     -- 7.2 v8: Perfiles completos (depende de 05_persistence)
     "57_profiles.lua",
-    -- 7.3 v8: Combos de cámara — secuencias automáticas de modos
-    "58_combos.lua",
-    -- 7.4 v8: Macros — grabación/reproducción de acciones discretas
-    "65_macros.lua",
-    -- 7.5 v8: Audio Reactive — beat detection (FOV/shake/flash al ritmo)
-    "75_audioreactive.lua",
     -- 8. Orquestador de la UI (solo arma la Window y delega)
     "80_ui.lua",
     -- 8.5 v8: Monitor de performance (opcional, debug)
@@ -109,8 +97,6 @@ local ORDER = {
     "ui/inicio.lua",
     "ui/camaras.lua",
     "ui/espectador.lua",
-    "ui/slowmo.lua",
-    "ui/timecontrol.lua",   -- v7: pestaña ⏱️ Tiempo (Time Ramp, Frame-by-Frame)
     "ui/cinematic.lua",
     "ui/filters.lua",
     "ui/light.lua",
@@ -120,12 +106,8 @@ local ORDER = {
     "ui/bodycolor.lua",    -- v7: pestaña 🎨 Cuerpo (colores por partes)
     "ui/poses.lua",        -- v7: pestaña 🧍 Poses
     "ui/playermod.lua",    -- v7: pestaña 👥 Mod Jugadores
-    "ui/replay.lua",       -- v7: pestaña 🎬 Replay (grabación de cámara)
+    "ui/replay.lua",       -- v8.1: pestaña 🎬 Replay (REMASTERIZADO)
     "ui/profiles.lua",     -- v8: pestaña 📁 Perfiles
-    "ui/combos.lua",       -- v8: pestaña ⚡ Combos
-    "ui/macros.lua",       -- v8: pestaña 🎯 Macros
-    "ui/audioreactive.lua",-- v8: pestaña 🔊 Audio Reactive
-    "ui/filterspro.lua",   -- v8: pestaña ✨ Filtros Pro
     "ui/config.lua",
     "ui/info.lua",
     -- 10. Init: llama a buildUI() y notifica "Listo"

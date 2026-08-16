@@ -8,7 +8,7 @@
 -- Dependencias: 00_config (para Rayfield) + todos los ui/*.lua cargados antes.
 -- Expone (UCam.*):
 --   buildUI()  -- arma la Window y llama a cada UCam.build_xxx
---   build_inicio, build_camaras, build_espectador, build_slowmo,
+--   build_inicio, build_camaras, build_espectador,
 --   build_cinematic, build_filters, build_light, build_estudio,
 --   build_gimbal, build_fun, build_config, build_info
 --
@@ -18,13 +18,13 @@
 -- ============================================================
 local UCam = _G.UCam
 
--- Tabla de sub-builders (v7: agregados bodycolor, poses, playermod, timecontrol, replay)
--- v8: profiles, combos, macros, audioreactive, filterspro
+-- Tabla de sub-builders (v7: agregados bodycolor, poses, playermod, replay)
+-- v8: profiles
+-- v8.1: eliminados slowmo, timecontrol, combos, macros, audioreactive, filterspro
 UCam._uiBuilders = {
     "inicio",
     "camaras",
     "espectador",
-    "slowmo",
     "cinematic",
     "filters",
     "light",
@@ -34,13 +34,8 @@ UCam._uiBuilders = {
     "bodycolor",    -- v7: Coloreo avanzado por partes
     "poses",        -- v7: Sistema de poses avanzadas
     "playermod",    -- v7: Modificar otros jugadores
-    "timecontrol",  -- v7: Control de Tiempo (Time Ramp, Frame-by-Frame, Fast Forward)
     "replay",       -- v7: Grabación y Replay de cámara
     "profiles",     -- v8: Perfiles completos
-    "combos",       -- v8: Secuencias automáticas de modos
-    "macros",       -- v8: Macros grabables/reproducibles
-    "audioreactive",-- v8: Beats → FOV/Shake/Flash
-    "filterspro",   -- v8: Efectos visuales avanzados
     "config",
     "info",
 }
@@ -114,8 +109,8 @@ function UCam.unregisterTabBuilder(name)
 end
 
 -- Sliders/dropdowns que el boton "Restablecer todos los valores" de
--- Inicio necesita leer/escribir (los crean las pestañas de Camaras
--- y Slowmo). Se forward-declaran para que Inicio ya los pueda usar.
+-- Inicio necesita leer/escribir (los crea la pestaña de Camaras).
+-- Se forward-declaran para que Inicio ya los pueda usar.
 UCam.UISliders = {
     modeDropdown          = nil,
     speedSlider           = nil,
@@ -126,7 +121,6 @@ UCam.UISliders = {
     orbitDistSlider       = nil,
     orbitHeightSlider     = nil,
     orbitSpeedSlider      = nil,
-    slowMoIntensitySlider = nil,
     vertigoMinSlider      = nil,
     vertigoMaxSlider      = nil,
     vertigoSpeedSlider    = nil,
@@ -187,7 +181,7 @@ function UCam.buildUI()
             parts[#parts+1] = tostring(UCam.Follow and UCam.Follow.Distance)
             parts[#parts+1] = tostring(UCam.Bloom and UCam.Bloom.Intensity)
             parts[#parts+1] = tostring(UCam.DOF and UCam.DOF.FocusDistance)
-            parts[#parts+1] = tostring(UCam.SlowMo and UCam.SlowMo.Intensity)
+            -- v8.1: SlowMo eliminado
             parts[#parts+1] = tostring(UCam.Spectate and UCam.Spectate.Mode)
             parts[#parts+1] = tostring(UCam.LightingTweaks and UCam.LightingTweaks.ClockTime)
             parts[#parts+1] = tostring(UCam.Keybinds and UCam.Keybinds.Forward)
