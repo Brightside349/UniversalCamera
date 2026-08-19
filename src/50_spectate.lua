@@ -322,38 +322,9 @@ local function getSpectablePlayers()
     return list
 end
 
-function UCam.spectateNextPlayer()
-    local list = getSpectablePlayers()
-    if #list == 0 then
-        UCam.notify("Espectador", "No hay jugadores disponibles.")
-        return
-    end
-    local currentIdx = 0
-    if UCam.Spectate.Target then
-        for i, p in ipairs(list) do
-            if p == UCam.Spectate.Target then currentIdx = i; break end
-        end
-    end
-    local nextIdx = (currentIdx % #list) + 1
-    UCam.startSpectate(list[nextIdx])
-end
-
-function UCam.spectatePrevPlayer()
-    local list = getSpectablePlayers()
-    if #list == 0 then
-        UCam.notify("Espectador", "No hay jugadores disponibles.")
-        return
-    end
-    local currentIdx = 0
-    if UCam.Spectate.Target then
-        for i, p in ipairs(list) do
-            if p == UCam.Spectate.Target then currentIdx = i; break end
-        end
-    end
-    local prevIdx = currentIdx - 1
-    if prevIdx < 1 then prevIdx = #list end
-    UCam.startSpectate(list[prevIdx])
-end
+-- v9: la primera definición de spectateNextPlayer/spectatePrevPlayer (sin
+-- soporte de favoritos) fue eliminada; la versión vigente está más abajo,
+-- basada en getNavigablePlayers().
 
 -- ============================================================
 -- UPDATE: suaviza la camara segun el modo
@@ -376,7 +347,12 @@ function UCam.updateSpectateCamera(deltaTime)
         if UCam.Spectate.AutoJump then
             UCam.spectateAutoJump()
         else
-            UCam.notify("Espectador", UCam.Spectate.Target.DisplayName .. " perdio su personaje.")
+            -- v9: cooldown de 3 s — si el target parpadea (respawn) no spamear
+            local now = os.clock()
+            if not UCam.Spectate._lostCharAt or (now - UCam.Spectate._lostCharAt) > 3 then
+                UCam.Spectate._lostCharAt = now
+                UCam.notify("Espectador", UCam.Spectate.Target.DisplayName .. " perdio su personaje.")
+            end
             UCam.stopSpectate()
         end
         return
@@ -406,15 +382,8 @@ function UCam.updateSpectateCamera(deltaTime)
 
     UCam.camera.CFrame = UCam.camCFrame
     if UCam.Spectate.UseCustomFOV then UCam.camera.FieldOfView = UCam.Spectate.FOV end
-
-    -- v7: actualizar Picture-in-Picture (throttle: 4fps para no clonar cada frame)
-    if UCam.Spectate.PiP.Enabled then
-        UCam.Spectate._pipTimer = (UCam.Spectate._pipTimer or 0) + deltaTime
-        if UCam.Spectate._pipTimer >= 0.25 then
-            UCam.Spectate._pipTimer = 0
-            pcall(UCam.updatePiP)
-        end
-    end
+    -- v9: Picture-in-Picture eliminado (clonar personajes ajenos en cliente
+    -- casi siempre fallaba → ventana en negro). El zoom con rueda sigue vivo.
 end
 
 -- ============================================================
@@ -552,111 +521,16 @@ function UCam.spectateAutoJump()
 end
 
 -- ============================================================
--- PICTURE-IN-PICTURE
--- Muestra a otro jugador en un ViewportFrame pequeño en una esquina.
--- ============================================================
-local _pipGui = nil
-local _pipVP  = nil
-local _pipCamera = nil
-
-function UCam.ensurePiPGui()
-    if _pipGui and _pipGui.Parent then return _pipGui end
-    local playerGui = UCam.player:FindFirstChildOfClass("PlayerGui")
-    if not playerGui then return nil end
-
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "UCam_PiP"
-    gui.IgnoreGuiInset = true
-    gui.ResetOnSpawn = false
-    gui.Parent = playerGui
-
-    local frame = Instance.new("Frame")
-    frame.Name = "PiPContainer"
-    frame.BorderSizePixel = 2
-    frame.BorderColor3 = Color3.fromRGB(255, 255, 255)
-    frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-    frame.Parent = gui
-
-    local vp = Instance.new("ViewportFrame")
-    vp.Name = "PiPViewport"
-    vp.Size = UDim2.fromScale(1, 1)
-    vp.BackgroundTransparency = 1
-    vp.Parent = frame
-
-    local cam = Instance.new("Camera")
-    cam.FieldOfView = 40
-    vp.CurrentCamera = cam
-
-    _pipGui = gui
-    _pipVP = vp
-    _pipCamera = cam
-    return gui
-end
-
-local function positionPiP()
-    if not (_pipGui and _pipGui.Parent) then return end
-    local container = _pipGui:FindFirstChild("PiPContainer")
-    if not container then return end
-    local size = UCam.clamp(UCam.Spectate.PiP.Size, 0.15, 0.4)
-    -- Esquina inferior derecha, con margen
-    container.Size = UDim2.fromScale(size, size * 0.5625) -- 16:9
-    container.AnchorPoint = Vector2.new(1, 1)
-    container.Position = UDim2.new(1, -10, 1, -10)
-end
-
-function UCam.updatePiP()
-    if not UCam.Spectate.PiP.Enabled then
-        UCam.destroyPiP()
-        return
-    end
-    local target = UCam.Spectate.PiP.Target
-    if not target or not target.Character then return end
-    local gui = UCam.ensurePiPGui()
-    if not gui then return end
-    if not gui.Parent then positionPiP() end
-    positionPiP()
-
-    local char = target.Character
-    local root = UCam.getCharacterRoot(char)
-    if not root then return end
-
-    -- Clonar el personaje dentro del ViewportFrame (solo Modelo他俩)
-    -- Limpiar clones viejos
-    for _, c in ipairs(_pipVP:GetChildren()) do
-        if c:IsA("Model") then pcall(function() c:Destroy() end) end
-    end
-    local clone
-    pcall(function() clone = char:Clone() end)
-    if clone then
-        clone.Parent = _pipVP
-        local cRoot = UCam.getCharacterRoot(clone)
-        if cRoot then
-            -- Cámara mirando al personaje clonado, de frente, un poco elevada
-            local pos = cRoot.Position
-            _pipCamera.CFrame = CFrame.lookAt(pos + Vector3.new(4, 3, 6), pos + Vector3.new(0, 1, 0))
-        end
-    end
-end
-
-function UCam.destroyPiP()
-    if _pipGui then
-        pcall(function() _pipGui:Destroy() end)
-        _pipGui = nil
-        _pipVP = nil
-        _pipCamera = nil
-    end
-end
-
--- ============================================================
 -- ZOOM SCROLL: rueda del mouse ajusta la distancia mientras espectas
+-- (v9: Picture-in-Picture eliminado — ver comentario en updateSpectateCamera)
 -- ============================================================
-local _pipWheelConn = nil
+local _zoomWheelConn = nil
 function UCam.enableSpectateZoomScroll()
-    if _pipWheelConn then return end
+    if _zoomWheelConn then return end
     -- v9 FIX (fuga de memoria): la rueda del mouse quedaba conectada para
     -- siempre sin pasar por trackConnection. Ahora cleanupConnections() la
     -- desconecta en cada Unload/recarga.
-    _pipWheelConn = UCam.trackConnection(
+    _zoomWheelConn = UCam.trackConnection(
         UCam.UserInputService.InputChanged:Connect(function(input)
             if not UCam.Spectate.Active or not UCam.Spectate.ZoomScroll then return end
             if input.UserInputType == Enum.UserInputType.MouseWheel then
@@ -664,7 +538,7 @@ function UCam.enableSpectateZoomScroll()
                 UCam.Spectate.Distance = UCam.clamp(UCam.Spectate.Distance + delta * 1.5, 1.5, 60)
             end
         end),
-        "spectate.pipWheel"
+        "spectate.zoomWheel"
     )
 end
 

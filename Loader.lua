@@ -1,6 +1,6 @@
 -- ============================================================
--- Universal Camera PRO · Loader
--- By Cocoa Feliz · v8.1 release
+-- Universal Camera PRO v9 · Loader
+-- By Cocoa Feliz · v9 release
 --
 -- ESTE es el unico script que pegas en el juego.
 -- Descarga cada parte desde GitHub raw y la ejecuta inyectando el
@@ -18,7 +18,7 @@
 -- ============================================================
 -- CONFIG: repo de GitHub para cargar las partes modularizadas
 -- ============================================================
-local VERSION = "v8.1.1"   -- pre-v9.0 cleanup release
+local VERSION = "v9.0.0"   -- release v9 completa
 
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 
@@ -93,6 +93,7 @@ local ORDER = {
     -- buildUI() via _dynamicTabBuilders (antes se cargaban después de 90_init
     -- y sus pestañas nunca aparecían). Necesita registerTabBuilder (80_ui).
     "85_plugins.lua",
+    "88_v9extras.lua",
     -- 9. Sub-builders de cada pestana (registran UCam.build_xxx)
     "ui/inicio.lua",
     "ui/camaras.lua",
@@ -202,7 +203,7 @@ end
 table.clear(sources)
 
 if #failedList == 0 then
-    print(("[UCam] Universal Camera Pro v8 cargado OK (%d partes)."):format(loaded))
+    print(("[UCam] Universal Camera Pro v9 cargado OK (%d partes)."):format(loaded))
 else
     warn(("[UCam] Carga completada con %d errores. Fallaron: %s"):format(
         #failedList, table.concat(failedList, ", ")

@@ -1,8 +1,8 @@
-# Universal Camera Pro v8.1 · Modular
+# Universal Camera Pro v9 · Modular
 
 Camara libre cinematografica para Roblox. **14 modos de camara, 30 filtros, Bullet Time universal, espectador con 9 estilos, modo Director con waypoints, post-procesado completo, efectos de diversion, nuevas funciones v8.1 y una UI expandida** — todo envuelto en una UI de 12+ pestanas de Rayfield.
 
-> Versión actual: tag `v8.1.0`.
+> Versión actual: tag `v9.0.0`.
 > La versión anterior quedó preservada en la rama `legacy/v6` y en el tag `v6.0.0`.
 > Script original: `Universal Camera.lua` (6292 lineas, 235 KB).
 > Refactorizado en varios archivos siguiendo el plan del documento `PLAN_MODULARIZACION.md`.
@@ -53,7 +53,7 @@ universal-camera/
     ├── 10_utils.lua          ← refresh refs, freeze/unfreeze, clamp, easing, path viz, croma, lighting tweaks
     ├── 20_filters.lua        ← color correction, bloom, DOF, sun rays, vignette, letterbox
     ├── 30_fun.lua            ← modulo de diversion: montar, noclip, escala, poses, trail, disco, etc.
-    ├── 40_slowmo.lua         ← Bullet Time universal (humanoides + fisicas)
+    ├── 88_v9extras.lua       ← gamepad, escenas, keyframes, plugins v2 y timelapse
     ├── 50_spectate.lua       ← espectador (9 modos) + navegacion Q/E
     ├── 60_director.lua       ← waypoints + reproduccion con easing
     ├── 70_camcore.lua        ← toggleFreeCam, CrashZoom, Shake, updateCamera (14 modos), input

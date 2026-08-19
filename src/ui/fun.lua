@@ -302,45 +302,8 @@ function UCam.build_fun(Window)
         end,
     })
 
-    FunTab:CreateSection("Pose forzada (T-Pose ragdoll / sentado / flotando)")
-    FunTab:CreateParagraph({
-        Title   = "T-Pose Globo (ragdoll empujable)",
-        Content = "Activa T-Pose para que tu personaje se quede quieto en pose T, flotando como un globo. Si otro jugador o una estructura te empuja, ruedas segun las fisicas. Sube 'Flotabilidad' para que flote mas, bajala a 0 para que se quede clavado donde lo actives.",
-    })
-    FunTab:CreateDropdown({
-        Name            = "Pose",
-        Options         = UCam.Fun.Pose.Modes,
-        CurrentOption   = { UCam.Fun.Pose.Mode },
-        MultipleOptions = false,
-        Callback        = function(o)
-            local v = UCam.resolveDropdownValue(o)
-            if not v then return end
-            UCam.Fun.Pose.Mode = v
-            if v ~= "Normal" then UCam.startFun() end
-            if not UCam.funAnyActive() then UCam.stopFun() end
-            UCam.notify("Diversion", "Pose: " .. v)
-        end,
-    })
-    FunTab:CreateSlider({
-        Name         = "Flotabilidad del globo (T-Pose)",
-        Range        = { -1, 4 },
-        Increment    = 0.05,
-        Suffix       = " st/s",
-        CurrentValue = UCam.Fun.Pose.FloatForce,
-        Callback     = function(v) UCam.Fun.Pose.FloatForce = v end,
-    })
-    FunTab:CreateSlider({
-        Name         = "Damping horizontal (globo)",
-        Range        = { 0.5, 1 },
-        Increment    = 0.01,
-        Suffix       = "",
-        CurrentValue = UCam.Fun.Pose.DampXZ,
-        Callback     = function(v) UCam.Fun.Pose.DampXZ = v end,
-    })
-    FunTab:CreateParagraph({
-        Title   = "Tip",
-        Content = "Damping = 1.0 -> no rueda nada, se queda donde lo empujen. Damping = 0.7 -> rueda lejos cuando lo chocan. Flotabilidad 0 -> se queda a la misma altura, -1 -> se hunde, +4 -> sale volando hacia arriba.",
-    })
+    -- v9: sección "Pose forzada" eliminada — unificada en la pestaña 🧍 Poses
+    -- (33_poses.lua), que además incluye T-Pose/Sentado/Flotando avanzados.
 
     FunTab:CreateSection("Aspecto (arcoiris / neon / material)")
     FunTab:CreateToggle({
@@ -573,14 +536,14 @@ function UCam.build_fun(Window)
     })
 
     -- Refrescar el dropdown cuando entren o salgan jugadores
-    UCam.Players.PlayerAdded:Connect(function()
+    UCam.trackConnection(UCam.Players.PlayerAdded:Connect(function()
         task.defer(function()
             if funMountDropdown then
                 pcall(function() funMountDropdown:Refresh(getFunMountOptions()) end)
             end
         end)
-    end)
-    UCam.Players.PlayerRemoving:Connect(function()
+    end), "ui.fun.playerAdded")
+    UCam.trackConnection(UCam.Players.PlayerRemoving:Connect(function()
         task.defer(function()
             if funMountDropdown then
                 pcall(function() funMountDropdown:Refresh(getFunMountOptions()) end)
@@ -590,5 +553,5 @@ function UCam.build_fun(Window)
                 UCam.Fun.Mount.Enabled = false
             end
         end)
-    end)
+    end), "ui.fun.playerRemoving")
 end

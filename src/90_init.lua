@@ -33,8 +33,6 @@ function UCam.Unload()
         if UCam.destroyGreenScreen then UCam.destroyGreenScreen() end
         if UCam.destroyLetterbox then UCam.destroyLetterbox() end
         if UCam.destroyVignetteGui then UCam.destroyVignetteGui() end
-        if UCam.destroyChromaticGui then UCam.destroyChromaticGui() end
-        if UCam.destroyPiP then UCam.destroyPiP() end
         if UCam.destroyCustomSky then UCam.destroyCustomSky() end
         if UCam.clearPathVisualizer then UCam.clearPathVisualizer() end
         if UCam.stopSpectate then UCam.stopSpectate() end
@@ -124,10 +122,10 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v8.1.1 By Cocoa Feliz",
+        "Universal Camera Pro v9.0 By Cocoa Feliz",
         "v8.1: Módulos simplificados, Replay remasterizado, bugs corregidos. Presiona Delete para UI."
     )
-    print("[UCam] Universal Camera Pro v8.1.1 cargado OK. Pre-v9.0 cleanup: módulos obsoletos eliminados, Replay remasterizado.")
+    print("[UCam] Universal Camera Pro v9.0 cargado OK. Notificaciones silenciables + estabilizacion v8.1.")
 else
     warn("[UCam] Error al construir la UI: " .. tostring(err))
 end

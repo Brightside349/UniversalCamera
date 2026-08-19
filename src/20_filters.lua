@@ -45,10 +45,23 @@ function UCam.disableColorCorrection()
     cc.Enabled = false
 end
 
+-- v9 FIX: resuelve un índice de filtro sabiendo que los negativos
+-- refieren a filtros custom (-i → UCam.CustomFilters[i]). Devuelve
+-- (indexNormalizado, filtro) — si el custom no existe cae al 1.
+local function resolveFilterIndex(index)
+    if index and index < 0 then
+        local cf = UCam.CustomFilters and UCam.CustomFilters[-index]
+        if cf then return index, cf end
+        return 1, UCam.Filters[1]
+    end
+    index = UCam.clamp(index or 1, 1, #UCam.Filters)
+    return index, UCam.Filters[index]
+end
+
 function UCam.applyFilter(index)
-    index              = UCam.clamp(index or 1, 1, #UCam.Filters)
+    local f
+    index, f = resolveFilterIndex(index)
     UCam.currentFilterIndex = index
-    local f            = UCam.Filters[index]
     UCam.applyColorCorrection(f.Brightness, f.Contrast, f.Saturation, f.TintColor)
     if index == 1 then UCam.disableColorCorrection() end
 end
@@ -342,7 +355,7 @@ function UCam.destroyVignetteGui()
 end
 
 -- ============================================================
--- EXPANSIÓN FILTROS v7: transiciones, combinación, temporal, chromatic
+-- EXPANSIÓN FILTROS v7: transiciones, combinación, temporal
 -- ============================================================
 
 -- Colores Help
@@ -366,67 +379,8 @@ local function blendFilters(fA, fB, mix)
     }
 end
 
--- Estado chromatic aberration (overlay con dos imágenes desplazadas en R/B)
-UCam.ChromaticAberration = UCam.ChromaticAberration or {
-    Enabled  = false,
-    Amount   = 4,        -- px de desplazamiento de cada canal
-    Gui      = nil,
-}
-
-function UCam.destroyChromaticGui()
-    if UCam.ChromaticAberration.Gui then
-        pcall(function() UCam.ChromaticAberration.Gui:Destroy() end)
-        UCam.ChromaticAberration.Gui = nil
-    end
-end
-
--- Crea/actualiza el overlay de chromatic aberration. Usamos dos frames
--- semi-transparentes tintados rojo y azul desplazados ±amount px, sobre
--- el centro de la pantalla, para simular RGB split.
-function UCam.applyChromaticAberration()
-    local ca = UCam.ChromaticAberration
-    if not ca.Enabled then
-        UCam.destroyChromaticGui()
-        return
-    end
-
-    local playerGui = UCam.player:FindFirstChild("PlayerGui")
-    if not playerGui then return end
-
-    if not ca.Gui or not ca.Gui.Parent then
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "UCam_Chromatic"
-        gui.IgnoreGuiInset = true
-        gui.DisplayOrder = 1001
-        gui.ResetOnSpawn = false
-        gui.Parent = playerGui
-
-        for _, side in ipairs({ "Red", "Blue" }) do
-            local f = Instance.new("Frame")
-            f.Name = side
-            f.Size = UDim2.fromScale(1, 1)
-            f.BorderSizePixel = 0
-            f.BackgroundTransparency = 0.5
-            f.ZIndex = 12
-            f.Parent = gui
-        end
-        ca.Gui = gui
-    end
-
-    local amt = ca.Amount or 4
-    local red  = ca.Gui:FindFirstChild("Red")
-    local blue = ca.Gui:FindFirstChild("Blue")
-    if red then
-        red.BackgroundColor3  = Color3.fromRGB(255, 0, 0)
-        red.BackgroundTransparency = 0.92
-        red.Position = UDim2.new(0, -amt, 0, 0)
-    end
-    if blue then
-        blue.BackgroundColor3 = Color3.fromRGB(0, 80, 255)
-        blue.BackgroundTransparency = 0.92
-        blue.Position = UDim2.new(0, amt, 0, 0)
-    end
-end
+-- v9: ChromaticAberration eliminado — el overlay (dos frames tintados con
+-- BackgroundTransparency 0.92) apenas se veía y no era una aberración real.
 
 -- Aplica inmediatamente un filtro sin transición (uso interno)
 local function applyFilterInstant(f)
@@ -437,9 +391,12 @@ end
 -- Mantenemos la firma applyFilter(index) para no romper la UI existente.
 local _origApplyFilter = UCam.applyFilter
 UCam.applyFilter = function(index, instant)
-    index = UCam.clamp(index or 1, 1, #UCam.Filters)
+    -- v9 FIX: índices negativos = filtros custom; antes el clamp los
+    -- reseteaba silenciosamente al filtro 1 ("Ninguno").
+    local target
+    index, target = resolveFilterIndex(index)
     UCam.currentFilterIndex = index
-    local target = UCam.Filters[index]
+    if UCam.emit then UCam.emit("filterChanged", { index = index, filter = target }) end
 
     -- Modo combinación: mezcla con un segundo filtro
     if UCam.FilterCombine.Enabled and UCam.FilterCombine.IndexB then
@@ -475,11 +432,6 @@ end
 -- Update de filtros (transición lerp + temporal auto-fade). Se llama desde
 -- el loop de cámara (updateCamera) o un heartbeat dedicado.
 function UCam.updateFilters(deltaTime)
-    -- Chromatic aberration: el overlay es estático, solo (re)aplicar si hace falta
-    if UCam.ChromaticAberration.Enabled and not UCam.ChromaticAberration.Gui then
-        UCam.applyChromaticAberration()
-    end
-
     if UCam.FilterTransition.Active then
         UCam.FilterTransition.Elapsed = UCam.FilterTransition.Elapsed + (deltaTime or 0)
         local t = UCam.clamp(UCam.FilterTransition.Elapsed * UCam.FilterTransition.Speed, 0, 1)
@@ -503,9 +455,4 @@ function UCam.updateFilters(deltaTime)
             UCam.applyFilter(1, true)  -- volver a "Ninguno" sin transición
         end
     end
-end
-
-function UCam.setChromaticAmount(amount)
-    UCam.ChromaticAberration.Amount = UCam.clamp(amount or 0, 0, 40)
-    if UCam.ChromaticAberration.Gui then UCam.applyChromaticAberration() end
 end

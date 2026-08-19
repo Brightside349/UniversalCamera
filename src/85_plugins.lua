@@ -25,6 +25,19 @@ local UCam = _G.UCam
 
 UCam.Plugins = { Loaded = {}, Disabled = {} }
 
+function UCam.setPluginDisabled(name, disabled)
+    if not name then return false end
+    UCam.Plugins.Disabled[name] = disabled and true or nil
+    local plugin = UCam.Plugins.Loaded[name]
+    if disabled and plugin and plugin.stopFn then pcall(plugin.stopFn, UCam) end
+    if not disabled and plugin and plugin.startFn then pcall(plugin.startFn, UCam) end
+    return true
+end
+
+function UCam.isPluginDisabled(name)
+    return UCam.Plugins.Disabled[name] == true
+end
+
 local HAS_FS = UCam.HasFileSystem
 
 -- ============================================================
@@ -69,6 +82,7 @@ function UCam.registerPlugin(spec, filename)
 
     -- wrapper de build para respetar stop/start
     local function buildWrapper(Window)
+        if UCam.isPluginDisabled(name) then return end
         if type(spec.build) == "function" then
             local ok, bErr = pcall(spec.build, Window)
             if not ok then
@@ -89,11 +103,12 @@ function UCam.registerPlugin(spec, filename)
         stopFn    = spec.stop,
         startFn   = spec.start,
         registeredName = registeredName,
+        disabled   = UCam.isPluginDisabled(name),
     }
     UCam.Plugins.Loaded[name] = entry
 
     -- start post-build (si está inicializado ya)
-    if UCam.Initialized and entry.startFn then
+    if UCam.Initialized and entry.startFn and not entry.disabled then
         task.defer(function()
             pcall(entry.startFn, UCam)
         end)

@@ -16,11 +16,23 @@ function UCam.build_filters(Window)
         return names
     end
 
-    FilterTab:CreateSection("Selector rapido (30 built-in + custom)")
+    FilterTab:CreateSection("Selector rapido (built-in + custom)")
+    -- v9 FIX: currentFilterIndex puede ser negativo (filtro custom) —
+    -- resolver el nombre sin indexar UCam.Filters fuera de rango.
+    local function currentFilterName()
+        local idx = UCam.currentFilterIndex or 1
+        local f
+        if idx < 0 then
+            f = UCam.CustomFilters and UCam.CustomFilters[-idx]
+        else
+            f = UCam.Filters[idx]
+        end
+        return f and f.Name or (UCam.Filters[1] and UCam.Filters[1].Name or "Ninguno")
+    end
     UCam.UIRefs.FilterDropdown = FilterTab:CreateDropdown({
         Name = "Filtro activo",
         Options = listAllFilterNames(),
-        CurrentOption = { UCam.Filters[UCam.currentFilterIndex].Name },
+        CurrentOption = { currentFilterName() },
         MultipleOptions = false,
         Callback = function(options)
             local value = UCam.resolveDropdownValue(options)
@@ -258,7 +270,7 @@ function UCam.build_filters(Window)
         end,
     })
 
-    -- ===== v7: Expansion Filtros (transiciones, combinación, temporal, chromatic) =====
+    -- ===== v7: Expansion Filtros (transiciones, combinación, temporal) =====
     local function builtinNames()
         local n = {}
         for _, f in ipairs(UCam.Filters) do table.insert(n, f.Name) end
@@ -350,22 +362,6 @@ function UCam.build_filters(Window)
         end,
     })
 
-    FilterTab:CreateSection("v7 - Aberración Cromática (Chromatic)")
-    FilterTab:CreateToggle({
-        Name = "Activar aberración cromática (RGB split)",
-        CurrentValue = UCam.ChromaticAberration.Enabled,
-        Callback = function(v)
-            UCam.ChromaticAberration.Enabled = v
-            UCam.applyChromaticAberration()
-            if not v then UCam.destroyChromaticGui() end
-        end,
-    })
-    FilterTab:CreateSlider({
-        Name = "Cantidad de desplazamiento",
-        Range = { 0, 40 },
-        Increment = 1,
-        Suffix = " px",
-        CurrentValue = UCam.ChromaticAberration.Amount,
-        Callback = function(v) UCam.setChromaticAmount(v) end,
-    })
+    -- v9: sección "Aberración Cromática" eliminada — el overlay apenas se
+    -- veía y no producía un RGB split real.
 end

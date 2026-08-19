@@ -53,16 +53,7 @@ local es = {
     espectador_prev   = "Anterior (Q)",
     espectador_stop   = "Dejar de espectar (X)",
 
-    -- Tab Slow-Mo
-    tab_slowmo        = "⏱️ Slow-Mo",
-    slowmo_toggle     = "Bullet Time",
-    slowmo_intensity  = "Intensidad",
-    slowmo_freeze     = "Congelar todo",
 
-    -- Tab Time Control
-    tab_timecontrol   = "⏱️ Tiempo",
-    time_ramp_preset  = "Rampa predefinida",
-    time_framebyframe = "Frame por frame",
 
     -- Tab Cinemática
     tab_cinematic     = "🎬 Cinemática",
@@ -159,14 +150,7 @@ local en = {
     espectador_prev   = "Previous (Q)",
     espectador_stop   = "Stop spectating (X)",
 
-    tab_slowmo        = "⏱️ Slow-Mo",
-    slowmo_toggle     = "Bullet Time",
-    slowmo_intensity  = "Intensity",
-    slowmo_freeze     = "Freeze all",
 
-    tab_timecontrol   = "⏱️ Time",
-    time_ramp_preset  = "Time ramp preset",
-    time_framebyframe = "Frame by frame",
 
     tab_cinematic     = "🎬 Cinematic",
     tab_filters       = "🎨 Filters",
@@ -233,14 +217,7 @@ local pt = {
     espectador_prev   = "Anterior (Q)",
     espectador_stop   = "Parar de assistir (X)",
 
-    tab_slowmo        = "⏱️ Slow-Mo",
-    slowmo_toggle     = "Bullet Time",
-    slowmo_intensity  = "Intensidade",
-    slowmo_freeze     = "Congelar tudo",
 
-    tab_timecontrol   = "⏱️ Tempo",
-    time_ramp_preset  = "Preset de rampa",
-    time_framebyframe = "Quadro a quadro",
 
     tab_cinematic     = "🎬 Cinemático",
     tab_filters       = "🎨 Filtros",

@@ -471,10 +471,9 @@ function UCam.build_camaras(Window)
         CurrentValue = UCam.CableCam.Speed,
         Callback = function(v) UCam.CableCam.Speed = v end,
     })
-    CamTab:CreateToggle({
-        Name = "Loop (repetir A→B)",
-        CurrentValue = UCam.Waypoint.Loop,
-        Callback = function(v) UCam.Waypoint.Loop = v end,
+    CamTab:CreateParagraph({
+        Title = "Loop",
+        Content = "El loop de rutas se controla desde Cinematografico → Director para mantener un unico estado.",
     })
 
     CamTab:CreateSection("v7 - Security Cam")

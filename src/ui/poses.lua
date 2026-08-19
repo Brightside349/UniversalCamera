@@ -76,7 +76,7 @@ function UCam.build_poses(Window)
         return names
     end
     
-    local targetPlayerDropdown = Tab:CreateDropdown({
+    local targetPlayerDropdown = UCam.registerTargetPlayerDropdown(Tab:CreateDropdown({
         Name = "Jugador Objetivo",
         Options = getPlayerNames(),
         CurrentOption = {""},
@@ -86,11 +86,11 @@ function UCam.build_poses(Window)
             if playerName then
                 local targetPlayer = UCam.Players:FindFirstChild(playerName)
                 if targetPlayer then
-                    UCam.PlayerMod.TargetPlayer = targetPlayer
+                    UCam.setTargetPlayer(targetPlayer)
                 end
             end
         end,
-    })
+    }))
     
     -- Refresh player list button
     Tab:CreateButton({

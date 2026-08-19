@@ -60,8 +60,6 @@ end
 
 local _origUpdateCamera = nil
 local _origFunUpdate    = nil
-local _origReplayUpd    = nil
-local _origTimeControl  = nil
 
 -- Envuelve una función existente para medirla
 local function hookFunction(parent, name, wrapper)
@@ -111,23 +109,12 @@ local function installHooks()
         end
     end)
 
-    -- updateTimeControl
-    _origTimeControl = hookFunction(UCam, "updateTimeControl", function(orig)
-        return function(dt)
-            local t0 = os.clock()
-            local ok, res = pcall(orig, dt)
-            -- v8.1: timecontrol.updateTimeControl eliminado
-            UCam.perfRecord("camcore.updateCamera", (os.clock() - t0) * 1000)
-            if not ok then error(res) end
-            return res
-        end
-    end)
+    -- v8.1: updateTimeControl eliminado junto a su módulo
 end
 
 local function removeHooks()
     unhookFunction(UCam, "updateCamera")
     unhookFunction(UCam, "funUpdate")
-    unhookFunction(UCam, "updateTimeControl")
     -- Restaurar el render step "UCamRender" a la función original de updateCamera
     -- (70_camcore lo vuelve a enlazar por su cuenta al recargar, pero en caliente
     -- hay que restaurar la referencia que instaló el profiler).

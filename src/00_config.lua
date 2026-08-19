@@ -65,15 +65,102 @@ if not Rayfield then error("[Universal Camera] No se pudo cargar Rayfield.") end
 UCam.Rayfield = Rayfield
 
 -- ============================================================
--- NOTIFY (wrapper de Rayfield:Notify)
+-- NOTIFY (wrapper de Rayfield:Notify) — v9: modos de notificación
 -- ============================================================
-function UCam.notify(title, content, duration)
+-- UCam.Config.Notifications:
+--   .Mode       "all" | "important" | "silent"
+--   .Duration   duración global por defecto (s)
+--   .MuteOnCapture  silencia TODO mientras Replay graba/reproduce
+-- Cada llamada puede pasar opts como 4º argumento:
+--   { important = true }  → sobrevive al modo "important"
+--   { critical  = true }  → sobrevive incluso al modo "silent"
+UCam.Config = UCam.Config or {}
+UCam.Config.Notifications = UCam.Config.Notifications or {
+    Mode         = "all",
+    Duration     = 3,
+    MuteOnCapture = true,
+}
+
+function UCam.notify(title, content, duration, opts)
+    -- Compatibilidad con la firma v9 propuesta: notify(title, msg, opts).
+    if type(duration) == "table" and opts == nil then opts, duration = duration, nil end
+    opts = opts or {}
+    local ncfg = UCam.Config.Notifications
+    -- Silencio automático durante tomas (grabación/reproducción de Replay)
+    if ncfg.MuteOnCapture and not opts.critical and UCam.Replay
+        and (UCam.Replay.Recording or UCam.Replay.Playing) then
+        return
+    end
+    local mode = ncfg.Mode or "all"
+    if UCam.emit then UCam.emit("notification", { title = title, content = content, opts = opts }) end
+    if mode == "silent" and not opts.critical then return end
+    if mode == "important" and not (opts.important or opts.critical) then return end
     Rayfield:Notify({
         Title    = title,
         Content  = content,
-        Duration = duration or 3,
+        Duration = duration or ncfg.Duration or 3,
         Image    = 4483362458,
     })
+end
+
+-- Cicla el modo de notificaciones (para keybind/botón rápido).
+-- Devuelve el nuevo modo. El cambio NO notifica salvo en modo "all"
+-- (para no arruinar la toma que se intenta limpiar).
+function UCam.cycleNotificationMode()
+    local ncfg = UCam.Config.Notifications
+    local order = { "all", "important", "silent" }
+    local idx = 1
+    for i, m in ipairs(order) do
+        if m == ncfg.Mode then idx = i; break end
+    end
+    ncfg.Mode = order[(idx % #order) + 1]
+    if ncfg.Mode == "all" then
+        local names = { all = "Todas", important = "Solo importantes", silent = "Silencio total" }
+        UCam.notify("Notificaciones",
+            "Modo cambiado a: " .. (names[ncfg.Mode] or ncfg.Mode), 2)
+    end
+    return ncfg.Mode
+end
+
+-- Modo Toma Limpia: prepara una captura sin UI ni notificaciones.
+UCam.CleanShot = {
+    Enabled = false,
+    HideNametag = true,
+    _previousNotificationMode = nil,
+    _previousAutoHUD = nil,
+    _previousHudHidden = nil,
+    _previousMouseIcon = nil,
+    _previousDisplayDistanceType = nil,
+}
+
+function UCam.setCleanShot(enabled)
+    enabled = enabled and true or false
+    local cs = UCam.CleanShot
+    if cs.Enabled == enabled then return end
+    cs.Enabled = enabled
+    if UCam.emit then UCam.emit("onToggle", { name = "CleanShot", value = enabled }) end
+    if enabled then
+        cs._previousNotificationMode = UCam.Config.Notifications.Mode
+        cs._previousAutoHUD = UCam.AutoHUD.Enabled
+        cs._previousHudHidden = UCam.Hud and UCam.Hud.Hidden or false
+        cs._previousMouseIcon = UCam.UserInputService.MouseIconEnabled
+        UCam.Config.Notifications.Mode = "silent"
+        UCam.AutoHUD.Enabled = true
+        if UCam.setHudHidden then UCam.setHudHidden(true) end
+        UCam.UserInputService.MouseIconEnabled = false
+        if cs.HideNametag and UCam.humanoid then
+            cs._previousDisplayDistanceType = UCam.humanoid.DisplayDistanceType
+            UCam.humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+        end
+    else
+        UCam.Config.Notifications.Mode = cs._previousNotificationMode or "all"
+        UCam.AutoHUD.Enabled = cs._previousAutoHUD or false
+        UCam.UserInputService.MouseIconEnabled = cs._previousMouseIcon ~= false
+        if UCam.humanoid and cs._previousDisplayDistanceType then
+            UCam.humanoid.DisplayDistanceType = cs._previousDisplayDistanceType
+        end
+        if not cs._previousHudHidden and UCam.setHudHidden then UCam.setHudHidden(false) end
+    end
 end
 -- alias local
 local notify = UCam.notify
@@ -432,12 +519,7 @@ UCam.Spectate = {
     ZoomScroll   = true,      -- rueda del mouse ajusta la distancia
     Favorites    = {},       -- { Player, ... } marcados para acceso rápido
     OnlyFavorites = false,   -- al navegar Q/E, iterar solo por favoritos
-    -- Picture-in-Picture
-    PiP = {
-        Enabled  = false,
-        Target   = nil,      -- Player mostrado en la ventana
-        Size     = 0.25,      -- fracción de la pantalla (0.15..0.4)
-    },
+    -- v9: Picture-in-Picture eliminado (clonar personajes ajenos fallaba en cliente)
     -- Director Espectador: grabar waypoints mientras espectas
     DirectorRecord = false,
 }
@@ -467,7 +549,26 @@ UCam.UIRefs = {
     PlayerDropdown       = nil,
     FilterDropdown       = nil,
     CustomFilterDropdown = nil,
+    MoveKeybinds         = {},
+    TargetPlayerDropdowns = {},
 }
+
+function UCam.setTargetPlayer(player)
+    if not player or player == UCam.player then return false end
+    UCam.PlayerMod.TargetPlayer = player
+    if UCam.emit then UCam.emit("targetChanged", player) end
+    for _, dropdown in ipairs(UCam.UIRefs.TargetPlayerDropdowns or {}) do
+        pcall(function()
+            if dropdown and dropdown.Set then dropdown:Set({ player.Name }) end
+        end)
+    end
+    return true
+end
+
+function UCam.registerTargetPlayerDropdown(dropdown)
+    if dropdown then table.insert(UCam.UIRefs.TargetPlayerDropdowns, dropdown) end
+    return dropdown
+end
 
 -- v6: Auto-ocultar HUD al entrar en camara libre
 UCam.AutoHUD = {
@@ -581,12 +682,7 @@ UCam.Fun = {
         Axis    = "Vertical",
         Axes    = { "Vertical", "Horizontal", "Diagonal" },
     },
-    Pose = {
-        Mode       = "Normal",
-        Modes      = { "Normal", "T-Pose", "Sentado", "Flotando" },
-        FloatForce = 0.3,
-        DampXZ     = 0.92,
-    },
+    -- v9: Fun.Pose eliminado (unificado en 33_poses.lua)
     Rainbow = {
         Enabled = false,
         Speed   = 1.0,
@@ -654,7 +750,6 @@ UCam.Fun = {
     _connHeartbeat    = nil,
     _spinAngle        = 0,
     _rainbowTick      = 0,
-    _tposeSetupDone   = false,
 }
 
 -- ============================================================
@@ -920,5 +1015,5 @@ function UCam.resolveDropdownValue(options)
     return nil
 end
 
-notify("Universal Camera Pro v8 By Cocoa Feliz",
+notify("Universal Camera Pro v9 By Cocoa Feliz",
     "Cargando partes modulares...")

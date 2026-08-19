@@ -169,6 +169,29 @@ local function sampleRoute(t)
     return cf, fov, roll
 end
 
+-- Convierte el tiempo transcurrido en t global respetando la velocidad
+-- guardada en cada waypoint. speed=2 hace que ese segmento dure la mitad;
+-- speed=0.5 lo hace durar el doble.
+local function routeTBySpeed(elapsed, totalDuration)
+    local list = UCam.Waypoint.List
+    local segments = math.max(#list - 1, 1)
+    local weightSum = 0
+    for i = 1, segments do
+        weightSum = weightSum + (1 / math.max(wpSpeed(list[i]), 0.05))
+    end
+    local cursor = UCam.clamp(elapsed / math.max(totalDuration, 0.5), 0, 1) * weightSum
+    local accumulated = 0
+    for i = 1, segments do
+        local weight = 1 / math.max(wpSpeed(list[i]), 0.05)
+        if cursor <= accumulated + weight then
+            local localT = (cursor - accumulated) / weight
+            return ((i - 1) + localT) / segments
+        end
+        accumulated = accumulated + weight
+    end
+    return 1
+end
+
 -- ============================================================
 -- API PÚBLICA DE WAYPOINTS
 -- ============================================================
@@ -220,7 +243,7 @@ function UCam.updateDirector(deltaTime)
     -- Calculamos en qué segmento estamos en base al tiempo para escalar deltaTime.
     local total = math.max(UCam.Waypoint.Duration, 0.5)
     local elapsed = os.clock() - UCam.Director.StartTime
-    local t = elapsed / total
+    local t = routeTBySpeed(elapsed, total)
 
     if t >= 1 then
         if UCam.Waypoint.Loop then

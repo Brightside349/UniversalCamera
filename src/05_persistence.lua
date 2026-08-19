@@ -171,6 +171,11 @@ local SCHEMA = {
         MaxDuration = nil, PlaybackSpeed = nil, Loop = nil,
     },
 
+    -- v9: notificaciones (modo / duración / silencio en tomas)
+    Config = {
+        Notifications = { Mode = nil, Duration = nil, MuteOnCapture = nil },
+    },
+
     -- v8: Perfiles (Slots se serializa aparte por su tamaño)
     Locale = nil,
 
@@ -527,13 +532,15 @@ local function serEnumOrString(v)
 end
 
 -- v8.1 FIX: Spectate.Favorites guarda instancias Player → JSON explota.
--- Se serializan como nombres de jugador.
+-- Se serializan como nombres de jugador (typeof, no type: las Instances son userdata).
 local function serFavorites(favs)
     if type(favs) ~= "table" then return nil end
     local out = {}
     for _, p in ipairs(favs) do
-        if type(p) == "table" and (typeof(p) == "Instance") then
+        if typeof(p) == "Instance" then
             if p.Name then out[#out + 1] = p.Name end
+        elseif type(p) == "string" then
+            out[#out + 1] = p
         end
     end
     if next(out) == nil then return nil end
@@ -570,11 +577,8 @@ local function buildConfigTable()
     -- v8.1 FIX: Spectate.Favorites guarda instancias Player (riesgo JSON).
     -- Persistir solo los nombres.
     if UCam.Spectate and type(UCam.Spectate.Favorites) == "table" then
-        local names = {}
-        for _, p in ipairs(UCam.Spectate.Favorites) do
-            if type(p) == "table" and p.Name then names[#names + 1] = p.Name end
-        end
-        if #names > 0 then cfg.SpectateNames = names end
+        local names = serFavorites(UCam.Spectate.Favorites)
+        if names then cfg.SpectateNames = names end
     end
     -- Director routes son strings → raw copy ya cubierto por SCHEMA
     return cfg
@@ -612,7 +616,7 @@ function UCam.saveConfig()
 
     local cfg = buildConfigTable()
     -- Campos extra no en SCHEMA pero que queremos persistir
-    cfg._version = "8.0"
+    cfg._version = "9.0"
     cfg._savedAt = os.time()
     -- v8: perfiles slots + quick (copia directa; NO contienen CFrames anidados)
     if UCam.Profiles then
@@ -621,6 +625,9 @@ function UCam.saveConfig()
             QuickSlots = UCam.Profiles.QuickSlots or {},
         }
     end
+    if UCam.Scenes then cfg._scenes = UCam.Scenes.Slots or {} end
+    if UCam.UISettings then cfg._uiSettings = UCam.UISettings end
+    if UCam.Gamepad then cfg._gamepad = { Enabled = UCam.Gamepad.Enabled } end
 
     local ok, json = pcall(function() return HttpService:JSONEncode(cfg) end)
     if not ok then
@@ -711,12 +718,8 @@ function UCam.loadConfig()
         end
     end
     -- Poses/presets custom: reemplazo directo
-    if cfg.Poses and cfg.Poses.CustomPoses then
-        UCam.Poses.CustomPoses = cfg.Poses.CustomPoses
-    end
-    if cfg.BodyColor and cfg.BodyColor.Presets then
-        UCam.BodyColor.Presets = cfg.BodyColor.Presets
-    end
+    -- (Poses.CustomPoses y BodyColor.Presets se restauran vía _customPoses /
+    --  _bodyColorPresets serializados, no por estas ramas del schema)
 
     -- v8 FIX: perfiles guardados en disco se restauran aquí también
     -- (antes solo se restauraban en importConfig, así que se perdían al reiniciar)
@@ -724,6 +727,12 @@ function UCam.loadConfig()
         UCam.Profiles.Slots      = cfg._profiles.Slots      or {}
         UCam.Profiles.QuickSlots = cfg._profiles.QuickSlots or {}
     end
+    if cfg._scenes and UCam.Scenes then UCam.Scenes.Slots = cfg._scenes end
+    if cfg._uiSettings and UCam.UISettings then
+        for key, value in pairs(cfg._uiSettings) do UCam.UISettings[key] = value end
+        if UCam.applyUISettings then UCam.applyUISettings() end
+    end
+    if cfg._gamepad and UCam.Gamepad then UCam.Gamepad.Enabled = cfg._gamepad.Enabled == true end
     -- v8.1 FIX: restaurar favoritos desde nombres resueltos a instancias Player
     if cfg.SpectateNames and type(cfg.SpectateNames) == "table" and UCam.Spectate then
         local favs = {}

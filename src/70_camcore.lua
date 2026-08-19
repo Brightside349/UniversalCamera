@@ -15,46 +15,16 @@ local UCam = _G.UCam
 -- ============================================================
 -- HUD HIDDEN (lo necesita toggleFreeCam y los toggles de Inicio)
 -- ============================================================
-local customHudPaths = {
-    "GameUI.Menu.Settings.Ability.Bar",
-    "GameUI.Menu.Settings.Game.SurvivorHP",
-    "Main.Game.Teams.Teammate",
-    "Round.Game.SurvivorHP",
-    "Round.Game.Ability",
-    "Round.Game.Time",
-    "Round.Game.SurvivorHP.AmyCards",
-    "Round.Game.Teams",
-    "InGameUI",
-}
-
-local function setCustomHudHidden(hidden)
-    local playerGui = UCam.player:FindFirstChild("PlayerGui")
-    if not playerGui then return end
-    for _, path in ipairs(customHudPaths) do
-        local current = playerGui
-        local found = true
-        for part in string.gmatch(path, "[^%.]+") do
-            current = current:FindFirstChild(part)
-            if not current then
-                found = false; break
-            end
-        end
-        if found and current then
-            if current:IsA("GuiObject") then
-                current.Visible = not hidden
-            elseif current:IsA("LayerCollector") then
-                current.Enabled = not hidden
-            end
-        end
-    end
-end
+-- v9: eliminado customHudPaths — rutas hardcodeadas de un juego concreto
+-- ("Round.Game.SurvivorHP" etc.) que eran no-op en cualquier otro juego.
+-- Si necesitas ocultar HUDs custom de un juego específico, créalo como
+-- plugin usando UCam.setHudHidden desde el evento que prefieras.
 
 function UCam.setHudHidden(hidden)
     UCam.Hud.Hidden = hidden
     pcall(function()
         UCam.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, not hidden)
     end)
-    setCustomHudHidden(hidden)
 end
 
 function UCam.setCharacterHidden(hidden)
@@ -316,7 +286,12 @@ function UCam.triggerShake(pattern)
     UCam.Shake.Enabled = true
     UCam.Shake.Pattern = pattern or "Sutil"
     noise1, noise2, noise3 = 0, 0, 0
-    UCam.notify("Camera Shake", "Patron: " .. UCam.Shake.Pattern)
+    -- v9: puede dispararse desde keybind/audio en ráfaga → solo notificar
+    -- si el patrón cambia (evita spam de confirmación).
+    if UCam.Shake.Pattern ~= UCam.Shake._lastNotifiedPattern then
+        UCam.Shake._lastNotifiedPattern = UCam.Shake.Pattern
+        UCam.notify("Camera Shake", "Patron: " .. UCam.Shake.Pattern)
+    end
 end
 
 -- ============================================================
@@ -375,16 +350,11 @@ UCam.updateAutoFocus = updateAutoFocus
 -- ============================================================
 local fovPulseT = 0
 
-local function applyTransitionBlend()
-    if not UCam.CameraTransition.Active then return end
-    UCam.CameraTransition.Elapsed = UCam.CameraTransition.Elapsed + 0 -- (se incrementa en caller)
-end
-
 function UCam.updateCamera(deltaTime)
     -- v7: updateReplay no necesita tick global
     -- porque usa su propio Heartbeat en startPlayback/startRecording.
     -- v8.1: updateTimeControl eliminado — ya no se tickea en cada frame.
-    -- v7: transiciones de filtro / temporal / chromatic aberration
+    -- v7: transiciones de filtro / temporal
     if UCam.updateFilters then
         pcall(UCam.updateFilters, deltaTime)
     end
@@ -419,6 +389,13 @@ function UCam.updateCamera(deltaTime)
                 UCam.CameraTransition.Active = false
             end
         end
+        updateAutoFocus(deltaTime)
+        return
+    end
+
+    -- v9 FIX: durante la reproducción de Replay el Heartbeat del replay
+    -- controla la cámara; el freecam no debe pisarle el CFrame cada frame.
+    if UCam.Replay and UCam.Replay.Playing then
         updateAutoFocus(deltaTime)
         return
     end
@@ -718,6 +695,11 @@ function UCam.updateCamera(deltaTime)
         local cur = UCam.camera.FieldOfView
         local alpha = UCam.clamp(deltaTime * (UCam.CamCore.ZoomSpeed or 10), 0, 1)
         UCam.camera.FieldOfView = UCam.clamp(UCam.lerpNum(cur, UCam.CamCore.TargetFOV, alpha), UCam.MIN_FOV, UCam.MAX_FOV)
+        -- v9 FIX: el zoom cambia el FOV base; si no, el MotionBlur tira de
+        -- vuelta al FOV obsoleto y ambos efectos pelean.
+        if UCam.CamCore._mbBaseFOV then
+            UCam.CamCore._mbBaseFOV = UCam.camera.FieldOfView
+        end
         if math.abs(UCam.camera.FieldOfView - UCam.CamCore.TargetFOV) < 0.05 then
             UCam.CamCore.TargetFOV = nil
         end
@@ -968,6 +950,10 @@ UCam.trackConnection(
                 end
             end
         elseif input.UserInputType == Enum.UserInputType.MouseWheel then
+            -- v9 FIX (conflicto de rueda): mientras se especta, la rueda
+            -- controla la distancia (50_spectate); el FOV queda fuera para
+            -- que no cambien las dos cosas a la vez.
+            if UCam.Spectate.Active then return end
             local current = UCam.CamCore.TargetFOV or UCam.camera.FieldOfView
             local newFov = current - (input.Position.Z * 3)
             newFov = UCam.clamp(newFov, UCam.MIN_FOV, UCam.MAX_FOV)
@@ -1013,7 +999,8 @@ UCam.trackConnection(
 
     UCam.Saved.RootCFrame               = nil
     UCam.Saved.RootAnchored             = false
-    UCam.Saved.AutoRotate               = true
+    -- forceRestoreCamera ya restauró el snapshot real en unfreezeCharacter.
+    UCam.Saved.AutoRotate               = nil
     UCam.Hud.CharacterHidden            = false
     UCam.Hud.Transparencies             = {}
     UCam.rightMouseHeld                 = false

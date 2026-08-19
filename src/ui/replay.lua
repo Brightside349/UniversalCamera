@@ -130,14 +130,14 @@ function UCam.build_replay(Window)
 
     Tab:CreateSlider({
         Name         = "Posición en el recorrido",
-        Range        = { 0, 120 },
+        Range        = { 0, 180 }, -- v9 FIX: cubre la duración máxima configurable (180s); el callback clampa al real
         Increment    = 0.5,
         Suffix       = "s",
         CurrentValue = 0,
         Flag         = "ReplaySeekPosition",
         Callback     = function(v)
             if #UCam.Replay.Frames < 2 then
-                UCam.notify("Replay", "No hay grabación cargada.", 3)
+                UCam.notify("Replay", "No hay grabación cargada.", 3, { important = true })
                 return
             end
             local maxT = UCam.Replay.Frames[#UCam.Replay.Frames].t
@@ -257,7 +257,7 @@ function UCam.build_replay(Window)
             end
             local str = UCam.serializeRoute()
             if str == "" then
-                UCam.notify("Replay", "Error al serializar la ruta.", 3)
+                UCam.notify("Replay", "Error al serializar la ruta.", 3, { important = true })
                 return
             end
             local ok = pcall(function() setclipboard(str) end)
@@ -269,6 +269,17 @@ function UCam.build_replay(Window)
                     "setclipboard no disponible. String en consola.", 3)
                 print("[UCam Replay] Ruta serializada:\n" .. str)
             end
+        end,
+    })
+
+    Tab:CreateButton({
+        Name = "📄 Exportar keyframes legibles",
+        Callback = function()
+            local textValue, err = UCam.exportReplayKeyframes()
+            if not textValue then UCam.notify("Replay", err or "No hay frames.", 3); return end
+            local ok = pcall(function() setclipboard(textValue) end)
+            if ok then UCam.notify("Replay", "Keyframes copiados al portapapeles.")
+            else print("[UCam Keyframes]\n" .. textValue); UCam.notify("Replay", "Exportados en consola.") end
         end,
     })
 
@@ -287,12 +298,12 @@ function UCam.build_replay(Window)
         Name     = "📥  Importar Ruta",
         Callback = function()
             if not importStr or importStr == "" then
-                UCam.notify("Replay", "El campo de importación está vacío.", 3)
+                UCam.notify("Replay", "El campo de importación está vacío.", 3, { important = true })
                 return
             end
             local frames = UCam.deserializeRoute(importStr)
             if not frames then
-                UCam.notify("Replay", "String inválido o demasiado corto.", 3)
+                UCam.notify("Replay", "String inválido o demasiado corto.", 3, { important = true })
                 return
             end
             table.clear(UCam.Replay.Frames)
@@ -304,6 +315,29 @@ function UCam.build_replay(Window)
                 string.format("Ruta importada: %d frames / %s",
                     #frames,
                     UCam.Replay.getFormattedTime(frames[#frames].t)))
+        end,
+    })
+
+    Tab:CreateSection("Timelapse v9")
+    Tab:CreateSlider({
+        Name = "Intervalo de captura",
+        Range = { 0.5, 10 }, Increment = 0.5, Suffix = "s",
+        CurrentValue = UCam.Timelapse.Interval,
+        Callback = function(v) UCam.Timelapse.Interval = tonumber(v) or 2 end,
+    })
+    Tab:CreateToggle({
+        Name = "Capturar timelapse",
+        CurrentValue = UCam.Timelapse.Active,
+        Callback = function(v)
+            local ok, err = UCam.toggleTimelapse(v)
+            if not ok and v then UCam.notify("Timelapse", err or "No se pudo iniciar.", 3) end
+        end,
+    })
+    Tab:CreateButton({
+        Name = "Detener y reproducir timelapse",
+        Callback = function()
+            local count = UCam.stopTimelapse()
+            if count >= 2 then UCam.startPlayback() else UCam.notify("Timelapse", "Captura insuficiente.", 3) end
         end,
     })
 

@@ -166,10 +166,10 @@ function UCam.build_espectador(Window)
         Callback = function(v) UCam.Spectate.HideSelf = v end,
     })
 
-    UCam.Players.PlayerAdded:Connect(function()
+    UCam.trackConnection(UCam.Players.PlayerAdded:Connect(function()
         task.defer(function() refreshPlayerList(UCam.UIRefs.PlayerDropdown) end)
-    end)
-    UCam.Players.PlayerRemoving:Connect(function(p)
+    end), "ui.spectate.playerAdded")
+    UCam.trackConnection(UCam.Players.PlayerRemoving:Connect(function(p)
         task.defer(function()
             if UCam.Spectate.Active and UCam.Spectate.Target == p then
                 UCam.notify("Espectador", p.DisplayName .. " salio del juego.")
@@ -181,7 +181,7 @@ function UCam.build_espectador(Window)
             end
             refreshPlayerList(UCam.UIRefs.PlayerDropdown)
         end)
-    end)
+    end), "ui.spectate.playerRemoving")
 
     -- ===== v7: Expansiones Espectador =====
     SpectateTab:CreateSection("v7 - Anti-clip, Zoom, Auto-jump")
@@ -227,34 +227,8 @@ function UCam.build_espectador(Window)
         end,
     })
 
-    SpectateTab:CreateSection("v7 - Picture-in-Picture")
-    SpectateTab:CreateToggle({
-        Name = "Activar PiP (ventana de otro jugador)",
-        CurrentValue = UCam.Spectate.PiP.Enabled,
-        Callback = function(v)
-            UCam.Spectate.PiP.Enabled = v
-            if not v then UCam.destroyPiP() end
-        end,
-    })
-    SpectateTab:CreateDropdown({
-        Name = "Jugador a mostrar en PiP",
-        Options = getDropdownOptions(),
-        CurrentOption = { "(Selecciona uno)" },
-        MultipleOptions = false,
-        Callback = function(options)
-            local v = UCam.resolveDropdownValue(options)
-            if not v or v == "(Sin otros jugadores)" or v == "(Selecciona uno)" then return end
-            local target = UCam.findPlayerByLabel(v)
-            if target then UCam.Spectate.PiP.Target = target end
-        end,
-    })
-    SpectateTab:CreateSlider({
-        Name = "Tamaño de ventana PiP",
-        Range = { 0.15, 0.4 },
-        Increment = 0.05,
-        CurrentValue = UCam.Spectate.PiP.Size,
-        Callback = function(v) UCam.Spectate.PiP.Size = v end,
-    })
+    -- v9: sección "v7 - Picture-in-Picture" eliminada (el clonado de
+    -- personajes ajenos en cliente casi siempre fallaba → ventana en negro).
 
     SpectateTab:CreateSection("v7 - Director Espectador")
     SpectateTab:CreateToggle({

@@ -350,115 +350,11 @@ local function funUpdateJump()
 end
 
 -- ============================================================
--- POSE FORZADA (T-Pose ragdoll / globo / sentado / flotando) — v4.3
--- FIX v4.3: usar PlatformStand en vez de ChangeState (que se revierte solo)
--- y forzar cada Motor6D a Transform identidad cada frame.
--- v7: Optimizado con cache
+-- v9: POSE FORZADA (T-Pose/Sentado/Flotando) ELIMINADA
+-- Peleaba cada frame con el sistema avanzado de 33_poses (ambos escribían
+-- Motor6D.Transform y PlatformStand con objetivos distintos). Las poses
+-- viven ahora únicamente en la pestaña 🧍 Poses (33_poses.lua).
 -- ============================================================
-local function funApplyRestPose()
-    if not UCam.character then return end
-    
-    -- v7: Usar cache en vez de GetDescendants()
-    for _, joint in ipairs(UCam.Fun._cachedMotor6Ds) do
-        pcall(function() joint.Transform = CFrame.new() end)
-    end
-end
-
-local function funFreezeControl()
-    if not UCam.character or not UCam.humanoid or not UCam.rootPart then return false end
-    if UCam.Fun._tposeSetupDone then return true end
-
-    -- 1. Apagar scripts de animacion
-    for _, s in ipairs(UCam.character:GetDescendants()) do
-        if s:IsA("LocalScript") and (s.Name == "Animate" or s.Name == "RbxCharacterSounds") then
-            pcall(function() s.Disabled = true end)
-        end
-    end
-
-    -- 2. Frenar animaciones en curso
-    local animator = UCam.humanoid:FindFirstChildOfClass("Animator")
-    if animator then
-        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-            pcall(function() track:Stop(0) end)
-        end
-    end
-
-    -- 3. PlatformStand = true: apaga WASD/auto-balance de forma persistente
-    pcall(function()
-        UCam.humanoid.PlatformStand = true
-        UCam.humanoid.AutoRotate    = false
-    end)
-
-    -- 4. Desanclar el root
-    pcall(function() UCam.rootPart.Anchored = false end)
-
-    -- 5. Colision en todas las partes
-    for _, part in ipairs(UCam.character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            pcall(function() part.CanCollide = true end)
-        end
-    end
-
-    UCam.Fun._tposeSetupDone = true
-    return true
-end
-
-local function funUnfreezeControl()
-    if not UCam.Fun._tposeSetupDone then return end
-    UCam.refreshCharacterRefs()
-    if UCam.character then
-        for _, s in ipairs(UCam.character:GetDescendants()) do
-            if s:IsA("LocalScript") and (s.Name == "Animate" or s.Name == "RbxCharacterSounds") then
-                pcall(function() s.Disabled = false end)
-            end
-        end
-    end
-    if UCam.humanoid then
-        pcall(function()
-            UCam.humanoid.PlatformStand = false
-            UCam.humanoid.AutoRotate    = true
-            UCam.humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-        end)
-    end
-    UCam.Fun._tposeSetupDone = false
-end
-
-local function funUpdatePose(dt)
-    if UCam.Fun.Pose.Mode == "Normal" then
-        if UCam.Fun._tposeSetupDone then funUnfreezeControl() end
-        return
-    end
-    UCam.refreshCharacterRefs()
-    if not UCam.humanoid or not UCam.character or not UCam.rootPart then return end
-    if not funFreezeControl() then return end
-
-    if UCam.Fun.Pose.Mode == "T-Pose" then
-        funApplyRestPose()
-        pcall(function()
-            local v          = UCam.rootPart.AssemblyLinearVelocity
-            local floatForce = UCam.Fun.Pose.FloatForce or 0
-            local dampXZ     = UCam.Fun.Pose.DampXZ or 0.92
-            UCam.rootPart.AssemblyLinearVelocity = Vector3.new(
-                v.X * dampXZ,
-                floatForce,
-                v.Z * dampXZ
-            )
-        end)
-    elseif UCam.Fun.Pose.Mode == "Sentado" then
-        pcall(function() UCam.humanoid.Sit = true end)
-        pcall(function()
-            local v = UCam.rootPart.AssemblyLinearVelocity
-            UCam.rootPart.AssemblyLinearVelocity = Vector3.new(v.X * 0.85, v.Y, v.Z * 0.85)
-        end)
-    elseif UCam.Fun.Pose.Mode == "Flotando" then
-        pcall(function()
-            local v = UCam.rootPart.AssemblyLinearVelocity
-            if v.Y < 1 then
-                UCam.rootPart.AssemblyLinearVelocity = v + Vector3.new(0, 4 * dt, 0)
-            end
-        end)
-    end
-end
 
 local function funUpdateNeonGlow()
     if UCam.Fun.NeonGlow.Enabled then
@@ -613,13 +509,13 @@ end
 -- ya tiene fast-return. Ahora los refreshCharacterRefs() redundantes
 -- se eliminan donde las refs se actualizan en eventos.
 -- ============================================================
-function UCam.funUpdate(dt)
+local function funUpdateCore(dt)
     funUpdateNoclip()
     funUpdateRainbow(dt)
     funUpdateNeonGlow()
     funUpdateSpeed()
     funUpdateJump()
-    funUpdatePose(dt)
+    -- v9: funUpdatePose eliminado (sistema de poses unificado en 33_poses)
     if UCam.updateAdvPoses then UCam.updateAdvPoses(dt) end
     funUpdateGravity(dt)
     UCam.FunV6.updateTrail(dt)
@@ -632,6 +528,18 @@ end
 local function startFun()
     if UCam.Fun._connHeartbeat then return end
     UCam.funSnapshotCharacter()
+    -- El personaje puede reemplazarse al respawn mientras Fun sigue activo.
+    -- Reconstruir cache y snapshots evita operar sobre partes destruidas.
+    if UCam.Fun._characterAddedConn then
+        UCam.Fun._characterAddedConn:Disconnect()
+    end
+    UCam.Fun._characterAddedConn = UCam.trackConnection(UCam.player.CharacterAdded:Connect(function()
+        task.defer(function()
+            if UCam.Fun._connHeartbeat then
+                UCam.funSnapshotCharacter()
+            end
+        end)
+    end), "fun-character-cache")
     UCam.Fun._connHeartbeat = UCam.RunService.Heartbeat:Connect(function(dt)
         UCam.funUpdate(dt)
     end)
@@ -651,7 +559,6 @@ function UCam.funAnyActive()
         or UCam.Fun.Trail.Enabled
         or UCam.Fun.Disco.Enabled
         or UCam.Fun.Invisibility.Enabled
-        or UCam.Fun.Pose.Mode ~= "Normal"
         or UCam.Fun.Particles.Enabled
         or UCam.Fun.Fly.Enabled
 end
@@ -671,6 +578,10 @@ local function stopFun()
         UCam.Fun._descendantRemovingConn:Disconnect()
         UCam.Fun._descendantRemovingConn = nil
     end
+    if UCam.Fun._characterAddedConn then
+        UCam.Fun._characterAddedConn:Disconnect()
+        UCam.Fun._characterAddedConn = nil
+    end
     
     -- v7: Limpiar cache
     table.clear(UCam.Fun._cachedBaseParts)
@@ -679,8 +590,9 @@ local function stopFun()
     -- v7: Limpiar nuevas features
     UCam.FunV7.disableParticles()
     UCam.FunV7.disableFly()
-    
-    funUnfreezeControl()
+
+    -- v9: funUnfreezeControl eliminado junto al sistema Fun.Pose; la
+    -- restauración de PlatformStand/Animate la hace 33_poses si aplica.
     UCam.funRestorePartVisuals()
     UCam.funRestoreHumanoid()
     UCam.funClearHighlight()
@@ -696,7 +608,6 @@ local function stopFun()
     UCam.Fun.BodySpin.Enabled   = false
     UCam.Fun.Rainbow.Enabled    = false
     UCam.Fun.NeonGlow.Enabled   = false
-    UCam.Fun.Pose.Mode          = "Normal"
     UCam.FunV6.clearTrail()
     UCam.FunV6.destroyDisco()
     for part, trans in pairs(UCam.Fun._origTransparency) do
@@ -1152,7 +1063,7 @@ end
 -- v7: ACTUALIZAR funUpdate para incluir nuevas features
 -- ============================================================
 -- Guardar la función original
-local originalFunUpdate = UCam.funUpdate
+local originalFunUpdate = funUpdateCore
 
 function UCam.funUpdate(dt)
     -- Llamar a la original

@@ -92,13 +92,6 @@ function UCam.build_cinematic(Window)
         CurrentValue = UCam.Shake.Intensity,
         Callback = function(v) UCam.Shake.Intensity = v end,
     })
-    CinematicTab:CreateButton({
-        Name = "Disparar Camera Shake (patron actual)",
-        Callback = function()
-            UCam.triggerShake(UCam.Shake.Pattern)
-        end,
-    })
-
     CinematicTab:CreateSection("Disparar shake one-shot")
     for _, pat in ipairs(UCam.Shake.Patterns) do
         CinematicTab:CreateButton({

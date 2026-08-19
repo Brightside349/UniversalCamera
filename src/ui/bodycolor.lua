@@ -236,7 +236,7 @@ function UCam.build_bodycolor(Window)
         return names
     end
     
-    local targetPlayerDropdown = Tab:CreateDropdown({
+    local targetPlayerDropdown = UCam.registerTargetPlayerDropdown(Tab:CreateDropdown({
         Name = "Jugador Objetivo",
         Options = getPlayerNames(),
         CurrentOption = {""},
@@ -246,11 +246,11 @@ function UCam.build_bodycolor(Window)
             if playerName then
                 local targetPlayer = UCam.Players:FindFirstChild(playerName)
                 if targetPlayer then
-                    UCam.PlayerMod.TargetPlayer = targetPlayer
+                    UCam.setTargetPlayer(targetPlayer)
                 end
             end
         end,
-    })
+    }))
     
     Tab:CreateButton({
         Name = "🔄 Actualizar Lista de Jugadores",
@@ -427,18 +427,6 @@ function UCam.build_bodycolor(Window)
             if preset then
                 UCam.applyPresetToPlayer(UCam.PlayerMod.TargetPlayer, preset)
                 UCam.notify("Coloreo", "Preset '" .. preset .. "' aplicado a " .. UCam.PlayerMod.TargetPlayer.Name)
-            end
-        end,
-    })
-    
-    Tab:CreateButton({
-        Name = "Restaurar Jugador Seleccionado",
-        Callback = function()
-            if UCam.PlayerMod.TargetPlayer then
-                UCam.restorePlayerBodyColor(UCam.PlayerMod.TargetPlayer)
-                UCam.notify("Coloreo", "Aspecto restaurado para " .. UCam.PlayerMod.TargetPlayer.Name)
-            else
-                UCam.notify("Coloreo", "Selecciona un jugador primero", 3)
             end
         end,
     })

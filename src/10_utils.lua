@@ -213,7 +213,9 @@ function UCam.unfreezeCharacter()
     task.delay(0.05, function() UCam.enableControls() end)
     UCam.Saved.RootCFrame   = nil
     UCam.Saved.RootAnchored = false
-    UCam.Saved.AutoRotate   = true
+    -- No inventar un valor al limpiar el snapshot: el siguiente ciclo debe
+    -- capturar el AutoRotate real del personaje actual.
+    UCam.Saved.AutoRotate   = nil
 end
 
 function UCam.holdCharacterPosition()
@@ -674,4 +676,3 @@ function UCam.hexToColor(hex)
     if not (r and g and b) then return nil end
     return Color3.fromRGB(r, g, b)
 end
-

@@ -39,6 +39,28 @@ function UCam.build_inicio(Window)
         end,
     })
 
+    -- v9: botón rápido de modo de notificaciones (junto al HUD-toggle)
+    InicioTab:CreateButton({
+        Name     = "🔔 Notificaciones: silenciar / restaurar",
+        Callback = function()
+            local ncfg = UCam.Config.Notifications
+            -- alternar rápido entre el modo anterior y silencio total
+            if ncfg.Mode ~= "silent" then
+                ncfg._lastMode = ncfg.Mode
+                ncfg.Mode = "silent"
+            else
+                ncfg.Mode = ncfg._lastMode or "all"
+            end
+        end,
+    })
+
+    InicioTab:CreateToggle({
+        Name         = "Modo Toma Limpia (sin UI ni notificaciones)",
+        CurrentValue = UCam.CleanShot.Enabled,
+        Flag         = "CleanShot",
+        Callback     = function(v) UCam.setCleanShot(v) end,
+    })
+
     InicioTab:CreateSection(T("inicio_quick"))
 
     InicioTab:CreateButton({
