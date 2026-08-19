@@ -101,6 +101,7 @@ function UCam.registerPlugin(spec, filename)
         icon      = spec.icon    or 4483362458,
         filename  = filename,
         stopFn    = spec.stop,
+        disposeFn = spec.dispose,
         startFn   = spec.start,
         registeredName = registeredName,
         disabled   = UCam.isPluginDisabled(name),
@@ -239,6 +240,12 @@ function UCam.stopAllPlugins()
             local ok, err = pcall(p.stopFn, UCam)
             if not ok then
                 warn(("[UCam] Plugin '%s' stop falló: %s"):format(name, tostring(err)))
+            end
+        end
+        if p.disposeFn then
+            local ok, err = pcall(p.disposeFn, UCam)
+            if not ok then
+                warn(("[UCam] Plugin '%s' dispose falló: %s"):format(name, tostring(err)))
             end
         end
     end

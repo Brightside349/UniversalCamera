@@ -1,6 +1,6 @@
 -- ============================================================
--- Universal Camera PRO v9 · Loader
--- By Cocoa Feliz · v9 release
+-- Universal Camera PRO v10 · Loader
+-- By Cocoa Feliz · v10 release
 --
 -- ESTE es el unico script que pegas en el juego.
 -- Descarga cada parte desde GitHub raw y la ejecuta inyectando el
@@ -18,7 +18,7 @@
 -- ============================================================
 -- CONFIG: repo de GitHub para cargar las partes modularizadas
 -- ============================================================
-local VERSION = "v9.0.0"   -- release v9 completa
+local VERSION = "v10.0.0"  -- release v10; publica este tag antes de usar el Loader remoto
 
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 
@@ -94,6 +94,8 @@ local ORDER = {
     -- y sus pestañas nunca aparecían). Necesita registerTabBuilder (80_ui).
     "85_plugins.lua",
     "88_v9extras.lua",
+    -- v10: integraciones locales (capture, guias, recovery, escenas)
+    "89_v10extras.lua",
     -- 9. Sub-builders de cada pestana (registran UCam.build_xxx)
     "ui/inicio.lua",
     "ui/camaras.lua",
@@ -110,6 +112,7 @@ local ORDER = {
     "ui/replay.lua",       -- v8.1: pestaña 🎬 Replay (REMASTERIZADO)
     "ui/profiles.lua",     -- v8: pestaña 📁 Perfiles
     "ui/config.lua",
+    "ui/creator.lua",      -- v10: acciones rapidas para creadores
     "ui/info.lua",
     -- 10. Init: llama a buildUI() y notifica "Listo"
     "90_init.lua",
@@ -203,7 +206,7 @@ end
 table.clear(sources)
 
 if #failedList == 0 then
-    print(("[UCam] Universal Camera Pro v9 cargado OK (%d partes)."):format(loaded))
+    print(("[UCam] Universal Camera Pro v10 cargado OK (%d partes)."):format(loaded))
 else
     warn(("[UCam] Carga completada con %d errores. Fallaron: %s"):format(
         #failedList, table.concat(failedList, ", ")

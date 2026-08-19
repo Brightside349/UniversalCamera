@@ -8,8 +8,7 @@
 -- - Es una alternativa al Director sin waypoints manuales
 -- - Graba el recorrido libre que hagas manualmente
 -- - Al reproducir, repite ese recorrido de forma suave
--- - Eliminados: marcadores, speed ramps, compartir web (demasiado complejo)
--- - Simplificado: solo grabar, reproducir, guardar/cargar 3 rutas
+-- - v10: marcadores, recorte, reverse y speed segments locales
 --
 -- Dependencias: 00_config, 10_utils, 70_camcore
 -- Expone (UCam.*):
@@ -119,11 +118,12 @@ function UCam.startRecording()
 
     -- Limpiar frames previos sin guardar
     table.clear(UCam.Replay.Frames)
+    table.clear(UCam.Replay.Markers)
     UCam.Replay.Recording      = true
     UCam.Replay._recordStartTime = tick()
     _recordTimer = 0
 
-    _recordConn = UCam.RunService.Heartbeat:Connect(function(dt)
+    _recordConn = UCam.trackConnection(UCam.RunService.Heartbeat:Connect(function(dt)
         if not UCam.Replay.Recording then return end
         
         -- v8.1: Si se desactiva la free cam durante grabación, detener
@@ -152,7 +152,7 @@ function UCam.startRecording()
             fov = fov,
             t   = elapsed,
         })
-    end)
+    end), "Replay:Recording")
 
     UCam.notify("Replay", string.format("Grabando recorrido libre... (máx %ds)", UCam.Replay.MaxDuration))
 end
@@ -162,7 +162,11 @@ function UCam.stopRecording()
     UCam.Replay.Recording = false
 
     if _recordConn then
-        _recordConn:Disconnect()
+        if UCam.untrackConnection then
+            UCam.untrackConnection(_recordConn)
+        else
+            _recordConn:Disconnect()
+        end
         _recordConn = nil
     end
 
@@ -198,7 +202,7 @@ function UCam.startPlayback()
     -- Entrar en modo cámara scriptable (igual que Director)
     UCam.camera.CameraType = Enum.CameraType.Scriptable
 
-    _playConn = UCam.RunService.Heartbeat:Connect(function(dt)
+    _playConn = UCam.trackConnection(UCam.RunService.Heartbeat:Connect(function(dt)
         if not UCam.Replay.Playing or UCam.Replay.Paused then return end
 
         local frames = UCam.Replay.Frames
@@ -227,7 +231,7 @@ function UCam.startPlayback()
             UCam.camera.CFrame = cf
             UCam.camera.FieldOfView = fov
         end
-    end)
+    end), "Replay:Playback")
 
     UCam.notify("Replay", "Reproduciendo recorrido...")
 end
@@ -243,7 +247,11 @@ function UCam.stopPlayback()
     UCam.Replay.Paused  = false
 
     if _playConn then
-        _playConn:Disconnect()
+        if UCam.untrackConnection then
+            UCam.untrackConnection(_playConn)
+        else
+            _playConn:Disconnect()
+        end
         _playConn = nil
     end
 
@@ -287,6 +295,126 @@ function UCam.setPlaybackSpeed(speed)
 end
 
 -- ============================================================
+-- V10: MARCADORES Y EDICION LOCAL DE REPLAY
+-- ============================================================
+local function replayDuration()
+    local frames = UCam.Replay.Frames
+    return (#frames > 0 and tonumber(frames[#frames].t)) or 0
+end
+
+local function sortReplayMarkers()
+    table.sort(UCam.Replay.Markers, function(a, b)
+        return (a.time or 0) < (b.time or 0)
+    end)
+end
+
+function UCam.addReplayMarker(label, timeSecs)
+    if type(UCam.Replay.Markers) ~= "table" then UCam.Replay.Markers = {} end
+    local time = tonumber(timeSecs)
+    if not time then
+        if UCam.Replay.Recording then
+            time = tick() - (UCam.Replay._recordStartTime or tick())
+        else
+            time = UCam.Replay.CurrentTime or 0
+        end
+    end
+    time = math.clamp(time, 0, replayDuration())
+    label = tostring(label or "Marcador")
+    label = label:gsub("[%c]", " "):sub(1, 80)
+    if label == "" then label = "Marcador" end
+    if #UCam.Replay.Markers >= 100 then
+        table.remove(UCam.Replay.Markers, 1)
+    end
+    table.insert(UCam.Replay.Markers, { time = time, label = label })
+    sortReplayMarkers()
+    UCam.emit("replayMarkerAdded", { time = time, label = label })
+    return true, time
+end
+
+function UCam.removeLastReplayMarker()
+    if #UCam.Replay.Markers == 0 then return false end
+    table.remove(UCam.Replay.Markers)
+    return true
+end
+
+function UCam.clearReplayMarkers()
+    table.clear(UCam.Replay.Markers)
+end
+
+function UCam.getReplayMarkers()
+    local out = {}
+    for i, marker in ipairs(UCam.Replay.Markers or {}) do
+        out[i] = { time = marker.time, label = marker.label }
+    end
+    return out
+end
+
+local function copyReplayMarkers(fromTime, toTime, offset)
+    local out = {}
+    for _, marker in ipairs(UCam.Replay.Markers or {}) do
+        if marker.time >= fromTime and marker.time <= toTime then
+            table.insert(out, {
+                time = math.max(0, marker.time - (offset or fromTime)),
+                label = marker.label,
+            })
+        end
+    end
+    return out
+end
+
+function UCam.trimReplay(startTime, endTime)
+    local frames = UCam.Replay.Frames
+    if #frames < 2 then return false, "no hay frames suficientes" end
+    local duration = replayDuration()
+    startTime = math.clamp(tonumber(startTime) or 0, 0, duration)
+    endTime = math.clamp(tonumber(endTime) or duration, 0, duration)
+    if endTime <= startTime then return false, "rango inválido" end
+
+    local trimmed = {}
+    for _, frame in ipairs(frames) do
+        if frame.t >= startTime and frame.t <= endTime then
+            table.insert(trimmed, {
+                cf = frame.cf,
+                fov = frame.fov,
+                t = frame.t - startTime,
+                roll = frame.roll,
+            })
+        end
+    end
+    if #trimmed < 2 then return false, "el rango necesita al menos 2 frames" end
+    UCam.Replay.Frames = trimmed
+    UCam.Replay.Markers = copyReplayMarkers(startTime, endTime, startTime)
+    UCam.Replay.CurrentTime = 0
+    return true, #trimmed
+end
+
+function UCam.reverseReplay()
+    local frames = UCam.Replay.Frames
+    if #frames < 2 then return false, "no hay frames suficientes" end
+    local duration = replayDuration()
+    local reversed = {}
+    for i = #frames, 1, -1 do
+        local frame = frames[i]
+        table.insert(reversed, {
+            cf = frame.cf,
+            fov = frame.fov,
+            t = duration - frame.t,
+            roll = frame.roll,
+        })
+    end
+    table.sort(reversed, function(a, b) return a.t < b.t end)
+    local markers = {}
+    for _, marker in ipairs(UCam.Replay.Markers or {}) do
+        table.insert(markers, { time = duration - marker.time, label = marker.label })
+    end
+    UCam.Replay.Frames = reversed
+    UCam.Replay.Markers = markers
+    sortReplayMarkers()
+    UCam.Replay.CurrentTime = 0
+    return true, #reversed
+end
+
+-- ============================================================
 -- RUTAS GUARDADAS (hasta MAX_ROUTES)
 -- ============================================================
 function UCam.saveCurrentRoute(slotIndex)
@@ -300,14 +428,17 @@ function UCam.saveCurrentRoute(slotIndex)
     -- Deep-copy de frames (CFrames son value types en Lua, ok copiar directamente)
     local copy = {}
     for i, f in ipairs(frames) do
-        copy[i] = { cf = f.cf, fov = f.fov, t = f.t }
+        copy[i] = { cf = f.cf, fov = f.fov, t = f.t, roll = f.roll }
     end
+
+    local markers = UCam.getReplayMarkers and UCam.getReplayMarkers() or {}
 
     UCam.Replay.SavedRoutes[slotIndex] = {
         frames   = copy,
         savedAt  = os.time(),
         duration = frames[#frames].t,
         count    = #frames,
+        markers  = markers,
     }
 
     UCam.notify("Replay",
@@ -327,7 +458,17 @@ function UCam.loadRoute(slotIndex)
     -- Copiar a frames de trabajo
     table.clear(UCam.Replay.Frames)
     for i, f in ipairs(route.frames) do
-        UCam.Replay.Frames[i] = { cf = f.cf, fov = f.fov, t = f.t }
+        UCam.Replay.Frames[i] = { cf = f.cf, fov = f.fov, t = f.t, roll = f.roll }
+    end
+
+    UCam.Replay.Markers = {}
+    for i, marker in ipairs(route.markers or {}) do
+        if type(marker) == "table" and tonumber(marker.time) then
+            UCam.Replay.Markers[i] = {
+                time = tonumber(marker.time),
+                label = tostring(marker.label or "Marcador"),
+            }
+        end
     end
 
     UCam.Replay.CurrentTime = 0
@@ -448,5 +589,6 @@ function UCam.stopReplay()
     UCam.stopRecording()
     UCam.stopPlayback()
     table.clear(UCam.Replay.Frames)
+    if UCam.Replay.Markers then table.clear(UCam.Replay.Markers) end
     UCam.Replay.CurrentTime = 0
 end

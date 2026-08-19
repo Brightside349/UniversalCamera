@@ -4,7 +4,8 @@
 -- reproducir con scrubbing, velocidad variable, guardar hasta
 -- 3 rutas y exportar/importar por string.
 --
--- SIMPLIFICADO: Sin marcadores, sin speed ramps, sin compartir web.
+-- v10: los marcadores y la edición básica viven en la pestaña Creator;
+-- Replay conserva su flujo principal de grabar/reproducir.
 -- ============================================================
 local UCam = _G.UCam
 
@@ -311,6 +312,7 @@ function UCam.build_replay(Window)
                 UCam.Replay.Frames[i] = f
             end
             UCam.Replay.CurrentTime = 0
+            if UCam.clearReplayMarkers then UCam.clearReplayMarkers() end
             UCam.notify("Replay",
                 string.format("Ruta importada: %d frames / %s",
                     #frames,
@@ -353,6 +355,7 @@ function UCam.build_replay(Window)
                 UCam.stopReplay()
             else
                 table.clear(UCam.Replay.Frames)
+                if UCam.clearReplayMarkers then UCam.clearReplayMarkers() end
                 UCam.Replay.CurrentTime = 0
                 UCam.notify("Replay", "Grabación actual eliminada.")
             end

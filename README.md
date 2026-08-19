@@ -1,8 +1,8 @@
-# Universal Camera Pro v9 · Modular
+# Universal Camera Pro v10 · Modular Creator Update
 
-Camara libre cinematografica para Roblox. **14 modos de camara, 30 filtros, Bullet Time universal, espectador con 9 estilos, modo Director con waypoints, post-procesado completo, efectos de diversion, nuevas funciones v8.1 y una UI expandida** — todo envuelto en una UI de 12+ pestanas de Rayfield.
+Cámara libre cinematográfica para Roblox. **18 modos de cámara, 30+ filtros, espectador con 9 estilos, Director con waypoints, Replay Pro local, guías de composición, Clean Shot, escenas ampliadas y herramientas para creadores** — todo envuelto en una UI modular de Rayfield.
 
-> Versión actual: tag `v9.0.0`.
+> Versión actual: tag `v10.0.0` (propuesta aplicada localmente; crea/publica el tag antes de usar el Loader remoto).
 > La versión anterior quedó preservada en la rama `legacy/v6` y en el tag `v6.0.0`.
 > Script original: `Universal Camera.lua` (6292 lineas, 235 KB).
 > Refactorizado en varios archivos siguiendo el plan del documento `PLAN_MODULARIZACION.md`.
@@ -53,17 +53,18 @@ universal-camera/
     ├── 10_utils.lua          ← refresh refs, freeze/unfreeze, clamp, easing, path viz, croma, lighting tweaks
     ├── 20_filters.lua        ← color correction, bloom, DOF, sun rays, vignette, letterbox
     ├── 30_fun.lua            ← modulo de diversion: montar, noclip, escala, poses, trail, disco, etc.
-    ├── 88_v9extras.lua       ← gamepad, escenas, keyframes, plugins v2 y timelapse
+    ├── 88_v9extras.lua       ← gamepad, escenas, keyframes, UI y timelapse
+    ├── 89_v10extras.lua      ← capture local, guías, recovery y metadata de escenas
     ├── 50_spectate.lua       ← espectador (9 modos) + navegacion Q/E
     ├── 60_director.lua       ← waypoints + reproduccion con easing
-    ├── 70_camcore.lua        ← toggleFreeCam, CrashZoom, Shake, updateCamera (14 modos), input
+    ├── 70_camcore.lua        ← toggleFreeCam, CrashZoom, Shake, updateCamera (18 modos), input
     ├── 80_ui.lua             ← orquestador de la UI (arma la Window de Rayfield)
     ├── 90_init.lua           ← llamada final a buildUI() + notificacion
     └── ui/
         ├── inicio.lua        ← Camara libre, HUD, captura, teletransporte, Restablecer todo
-        ├── camaras.lua       ← los 14 modos y todos sus parametros
+        ├── camaras.lua       ← los 18 modos y todos sus parametros
         ├── espectador.lua    ← jugadores, auto-ciclo, 9 estilos
-        ├── slowmo.lua        ← Bullet Time (toggle + ajustes)
+        ├── creator.lua       ← captura preparada, guías, escenas y Replay Pro
         ├── cinematic.lua     ← letterbox, vignette, shake, FOV pulse, director, post-procesado
         ├── filters.lua       ← 30 built-in + editor custom
         ├── light.lua         ← mezclador de iluminacion / clima
@@ -83,7 +84,6 @@ universal-camera/
 | `10_utils.lua` | 480 |
 | `20_filters.lua` | 320 |
 | `30_fun.lua` | 580 |
-| `40_slowmo.lua` | 380 |
 | `50_spectate.lua` | 410 |
 | `60_director.lua` | 120 |
 | `70_camcore.lua` | 760 |
@@ -91,7 +91,7 @@ universal-camera/
 | `90_init.lua` | 30 |
 | `ui/*.lua` | 100–400 cada uno |
 
-**Total:** 23 archivos, ninguno mayor a 800 lineas, la mayoria por debajo de 400.
+**Total:** 35 archivos Lua bajo `src/`, ninguno mayor a 1.100 lineas, la mayoria por debajo de 500.
 
 ---
 
@@ -175,11 +175,11 @@ Para agregar una nueva pestana de UI:
 
 El refactor es **funcionalmente identico** al `Universal Camera.lua` original:
 
-- Mismas 14 modos de camara.
+- Mismos 18 modos de camara.
 - Mismos 30 filtros built-in + editor custom.
-- Mismo Bullet Time universal.
+- V10 añade Replay Pro local, marcadores, guías, recovery y escenas ampliadas.
 - Mismos 9 modos de espectador.
-- Mismas 12 pestanas de UI con los mismos controles.
+- UI modular ampliada con pestaña Creator y controles locales nuevos.
 - Mismas teclas y atajos.
 
 Los unicos cambios:

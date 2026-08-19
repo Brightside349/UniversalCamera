@@ -37,6 +37,7 @@ UCam._uiBuilders = {
     "replay",       -- v7: Grabación y Replay de cámara
     "profiles",     -- v8: Perfiles completos
     "config",
+    "creator",      -- v10: acciones rapidas de captura y produccion local
     "info",
 }
 
@@ -130,9 +131,9 @@ UCam.UISliders = {
 -- buildUI: arma la ventana y dispara los sub-builders en orden.
 function UCam.buildUI()
     local Window = UCam.Rayfield:CreateWindow({
-        Name                   = "Universal Camera Pro v8 By Cocoa Feliz",
-        LoadingTitle           = "Universal Camera",
-        LoadingSubtitle        = "Cargando interfaz v8...",
+        Name                   = "Universal Camera Pro v10 By Cocoa Feliz",
+        LoadingTitle           = "Universal Camera Pro v10",
+        LoadingSubtitle        = "Cargando Creator tools locales...",
         Icon                   = 4483362458,
         ToggleUIKeybind        = Enum.KeyCode.Delete,
         DisableRayfieldPrompts = true,

@@ -133,6 +133,24 @@ UCam.CleanShot = {
     _previousDisplayDistanceType = nil,
 }
 
+-- v10: estado local para preparar tomas sin introducir un sistema externo.
+-- Capture describe el estado de preparación; no promete crear un archivo de
+-- imagen si el entorno no expone una API de screenshot.
+UCam.Capture = {
+    Prepared            = false,
+    HideAfterSeconds    = 3,
+    ScreenshotAvailable = false,
+    _previousCleanShot  = nil,
+}
+
+-- v10: guías de composición dibujadas solo durante el preview.
+UCam.Guides = {
+    Enabled = false,
+    Type    = "Thirds",
+    Opacity = 0.65,
+    Gui     = nil,
+}
+
 function UCam.setCleanShot(enabled)
     enabled = enabled and true or false
     local cs = UCam.CleanShot
@@ -212,6 +230,7 @@ UCam.Hud = {
     Hidden = false,
     CharacterHidden = false,
     Transparencies = {},
+    CustomStates = {},
 }
 
 -- v6: 14 modos de camara
@@ -909,6 +928,7 @@ UCam.Replay = {
     PlaybackSpeed = 1.0,
     Loop = false,
     SavedRoutes = {},           -- hasta 3 rutas guardadas
+    Markers     = {},            -- v10: marcas locales { time, label }
     _recordStartTime = 0,
 }
 

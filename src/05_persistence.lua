@@ -118,6 +118,8 @@ local SCHEMA = {
     -- Auto-HUD
     AutoHUD = { Enabled = nil },
     LookAtLock = { HeightOffset = nil, Smoothing = nil },
+    Guides = { Enabled = nil, Type = nil, Opacity = nil },
+    Capture = { HideAfterSeconds = nil },
 
     -- Lighting
     LightingTweaks = {
@@ -166,9 +168,9 @@ local SCHEMA = {
     },
 
     -- Replay (SavedRoutes se serializa aparte — cada frame tiene CFrame)
-    -- v8.1: Simplificado, sin marcadores ni ramps
     Replay = {
         MaxDuration = nil, PlaybackSpeed = nil, Loop = nil,
+        Markers = nil,
     },
 
     -- v9: notificaciones (modo / duración / silencio en tomas)
@@ -344,6 +346,7 @@ local function serializeReplayRoutes(routes)
                         cf  = serCFrame(f.cf),
                         fov = f.fov,
                         t   = f.t,
+                        roll = f.roll,
                     }
                 end
             end
@@ -352,6 +355,7 @@ local function serializeReplayRoutes(routes)
                 savedAt  = route.savedAt,
                 duration = route.duration,
                 count    = route.count,
+                markers  = route.markers,
             }
         end
     end
@@ -372,6 +376,7 @@ local function deserializeReplayRoutes(saved)
                         cf  = desCFrame(f.cf),
                         fov = f.fov,
                         t   = f.t,
+                        roll = f.roll,
                     }
                 end
             end
@@ -380,6 +385,7 @@ local function deserializeReplayRoutes(saved)
                 savedAt  = route.savedAt,
                 duration = route.duration,
                 count    = route.count,
+                markers  = route.markers,
             }
         end
     end
@@ -616,7 +622,7 @@ function UCam.saveConfig()
 
     local cfg = buildConfigTable()
     -- Campos extra no en SCHEMA pero que queremos persistir
-    cfg._version = "9.0"
+    cfg._version = "10.0"
     cfg._savedAt = os.time()
     -- v8: perfiles slots + quick (copia directa; NO contienen CFrames anidados)
     if UCam.Profiles then

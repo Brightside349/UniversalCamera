@@ -49,6 +49,9 @@ function UCam.Unload()
         if UCam.stopAllPlugins then UCam.stopAllPlugins() end
         -- v8 fase 4: detener el monitor de performance
         if UCam.stopPerformance then UCam.stopPerformance() end
+        -- v10: cerrar estado de captura y guias antes de destruir instancias
+        if UCam.restoreCapture then pcall(UCam.restoreCapture) end
+        if UCam.destroyGuides then pcall(UCam.destroyGuides) end
 
         -- Heartbeat connections de modulos con su propio loop
         if UCam.Fun._connHeartbeat then
@@ -102,6 +105,9 @@ end
 if UCam.initPersistence then
     pcall(UCam.initPersistence)
 end
+if UCam.Guides and UCam.Guides.Enabled and UCam.setGuidesEnabled then
+    pcall(UCam.setGuidesEnabled, true)
+end
 
 local ok, err = pcall(function()
     UCam.buildUI()
@@ -122,10 +128,10 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v9.0 By Cocoa Feliz",
-        "v8.1: Módulos simplificados, Replay remasterizado, bugs corregidos. Presiona Delete para UI."
+        "Universal Camera Pro v10 By Cocoa Feliz",
+        "V10: herramientas locales para creadores, Replay ampliado y guias de composicion. Presiona Delete para UI."
     )
-    print("[UCam] Universal Camera Pro v9.0 cargado OK. Notificaciones silenciables + estabilizacion v8.1.")
+    print("[UCam] Universal Camera Pro v10 cargado OK. Creator tools + Replay Pro local.")
 else
     warn("[UCam] Error al construir la UI: " .. tostring(err))
 end

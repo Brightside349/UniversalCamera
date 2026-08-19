@@ -15,15 +15,76 @@ local UCam = _G.UCam
 -- ============================================================
 -- HUD HIDDEN (lo necesita toggleFreeCam y los toggles de Inicio)
 -- ============================================================
--- v9: eliminado customHudPaths — rutas hardcodeadas de un juego concreto
--- ("Round.Game.SurvivorHP" etc.) que eran no-op en cualquier otro juego.
--- Si necesitas ocultar HUDs custom de un juego específico, créalo como
--- plugin usando UCam.setHudHidden desde el evento que prefieras.
+-- v10: restauradas para el HUD del juego objetivo. Se aplican de forma
+-- segura y guardan el estado original para poder restaurarlo al desactivar.
+
+local customHudPaths = {
+    "GameUI.Menu.Settings.Ability.Bar",
+    "GameUI.Menu.Settings.Game.SurvivorHP",
+    "Main.Game.Teams.Teammate",
+    "Round.Game.SurvivorHP",
+    "Round.Game.Ability",
+    "Round.Game.Time",
+    "Round.Game.SurvivorHP.AmyCards",
+    "Round.Game.Teams",
+    "InGameUI",
+}
+
+local function setCustomHudHidden(hidden)
+    local player = UCam.player
+    local playerGui = player and player:FindFirstChild("PlayerGui")
+    if not playerGui then return end
+
+    if hidden then
+        for _, path in ipairs(customHudPaths) do
+            local current = playerGui
+            for part in string.gmatch(path, "[^%.]+") do
+                current = current:FindFirstChild(part)
+                if not current then break end
+            end
+
+            if current and current ~= playerGui then
+                if UCam.Hud.CustomStates[current] == nil then
+                    if current:IsA("GuiObject") then
+                        UCam.Hud.CustomStates[current] = {
+                            Kind = "Visible",
+                            Value = current.Visible,
+                        }
+                    elseif current:IsA("LayerCollector") then
+                        UCam.Hud.CustomStates[current] = {
+                            Kind = "Enabled",
+                            Value = current.Enabled,
+                        }
+                    end
+                end
+                if current:IsA("GuiObject") then
+                    current.Visible = false
+                elseif current:IsA("LayerCollector") then
+                    current.Enabled = false
+                end
+            end
+        end
+    else
+        for instance, state in pairs(UCam.Hud.CustomStates) do
+            if instance and instance.Parent then
+                if state.Kind == "Visible" and instance:IsA("GuiObject") then
+                    instance.Visible = state.Value
+                elseif state.Kind == "Enabled" and instance:IsA("LayerCollector") then
+                    instance.Enabled = state.Value
+                end
+            end
+        end
+        UCam.Hud.CustomStates = {}
+    end
+end
 
 function UCam.setHudHidden(hidden)
     UCam.Hud.Hidden = hidden
     pcall(function()
         UCam.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, not hidden)
+    end)
+    pcall(function()
+        setCustomHudHidden(hidden)
     end)
 end
 

@@ -67,7 +67,8 @@ function UCam.toggleGamepad(enabled)
 end
 
 -- Escenas: presets rápidos de cámara, filtro e iluminación.
-UCam.Scenes = { Slots = {}, MaxSlots = 5 }
+UCam.Scenes = UCam.Scenes or { Slots = {}, MaxSlots = 5 }
+UCam.Scenes.MaxSlots = UCam.Scenes.MaxSlots or 5
 local function sceneLighting()
     local l = UCam.LightingTweaks
     return {
@@ -78,14 +79,45 @@ local function sceneLighting()
 end
 function UCam.captureScene(slot)
     slot = UCam.clamp(math.floor(slot or 1), 1, UCam.Scenes.MaxSlots)
+    local previous = UCam.Scenes.Slots[slot]
     UCam.Scenes.Slots[slot] = {
+        Name = previous and previous.Name or ("Escena " .. slot),
+        Description = previous and previous.Description or "",
         FilterIndex = UCam.currentFilterIndex,
         CamMode = UCam.camMode,
         FOV = UCam.camera.FieldOfView,
+        Roll = UCam.dutchRoll,
+        Letterbox = {
+            Enabled = UCam.Letterbox.Enabled,
+            HeightRatio = UCam.Letterbox.HeightRatio,
+        },
+        Bloom = {
+            Enabled = UCam.Bloom.Enabled,
+            Intensity = UCam.Bloom.Intensity,
+            Size = UCam.Bloom.Size,
+            Threshold = UCam.Bloom.Threshold,
+        },
+        DOF = {
+            Enabled = UCam.DOF.Enabled,
+            FarIntensity = UCam.DOF.FarIntensity,
+            FocusDistance = UCam.DOF.FocusDistance,
+            InFocusRadius = UCam.DOF.InFocusRadius,
+        },
+        SunRays = {
+            Enabled = UCam.SunRays.Enabled,
+            Intensity = UCam.SunRays.Intensity,
+            Spread = UCam.SunRays.Spread,
+        },
+        Vignette = {
+            Enabled = UCam.Vignette.Enabled,
+            Intensity = UCam.Vignette.Intensity,
+            Smoothness = UCam.Vignette.Smoothness,
+        },
         Lighting = sceneLighting(),
         SavedAt = os.time(),
     }
     UCam.emit("sceneSaved", { slot = slot })
+    if UCam.scheduleSave then UCam.scheduleSave() end
     return true
 end
 function UCam.applyScene(slot)
@@ -93,8 +125,33 @@ function UCam.applyScene(slot)
     local scene = UCam.Scenes.Slots[slot]
     if not scene then return false end
     if scene.FilterIndex then UCam.applyFilter(scene.FilterIndex, true) end
-    if scene.CamMode then UCam.camMode = scene.CamMode end
+    if scene.CamMode and scene.CamMode ~= UCam.camMode then
+        if UCam.triggerTransition then UCam.triggerTransition() end
+        UCam.camMode = scene.CamMode
+    end
     if scene.FOV then UCam.camera.FieldOfView = UCam.clamp(scene.FOV, UCam.MIN_FOV, UCam.MAX_FOV) end
+    if scene.Roll ~= nil then UCam.dutchRoll = tonumber(scene.Roll) or 0 end
+    if scene.Letterbox then
+        UCam.Letterbox.Enabled = scene.Letterbox.Enabled == true
+        UCam.Letterbox.HeightRatio = tonumber(scene.Letterbox.HeightRatio) or UCam.Letterbox.HeightRatio
+        if UCam.applyLetterbox then pcall(UCam.applyLetterbox) end
+    end
+    if scene.Bloom then
+        for key, value in pairs(scene.Bloom) do UCam.Bloom[key] = value end
+        if UCam.applyBloom then pcall(UCam.applyBloom) end
+    end
+    if scene.DOF then
+        for key, value in pairs(scene.DOF) do UCam.DOF[key] = value end
+        if UCam.applyDOF then pcall(UCam.applyDOF) end
+    end
+    if scene.SunRays then
+        for key, value in pairs(scene.SunRays) do UCam.SunRays[key] = value end
+        if UCam.applySunRays then pcall(UCam.applySunRays) end
+    end
+    if scene.Vignette then
+        for key, value in pairs(scene.Vignette) do UCam.Vignette[key] = value end
+        if UCam.applyVignette then pcall(UCam.applyVignette) end
+    end
     if scene.Lighting then
         for key, value in pairs(scene.Lighting) do UCam.LightingTweaks[key] = value end
         if UCam.applyLightingTweaks then pcall(UCam.applyLightingTweaks) end
@@ -117,6 +174,7 @@ function UCam.importReplayKeyframes(textValue)
     table.clear(UCam.Replay.Frames)
     for i, frame in ipairs(frames) do UCam.Replay.Frames[i] = frame end
     UCam.Replay.CurrentTime = 0
+    if UCam.Replay.Markers then table.clear(UCam.Replay.Markers) end
     return true, #frames
 end
 
