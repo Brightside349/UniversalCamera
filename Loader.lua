@@ -18,7 +18,7 @@
 -- ============================================================
 -- CONFIG: repo de GitHub para cargar las partes modularizadas
 -- ============================================================
-local VERSION = "v10.0.1"  -- v10: estabilidad, recovery y Director con pausas
+local VERSION = "v11.0.0"  -- v11: WindUI principal con fallback Rayfield
 
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 
@@ -57,6 +57,7 @@ _G.UCam = UCam
 -- Cada parte solo puede usar UCam.* de las anteriores.
 -- ============================================================
 local ORDER = {
+    "00_ui_provider.lua", -- v11: WindUI + fallback Rayfield + compatibilidad
     -- 0. Config + estado + servicios + Rayfield
     "00_config.lua",
     -- 0.5 v8: Persistencia (write/read config JSON, export/import)

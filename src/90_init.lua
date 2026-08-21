@@ -83,7 +83,7 @@ function UCam.Unload()
         -- Destruye instancias trackeadas (parts de visualizador, etc.)
         if UCam.cleanupInstances then UCam.cleanupInstances() end
 
-        -- Destruir la UI de Rayfield por completo
+        -- Destruir la UI del proveedor activo por completo
         if UCam.Rayfield and UCam.Rayfield.Destroy then
             pcall(function() UCam.Rayfield:Destroy() end)
         end
@@ -128,10 +128,10 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v10 By Cocoa Feliz",
-        "V10: herramientas locales para creadores, Replay ampliado y guias de composicion. Presiona Delete para UI."
+        "Universal Camera Pro v11 By Cocoa Feliz",
+        string.format("WindUI activo (%s). Herramientas locales para creadores listas. Presiona Delete para UI.", UCam.UI and UCam.UI.Name or "fallback")
     )
-    print("[UCam] Universal Camera Pro v10 cargado OK. Creator tools + Replay Pro local.")
+    print(("[UCam] Universal Camera Pro v11 cargado OK. UI: %s."):format(UCam.UI and UCam.UI.Name or "fallback"))
 else
     warn("[UCam] Error al construir la UI: " .. tostring(err))
 end

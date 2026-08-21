@@ -1,11 +1,11 @@
 -- ============================================================
--- Universal Camera Pro v8 · 00_config
--- Servicios, Rayfield, notify y TODAS las tablas de estado.
+-- Universal Camera Pro v11 · 00_config
+-- Servicios, proveedor UI, notify y TODAS las tablas de estado.
 -- Esta parte NO define logica; solo crea el namespace UCam y
 -- expone lo que el resto de archivos necesita.
 --
 -- Dependencias: ninguna (es la primera parte).
--- Expone: UCam.Servicios, UCam.Rayfield, UCam.notify,
+-- Expone: UCam.Servicios, UCam.UI, UCam.Rayfield, UCam.notify,
 --         UCam.player, UCam.camera, UCam.controls,
 --         UCam.Saved, UCam.Hud, UCam.CamModes, UCam.camMode,
 --         UCam.Orbit, UCam.DronePath, UCam.Lateral, UCam.Follow,
@@ -49,20 +49,10 @@ UCam.Lighting         = game:GetService("Lighting")
 UCam.TweenService     = game:GetService("TweenService")
 
 -- ============================================================
--- RAYFIELD (con fallback a dos mirrors)
+-- UI PROVIDER (WindUI principal, Rayfield fallback)
 -- ============================================================
-local Rayfield
-for _, url in ipairs({
-    "https://sirius.menu/rayfield",
-    "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
-}) do
-    local ok, lib = pcall(function() return loadstring(game:HttpGet(url))() end)
-    if ok and lib then
-        Rayfield = lib; break
-    end
-end
-if not Rayfield then error("[Universal Camera] No se pudo cargar Rayfield.") end
-UCam.Rayfield = Rayfield
+local Rayfield = UCam.Rayfield
+if not Rayfield then error("[Universal Camera] UI provider no inicializado.") end
 
 -- ============================================================
 -- NOTIFY (wrapper de Rayfield:Notify) — v9: modos de notificación
