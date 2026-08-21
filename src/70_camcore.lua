@@ -410,6 +410,7 @@ UCam.updateAutoFocus = updateAutoFocus
 -- UPDATE CAMARA (núcleo de render) - 14 modos
 -- ============================================================
 local fovPulseT = 0
+local fovPulseBaseFOV = nil
 
 function UCam.updateCamera(deltaTime)
     -- v7: updateReplay no necesita tick global
@@ -746,9 +747,15 @@ function UCam.updateCamera(deltaTime)
     end
 
     if UCam.FovPulse.Enabled then
+        if not fovPulseBaseFOV then
+            fovPulseBaseFOV = UCam.camera.FieldOfView
+        end
         fovPulseT = fovPulseT + deltaTime
         local osc = math.sin(fovPulseT * UCam.FovPulse.Speed * math.pi) * UCam.FovPulse.Amplitude
-        UCam.camera.FieldOfView = UCam.clamp(UCam.camera.FieldOfView + osc * deltaTime * 6, UCam.MIN_FOV, UCam.MAX_FOV)
+        UCam.camera.FieldOfView = UCam.clamp(fovPulseBaseFOV + osc, UCam.MIN_FOV, UCam.MAX_FOV)
+    else
+        fovPulseT = 0
+        fovPulseBaseFOV = nil
     end
 
     -- v7: Smooth zoom (interpolar FOV hacia el target)

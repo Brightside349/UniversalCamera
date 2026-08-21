@@ -18,7 +18,7 @@
 -- ============================================================
 -- CONFIG: repo de GitHub para cargar las partes modularizadas
 -- ============================================================
-local VERSION = "v10.0.0"  -- release v10; publica este tag antes de usar el Loader remoto
+local VERSION = "v10.0.1"  -- v10: estabilidad, recovery y Director con pausas
 
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 

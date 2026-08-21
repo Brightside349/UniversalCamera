@@ -55,12 +55,20 @@ end
 
 --- Desconecta TODAS las conexiones registradas. Llamado desde Unload().
 function UCam.cleanupConnections()
+    local report = { total = #UCam._connections, failed = 0, failures = {} }
     -- Iterar en reversa para evitar problemas al remover
     for i = #UCam._connections, 1, -1 do
         local entry = UCam._connections[i]
-        pcall(function() entry.conn:Disconnect() end)
+        local ok, err = pcall(function() entry.conn:Disconnect() end)
+        if not ok then
+            report.failed = report.failed + 1
+            table.insert(report.failures, { tag = entry.tag, error = tostring(err) })
+        end
     end
     table.clear(UCam._connections)
+    UCam.LastCleanupReport = UCam.LastCleanupReport or {}
+    UCam.LastCleanupReport.connections = report
+    return report
 end
 
 --- Registra una instancia (part, gui, etc.) para destruirla luego.
@@ -83,10 +91,26 @@ end
 
 --- Destruye TODAS las instancias registradas. Llamado desde Unload().
 function UCam.cleanupInstances()
+    local report = { total = #UCam._instances, failed = 0, failures = {} }
     for i = #UCam._instances, 1, -1 do
-        pcall(function() UCam._instances[i].obj:Destroy() end)
+        local entry = UCam._instances[i]
+        local ok, err = pcall(function() entry.obj:Destroy() end)
+        if not ok then
+            report.failed = report.failed + 1
+            table.insert(report.failures, { tag = entry.tag, error = tostring(err) })
+        end
     end
     table.clear(UCam._instances)
+    UCam.LastCleanupReport = UCam.LastCleanupReport or {}
+    UCam.LastCleanupReport.instances = report
+    return report
+end
+
+function UCam.getCleanupReport()
+    local report = UCam.LastCleanupReport or {}
+    report.connections = report.connections or { total = #UCam._connections, failed = 0, failures = {} }
+    report.instances = report.instances or { total = #UCam._instances, failed = 0, failures = {} }
+    return report
 end
 
 -- ============================================================

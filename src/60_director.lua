@@ -56,7 +56,25 @@ local function wpSpeed(wp)
     return 1
 end
 
-UCam.directorGetWP = { cf = wpCF, fov = wpFOV, roll = wpRoll, speed = wpSpeed }
+local function wpHold(wp)
+    if type(wp) == "table" then return math.max(tonumber(wp.hold) or 0, 0) end
+    return 0
+end
+
+local function wpLabel(wp)
+    if type(wp) == "table" then return tostring(wp.label or "") end
+    return ""
+end
+
+local function wpFocusTarget(wp)
+    if type(wp) == "table" then return tostring(wp.focusTarget or "") end
+    return ""
+end
+
+UCam.directorGetWP = {
+    cf = wpCF, fov = wpFOV, roll = wpRoll, speed = wpSpeed,
+    hold = wpHold, label = wpLabel, focusTarget = wpFocusTarget,
+}
 
 -- ============================================================
 -- NORMALIZA LA LISTA: convierte cualquier CFrame puro en tabla
@@ -70,6 +88,9 @@ local function normalizeList()
                 fov   = UCam.Waypoint.FOV,
                 roll  = UCam.Waypoint.Roll,
                 speed = 1,
+                hold  = 0,
+                label = "",
+                focusTarget = "",
             }
         end
     end
@@ -175,19 +196,26 @@ end
 local function routeTBySpeed(elapsed, totalDuration)
     local list = UCam.Waypoint.List
     local segments = math.max(#list - 1, 1)
-    local weightSum = 0
+    local movementSum = 0
+    local holdSum = 0
     for i = 1, segments do
-        weightSum = weightSum + (1 / math.max(wpSpeed(list[i]), 0.05))
+        movementSum = movementSum + (1 / math.max(wpSpeed(list[i]), 0.05))
+        holdSum = holdSum + wpHold(list[i])
     end
-    local cursor = UCam.clamp(elapsed / math.max(totalDuration, 0.5), 0, 1) * weightSum
+    local movementDuration = math.max(totalDuration - holdSum, 0)
     local accumulated = 0
     for i = 1, segments do
-        local weight = 1 / math.max(wpSpeed(list[i]), 0.05)
-        if cursor <= accumulated + weight then
-            local localT = (cursor - accumulated) / weight
+        local movementWeight = 1 / math.max(wpSpeed(list[i]), 0.05)
+        local moveDuration = movementSum > 0 and movementDuration * movementWeight / movementSum or 0
+        local hold = wpHold(list[i])
+        if elapsed <= accumulated + hold then
+            return (i - 1) / segments
+        end
+        if elapsed <= accumulated + hold + moveDuration then
+            local localT = (elapsed - accumulated - hold) / math.max(moveDuration, 0.001)
             return ((i - 1) + localT) / segments
         end
-        accumulated = accumulated + weight
+        accumulated = accumulated + hold + moveDuration
     end
     return 1
 end
@@ -203,6 +231,9 @@ function UCam.directorAddWaypoint(cf)
         fov   = UCam.Waypoint.Next.useFOV and UCam.Waypoint.Next.fov or UCam.Waypoint.FOV,
         roll  = UCam.Waypoint.UseRoll and (UCam.Waypoint.Next.roll) or UCam.Waypoint.Roll,
         speed = UCam.Waypoint.Next.speed or 1,
+        hold  = math.clamp(tonumber(UCam.Waypoint.Next.hold) or 0, 0, 60),
+        label = tostring(UCam.Waypoint.Next.label or ""):gsub("[%c;]", " "):sub(1, 60),
+        focusTarget = tostring(UCam.Waypoint.Next.focusTarget or ""):gsub("[%c;]", " "):sub(1, 60),
     }
     table.insert(UCam.Waypoint.List, wp)
     UCam.notify("Director",
@@ -341,9 +372,9 @@ function UCam.directorSerializeRoute()
         local cf = wpCF(wp)
         local px, py, pz, rx, ry, rz, lx, ly, lz = cfTo9(cf)
         table.insert(parts, string.format(
-            "%.3f,%.3f,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.1f,%.3f,%.2f",
+            "%.3f,%.3f,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.1f,%.3f,%.2f,%.2f",
             px, py, pz, rx, ry, rz, lx, ly, lz,
-            wpFOV(wp), wpRoll(wp), wpSpeed(wp)
+            wpFOV(wp), wpRoll(wp), wpSpeed(wp), wpHold(wp)
         ))
     end
     return table.concat(parts, ";")
@@ -372,6 +403,9 @@ function UCam.directorDeserializeRoute(str)
                     fov   = #v >= 10 and v[10] or UCam.Waypoint.FOV,
                     roll  = #v >= 11 and v[11] or 0,
                     speed = #v >= 12 and v[12] or 1,
+                    hold  = #v >= 13 and math.max(v[13], 0) or 0,
+                    label = "",
+                    focusTarget = "",
                 })
             end
         end

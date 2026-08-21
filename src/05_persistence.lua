@@ -197,6 +197,7 @@ local SCHEMA = {
         Duration = nil, Loop = nil, Easing = nil,
         UseFOV = nil, FOV = nil, UseRoll = nil, Roll = nil,
         CurveMode = nil, PreviewArrows = nil,
+        Next = { useFOV = nil, fov = nil, roll = nil, speed = nil, hold = nil, label = nil, focusTarget = nil },
     },
     Director = {
         SavedRoutes = nil,

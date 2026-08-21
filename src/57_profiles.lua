@@ -152,6 +152,7 @@ local function captureState()
         Duration=UCam.Waypoint.Duration, Loop=UCam.Waypoint.Loop, Easing=UCam.Waypoint.Easing,
         UseFOV=UCam.Waypoint.UseFOV, FOV=UCam.Waypoint.FOV, UseRoll=UCam.Waypoint.UseRoll, Roll=UCam.Waypoint.Roll,
         CurveMode=UCam.Waypoint.CurveMode, PreviewArrows=UCam.Waypoint.PreviewArrows,
+        Next=UCam.Waypoint.Next,
     }
 
     -- Replay (solo settings, no frames)

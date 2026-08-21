@@ -41,7 +41,7 @@ local function hideRayfieldGuis(capture)
         for _, child in ipairs(parent:GetChildren()) do
             if child:IsA("ScreenGui") and (child.Name == "Rayfield" or child.Name:find("Rayfield")) then
                 if child.Enabled then
-                    table.insert(capture._hiddenGuis, child)
+                    table.insert(capture._hiddenGuis, { gui = child, enabled = child.Enabled })
                     child.Enabled = false
                 end
             end
@@ -50,8 +50,12 @@ local function hideRayfieldGuis(capture)
 end
 
 local function restoreRayfieldGuis(capture)
-    for _, gui in ipairs(capture._hiddenGuis or {}) do
-        if gui and gui.Parent then pcall(function() gui.Enabled = true end) end
+    for _, entry in ipairs(capture._hiddenGuis or {}) do
+        local gui = entry.gui or entry
+        local enabled = entry.enabled
+        if gui and gui.Parent then
+            pcall(function() gui.Enabled = enabled == nil and true or enabled end)
+        end
     end
     table.clear(capture._hiddenGuis or {})
 end

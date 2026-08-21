@@ -447,7 +447,7 @@ UCam.Waypoint = {
     CurveModes  = { "Linear", "Catmull-Rom", "Bezier" },
     PreviewArrows = false,    -- v7: dibujar flechas de dirección en el preview 3D
     -- Valores que se aplicarán al SIGUIENTE waypoint que se guarde
-    Next        = { useFOV = false, fov = 70, roll = 0, speed = 1 },
+    Next        = { useFOV = false, fov = 70, roll = 0, speed = 1, hold = 0, label = "", focusTarget = "" },
 }
 UCam.Director = {
     Active       = false,

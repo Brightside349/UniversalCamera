@@ -61,6 +61,31 @@ function UCam.build_inicio(Window)
         Callback     = function(v) UCam.setCleanShot(v) end,
     })
 
+    InicioTab:CreateSection("Recuperación V10")
+    InicioTab:CreateButton({
+        Name = "🛟 Recuperar cámara y estado",
+        Callback = function()
+            if UCam.recoverSession then
+                UCam.recoverSession()
+            elseif UCam.forceRestoreCamera then
+                UCam.forceRestoreCamera()
+            end
+        end,
+    })
+
+    InicioTab:CreateButton({
+        Name = "🧹 Ver diagnóstico de limpieza",
+        Callback = function()
+            local report = UCam.getCleanupReport and UCam.getCleanupReport() or nil
+            if report then
+                UCam.notify("Diagnóstico", string.format(
+                    "Conexiones: %d total / %d fallidas. Instancias: %d total / %d fallidas.",
+                    report.connections.total, report.connections.failed,
+                    report.instances.total, report.instances.failed), 6)
+            end
+        end,
+    })
+
     InicioTab:CreateSection(T("inicio_quick"))
 
     InicioTab:CreateButton({
@@ -141,7 +166,7 @@ function UCam.build_inicio(Window)
             UCam.Waypoint.Roll                                     = 0
             UCam.Waypoint.CurveMode                                = "Linear"
             UCam.Waypoint.PreviewArrows                            = false
-            UCam.Waypoint.Next                                     = { useFOV = false, fov = 70, roll = 0, speed = 1 }
+            UCam.Waypoint.Next                                     = { useFOV = false, fov = 70, roll = 0, speed = 1, hold = 0, label = "", focusTarget = "" }
             UCam.Crane.Height                                      = UCam.DEFAULTS.craneHeight
             UCam.Crane.SpinSpeed                                   = UCam.DEFAULTS.craneSpinSpeed
             UCam.Dolly.Distance                                    = UCam.DEFAULTS.dollyDistance

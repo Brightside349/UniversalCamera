@@ -2,7 +2,7 @@
 
 Cámara libre cinematográfica para Roblox. **18 modos de cámara, 30+ filtros, espectador con 9 estilos, Director con waypoints, Replay Pro local, guías de composición, Clean Shot, escenas ampliadas y herramientas para creadores** — todo envuelto en una UI modular de Rayfield.
 
-> Versión actual: tag `v10.0.0` (propuesta aplicada localmente; crea/publica el tag antes de usar el Loader remoto).
+> Versión actual: tag `v10.0.1` publicada en GitHub.
 > La versión anterior quedó preservada en la rama `legacy/v6` y en el tag `v6.0.0`.
 > Script original: `Universal Camera.lua` (6292 lineas, 235 KB).
 > Refactorizado en varios archivos siguiendo el plan del documento `PLAN_MODULARIZACION.md`.
@@ -33,7 +33,7 @@ Sube el contenido de `src/` (incluyendo la subcarpeta `ui/`) a tu repo en la ram
 Para produccion, **fija la URL a un tag** en vez de `@main`:
 
 ```lua
-local BASE = "https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/v7.0.0/src/"
+    local BASE = "https://raw.githubusercontent.com/Brightside349/UniversalCamera/v10.0.1/src/"
 ```
 
 La rama `main` contiene la version principal actual. Si necesitas la antigua, usa la rama `legacy/v6` o el tag `v6.0.0`.
@@ -177,7 +177,8 @@ El refactor es **funcionalmente identico** al `Universal Camera.lua` original:
 
 - Mismos 18 modos de camara.
 - Mismos 30 filtros built-in + editor custom.
-- V10 añade Replay Pro local, marcadores, guías, recovery y escenas ampliadas.
+- V10 añade Replay Pro local, marcadores, guías, recovery, escenas ampliadas,
+  pausas de Director, diagnóstico de limpieza y FOV Pulse seguro.
 - Mismos 9 modos de espectador.
 - UI modular ampliada con pestaña Creator y controles locales nuevos.
 - Mismas teclas y atajos.

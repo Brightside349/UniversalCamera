@@ -232,6 +232,20 @@ function UCam.build_cinematic(Window)
         CurrentValue = UCam.Waypoint.Next.speed,
         Callback = function(v) UCam.Waypoint.Next.speed = v end,
     })
+    CinematicTab:CreateSlider({
+        Name = "Pausa del SIGUIENTE waypoint",
+        Range = { 0, 10 },
+        Increment = 0.5,
+        Suffix = " s",
+        CurrentValue = UCam.Waypoint.Next.hold or 0,
+        Callback = function(v) UCam.Waypoint.Next.hold = v end,
+    })
+    CinematicTab:CreateInput({
+        Name = "Etiqueta del SIGUIENTE waypoint",
+        PlaceholderText = "Ej: entrada / giro / golpe",
+        RemoveTextAfterFocusLost = false,
+        Callback = function(v) UCam.Waypoint.Next.label = v or "" end,
+    })
     CinematicTab:CreateToggle({
         Name = "FOV personalizado para el siguiente waypoint",
         CurrentValue = UCam.Waypoint.Next.useFOV,
