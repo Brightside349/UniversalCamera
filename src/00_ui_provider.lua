@@ -63,6 +63,12 @@ end
 
 local function normalizeIcon(icon)
     if type(icon) == "number" then return "rbxassetid://" .. tostring(icon) end
+    if type(icon) == "string" and icon ~= "" then
+        if icon:find(":", 1, true) or icon:find("^rbxassetid://") or icon:find("^https?://") then
+            return icon
+        end
+        return "lucide:" .. icon
+    end
     return icon
 end
 
@@ -93,7 +99,7 @@ local function tabIcon(title, fallback)
         { "info", "info" },
     }
     for _, entry in ipairs(icons) do
-        if text:find(entry[1]) then return entry[2] end
+        if text:find(entry[1]) then return normalizeIcon(entry[2]) end
     end
     return normalizeIcon(fallback) or "circle"
 end
@@ -287,7 +293,9 @@ local function createWindWindow(library, options)
         Radius = 12,
         ElementsRadius = 8,
         TopBarButtonIconSize = 18,
-        Topbar = { Height = 44, ButtonsType = "Mac" },
+        -- El preset Mac deja controles visibles arriba y no aporta nada al
+        -- flujo de captura. Default conserva solo la barra de WindUI.
+        Topbar = { Height = 44, ButtonsType = "Default" },
         OpenButton = {
             Title = "Abrir Universal Camera",
             Icon = "video",
@@ -295,7 +303,9 @@ local function createWindWindow(library, options)
             StrokeThickness = 1,
             Color = ColorSequence.new(Color3.fromRGB(83, 120, 255), Color3.fromRGB(168, 85, 247)),
             OnlyMobile = false,
-            Enabled = true,
+            -- La UI debe desaparecer por completo al ocultarse. Se reabre con
+            -- Delete mediante SetToggleKey, sin botón flotante persistente.
+            Enabled = false,
             Draggable = true,
         },
     })
