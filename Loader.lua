@@ -18,7 +18,7 @@
 -- ============================================================
 -- CONFIG: repo de GitHub para cargar las partes modularizadas
 -- ============================================================
-local VERSION = "v11.0.0"  -- v11: WindUI principal con fallback Rayfield
+local VERSION = "v11.0.1"  -- v11.01: WindUI optimizada, iconos y layout responsive
 
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 

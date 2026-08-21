@@ -128,7 +128,7 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v11 By Cocoa Feliz",
+        "Universal Camera Pro v11.01 By Cocoa Feliz",
         string.format("WindUI activo (%s). Herramientas locales para creadores listas. Presiona Delete para UI.", UCam.UI and UCam.UI.Name or "fallback")
     )
     print(("[UCam] Universal Camera Pro v11 cargado OK. UI: %s."):format(UCam.UI and UCam.UI.Name or "fallback"))

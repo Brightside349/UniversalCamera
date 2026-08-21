@@ -131,9 +131,9 @@ UCam.UISliders = {
 -- buildUI: arma la ventana y dispara los sub-builders en orden.
 function UCam.buildUI()
     local Window = UCam.Rayfield:CreateWindow({
-        Name                   = "Universal Camera Pro v11 By Cocoa Feliz",
-        LoadingTitle           = "Universal Camera Pro v11",
-        LoadingSubtitle        = "WindUI · Creator tools locales",
+        Name                   = "Universal Camera Pro v11.01 By Cocoa Feliz",
+        LoadingTitle           = "Universal Camera Pro v11.01",
+        LoadingSubtitle        = "WindUI optimizada · Creator tools locales",
         Icon                   = 4483362458,
         ToggleUIKeybind        = Enum.KeyCode.Delete,
         DisableRayfieldPrompts = true,

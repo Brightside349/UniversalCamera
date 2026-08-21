@@ -9,7 +9,12 @@ _G.UCam = UCam
 UCam.UIProvider = UCam.UIProvider or {
     Preferred = "WindUI",
     WindUIVersion = "1.6.66",
+    Build = "v11.01",
     FallbackEnabled = true,
+    Acrylic = false,
+    AutoScale = true,
+    WindowWidth = 720,
+    WindowHeight = 600,
 }
 
 local config = UCam.UIProvider
@@ -61,6 +66,59 @@ local function normalizeIcon(icon)
     return icon
 end
 
+local function cleanLabel(value)
+    value = tostring(value or "")
+    -- Builders V10 heredaron emojis de la UI anterior. WindUI ya dibuja
+    -- iconos Lucide en tabs y controles; elimina solo los adornos iniciales.
+    while #value > 0 do
+        local byte = string.byte(value, 1)
+        if not byte or byte < 128 then break end
+        local width = byte < 224 and 2 or (byte < 240 and 3 or (byte < 248 and 4 or 1))
+        value = value:sub(width + 1):gsub("^%s+", "")
+    end
+    return value
+end
+
+local function tabIcon(title, fallback)
+    local text = string.lower(cleanLabel(title))
+    local icons = {
+        { "inicio", "house" }, { "c[aá]maras", "camera" },
+        { "espectador", "users" }, { "cinematogr", "clapperboard" },
+        { "filtros", "palette" }, { "iluminaci", "sun" },
+        { "estudio", "tv" }, { "gimbal", "crosshair" },
+        { "diversi", "sparkles" }, { "cuerpo", "palette" },
+        { "poses", "person-standing" }, { "mod jugadores", "users-round" },
+        { "replay", "film" }, { "perfiles", "folder" },
+        { "ajustes", "settings" }, { "creator", "video" },
+        { "info", "info" },
+    }
+    for _, entry in ipairs(icons) do
+        if text:find(entry[1]) then return entry[2] end
+    end
+    return normalizeIcon(fallback) or "circle"
+end
+
+local function buttonIcon(label)
+    local text = string.lower(cleanLabel(label))
+    local icons = {
+        { "preparar", "video" }, { "grabar", "circle" },
+        { "reproduc", "play" }, { "detener", "square" },
+        { "guardar", "save" }, { "aplicar", "check" },
+        { "añadir", "plus" }, { "agregar", "plus" },
+        { "limpiar", "trash-2" }, { "borrar", "trash-2" },
+        { "restaurar", "rotate-ccw" }, { "recuperar", "life-buoy" },
+        { "exportar", "upload" }, { "importar", "download" },
+        { "copiar", "copy" }, { "cargar", "folder-open" },
+        { "teletransport", "locate" }, { "reiniciar", "refresh-cw" },
+        { "restablecer", "refresh-cw" }, { "activar", "power" },
+        { "desactivar", "power" }, { "eliminar", "trash-2" },
+    }
+    for _, entry in ipairs(icons) do
+        if text:find(entry[1]) then return entry[2] end
+    end
+    return nil
+end
+
 local function makeControl(raw, state)
     state._raw = raw
     state.Set = function(self, value)
@@ -92,17 +150,17 @@ end
 
 local function createWindTab(rawTab)
     local tab = {}
-    function tab:CreateSection(title) return rawTab:Section({ Title = tostring(title or "") }) end
+    function tab:CreateSection(title) return rawTab:Section({ Title = cleanLabel(title), Opened = true }) end
     function tab:CreateParagraph(options)
         options = options or {}
-        return rawTab:Paragraph({ Title = options.Title or "", Desc = options.Content or options.Desc or "" })
+        return rawTab:Paragraph({ Title = cleanLabel(options.Title), Desc = options.Content or options.Desc or "" })
     end
     function tab:CreateButton(options)
         options = options or {}
         return rawTab:Button({
-            Title = options.Name or options.Title or "Button",
+            Title = cleanLabel(options.Name or options.Title or "Button"),
             Desc = options.Content or options.Description,
-            Icon = normalizeIcon(options.Icon),
+            Icon = normalizeIcon(options.Icon) or buttonIcon(options.Name or options.Title),
             Callback = options.Callback,
         })
     end
@@ -110,7 +168,7 @@ local function createWindTab(rawTab)
         options = options or {}
         local state = makeControl(nil, { Kind = "Toggle", CurrentValue = options.CurrentValue == true, Value = options.CurrentValue == true })
         local raw = rawTab:Toggle({
-            Title = options.Name or options.Title or "Toggle", Desc = options.Description,
+            Title = cleanLabel(options.Name or options.Title or "Toggle"), Desc = options.Description,
             Flag = options.Flag, Value = options.CurrentValue == true,
             Callback = function(value)
                 state._update(value == true)
@@ -124,7 +182,7 @@ local function createWindTab(rawTab)
         local range = options.Range or { 0, 1 }
         local state = makeControl(nil, { Kind = "Slider", CurrentValue = options.CurrentValue, Value = options.CurrentValue })
         local raw = rawTab:Slider({
-            Title = options.Name or options.Title or "Slider", Desc = options.Description,
+            Title = cleanLabel(options.Name or options.Title or "Slider"), Desc = options.Description,
             Flag = options.Flag, Step = options.Increment or 1, Suffix = options.Suffix,
             Value = { Min = range[1], Max = range[2], Default = options.CurrentValue },
             Callback = function(value)
@@ -140,7 +198,7 @@ local function createWindTab(rawTab)
         if type(selected) == "table" and not options.MultipleOptions then selected = selected[1] end
         local state = makeControl(nil, { Kind = "Dropdown", Options = options.Options or {}, CurrentOption = options.CurrentOption or {}, Value = selected })
         local raw = rawTab:Dropdown({
-            Title = options.Name or options.Title or "Dropdown", Desc = options.Description,
+            Title = cleanLabel(options.Name or options.Title or "Dropdown"), Desc = options.Description,
             Flag = options.Flag, Values = options.Options or {}, Value = selected,
             Multi = options.MultipleOptions == true,
             Callback = function(value)
@@ -154,7 +212,7 @@ local function createWindTab(rawTab)
         options = options or {}
         local state = makeControl(nil, { Kind = "Input", CurrentValue = options.CurrentValue or "", Value = options.CurrentValue or "" })
         local raw = rawTab:Input({
-            Title = options.Name or options.Title or "Input", Desc = options.Description,
+            Title = cleanLabel(options.Name or options.Title or "Input"), Desc = options.Description,
             Flag = options.Flag, Value = options.CurrentValue or "", Placeholder = options.PlaceholderText,
             Type = options.Type or "Input",
             Callback = function(value)
@@ -173,7 +231,7 @@ local function createWindTab(rawTab)
             Color = options.Color,
         })
         local raw = rawTab:Colorpicker({
-            Title = options.Name or options.Title or "Color",
+            Title = cleanLabel(options.Name or options.Title or "Color"),
             Desc = options.Description,
             Flag = options.Flag,
             Default = options.Color,
@@ -186,13 +244,13 @@ local function createWindTab(rawTab)
         state._raw = raw; addFlag(options.Flag, state); return state
     end
     function tab:CreateLabel(text)
-        return rawTab:Paragraph({ Title = tostring(text or ""), Desc = "" })
+        return rawTab:Paragraph({ Title = cleanLabel(text), Desc = "" })
     end
     function tab:CreateKeybind(options)
         options = options or {}
         local state = makeControl(nil, { Kind = "Keybind", CurrentKeybind = options.CurrentKeybind, Value = options.CurrentKeybind })
         local raw = rawTab:Keybind({
-            Title = options.Name or options.Title or "Keybind", Desc = options.Description,
+            Title = cleanLabel(options.Name or options.Title or "Keybind"), Desc = options.Description,
             Flag = options.Flag, Value = options.CurrentKeybind,
             Callback = function(value)
                 state._update(value)
@@ -210,16 +268,45 @@ end
 
 local function createWindWindow(library, options)
     local rawWindow = library:CreateWindow({
-        Title = options.Name or options.Title or "Universal Camera Pro",
-        Author = "Cocoa Feliz · Creator Tools", Icon = normalizeIcon(options.Icon),
-        Folder = "UniversalCamera", Size = UDim2.fromOffset(620, 560),
+        Title = "Universal Camera Pro · Creator Console",
+        Author = "Cocoa Feliz · WindUI V11.01", Icon = "video",
+        Folder = "UniversalCamera", Size = UDim2.fromOffset(config.WindowWidth or 720, config.WindowHeight or 600),
         Theme = (UCam.UISettings and UCam.UISettings.Theme) or "Dark",
-        NewElements = true, HideSearchBar = false,
-        OpenButton = { Enabled = true, Draggable = true },
+        Acrylic = config.Acrylic == true,
+        NewElements = true,
+        AutoScale = config.AutoScale ~= false,
+        Transparent = false,
+        Resizable = true,
+        MinSize = Vector2.new(520, 420),
+        MaxSize = Vector2.new(960, 780),
+        SideBarWidth = 190,
+        HideSearchBar = false,
+        ScrollBarEnabled = true,
+        BackgroundImageTransparency = 1,
+        ShadowTransparency = 0.2,
+        Radius = 12,
+        ElementsRadius = 8,
+        TopBarButtonIconSize = 18,
+        Topbar = { Height = 44, ButtonsType = "Mac" },
+        OpenButton = {
+            Title = "Abrir Universal Camera",
+            Icon = "video",
+            CornerRadius = UDim.new(0, 14),
+            StrokeThickness = 1,
+            Color = ColorSequence.new(Color3.fromRGB(83, 120, 255), Color3.fromRGB(168, 85, 247)),
+            OnlyMobile = false,
+            Enabled = true,
+            Draggable = true,
+        },
     })
     local window = {}
     function window:CreateTab(title, icon)
-        return createWindTab(rawWindow:Tab({ Title = title, Icon = normalizeIcon(icon) }))
+        return createWindTab(rawWindow:Tab({
+            Title = cleanLabel(title),
+            Icon = tabIcon(title, icon),
+            Border = true,
+            IconShape = "Square",
+        }))
     end
     function window:CreateSection(title) return rawWindow:Section({ Title = tostring(title or "") }) end
     function window:SetToggleKey(key) return callMethod(rawWindow, { "SetToggleKey", "SetMinimizeKey" }, key) end
@@ -233,6 +320,12 @@ local function createProvider()
     local library = config.Preferred == "WindUI" and loadWindUI() or nil
     if library then
         provider.Name, provider.Library = "WindUI", library
+        pcall(function()
+            library.TransparencyValue = 0.08
+            if library.SetTheme then
+                library:SetTheme((UCam.UISettings and UCam.UISettings.Theme) or "Dark")
+            end
+        end)
         provider.CreateWindow = function(_, options)
             provider.Window = createWindWindow(library, options or {})
             return provider.Window

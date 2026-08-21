@@ -33,7 +33,7 @@ Sube el contenido de `src/` (incluyendo la subcarpeta `ui/`) a tu repo en la ram
 Para produccion, **fija la URL a un tag** en vez de `@main`:
 
 ```lua
-    local BASE = "https://raw.githubusercontent.com/Brightside349/UniversalCamera/v11.0.0/src/"
+    local BASE = "https://raw.githubusercontent.com/Brightside349/UniversalCamera/v11.0.1/src/"
 ```
 
 La rama `main` contiene la version principal actual. Si necesitas la antigua, usa la rama `legacy/v6` o el tag `v6.0.0`.
