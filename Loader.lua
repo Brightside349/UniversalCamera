@@ -18,7 +18,7 @@
 -- ============================================================
 -- CONFIG: repo de GitHub para cargar las partes modularizadas
 -- ============================================================
-local VERSION = "v11.0.1"  -- v11.01: WindUI optimizada, iconos y layout responsive
+local VERSION = "v11.0.2"  -- v11.02: sidebar Lucide y UI completamente oculta
 
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 
