@@ -104,6 +104,7 @@ function UCam.funSnapshotCharacter()
     end
     UCam.Fun._origModelScale = modelScale
     UCam.Fun._scaleUsingHumanoidValues = false
+    UCam.Fun._scaleUsingManual = false
     UCam.Fun._scaleWarningShown = false
     table.clear(UCam.Fun._origHumanoidScales)
     if UCam.humanoid then
@@ -129,6 +130,42 @@ function UCam.funSnapshotCharacter()
         UCam.Fun._origMaterials[part]   = part.Material
         table.insert(UCam.Fun._origParts, part)
     end
+
+    -- Captura extra para fallback manual visual (no deforma):
+    -- Joints (Motor6D/Weld) -> C0/C1, Attachments -> CFrame, SpecialMesh -> Scale, HipHeight.
+    -- Estos permiten escalar localmente sin tocar el servidor y sin deformar R6/R15,
+    -- incluso cuando Model:ScaleTo no está disponible (foros: Humanoid NumberValues
+    -- no funcionan client-sided, solo ScaleTo o escalado manual de C0/C1 + Size).
+    UCam.Fun._origJointData = UCam.Fun._origJointData or {}
+    UCam.Fun._origAttachmentData = UCam.Fun._origAttachmentData or {}
+    UCam.Fun._origMeshScales = UCam.Fun._origMeshScales or {}
+    table.clear(UCam.Fun._origJointData)
+    table.clear(UCam.Fun._origAttachmentData)
+    table.clear(UCam.Fun._origMeshScales)
+    UCam.Fun._origHipHeight = UCam.humanoid and UCam.humanoid.HipHeight or nil
+
+    for _, desc in ipairs(UCam.character:GetDescendants()) do
+        if desc:IsA("Motor6D") then
+            local ok0, c0 = pcall(function() return desc.C0 end)
+            local ok1, c1 = pcall(function() return desc.C1 end)
+            if ok0 and ok1 and c0 and c1 then
+                UCam.Fun._origJointData[desc] = {c0 = c0, c1 = c1}
+            end
+        elseif desc:IsA("Weld") and desc:IsA("JointInstance") then
+            local ok0, c0 = pcall(function() return desc.C0 end)
+            local ok1, c1 = pcall(function() return desc.C1 end)
+            if ok0 and ok1 and c0 and c1 then
+                UCam.Fun._origJointData[desc] = {c0 = c0, c1 = c1}
+            end
+        elseif desc:IsA("Attachment") then
+            local ok, cf = pcall(function() return desc.CFrame end)
+            if ok and cf then
+                UCam.Fun._origAttachmentData[desc] = cf
+            end
+        elseif desc:IsA("SpecialMesh") then
+            UCam.Fun._origMeshScales[desc] = desc.Scale
+        end
+    end
     
     if UCam.humanoid and UCam.Fun._savedWalkSpeed == nil then
         UCam.Fun._savedWalkSpeed  = UCam.humanoid.WalkSpeed
@@ -141,15 +178,43 @@ function UCam.funRestoreCharacterScale()
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
 
-    -- ScaleTo restaura también joints, attachments, meshes y accesorios.
-    -- Es importante hacerlo antes de limpiar los snapshots de partes.
+    -- 1) Intento principal: ScaleTo (uniforme, no deforma). Restaura joints,
+    -- attachments, meshes y accesorios de golpe. Es local (client-sided) y
+    -- no replica al servidor, por lo que es "solo visual" como pide el bug.
     if UCam.Fun._origModelScale then
         pcall(function()
             UCam.character:ScaleTo(UCam.Fun._origModelScale)
         end)
     end
 
-    -- Fallback para clientes/rigs donde Model:ScaleTo no está disponible.
+    -- 2) Fallback manual visual (foros): si se usó escalado manual por falta
+    -- de ScaleTo, hay que restaurar C0/C1, attachments, meshes e HipHeight.
+    if UCam.Fun._scaleUsingManual then
+        for joint, data in pairs(UCam.Fun._origJointData or {}) do
+            if joint and joint.Parent then
+                pcall(function()
+                    joint.C0 = data.c0
+                    joint.C1 = data.c1
+                end)
+            end
+        end
+        for att, cf in pairs(UCam.Fun._origAttachmentData or {}) do
+            if att and att.Parent then
+                pcall(function() att.CFrame = cf end)
+            end
+        end
+        for mesh, sc in pairs(UCam.Fun._origMeshScales or {}) do
+            if mesh and mesh.Parent then
+                pcall(function() mesh.Scale = sc end)
+            end
+        end
+        if UCam.humanoid and UCam.Fun._origHipHeight ~= nil then
+            pcall(function() UCam.humanoid.HipHeight = UCam.Fun._origHipHeight end)
+        end
+    end
+
+    -- 3) Fallback legacy para clientes/rigs donde Model:ScaleTo no está
+    -- disponible y se tocaron NumberValues de R15.
     if UCam.Fun._scaleUsingHumanoidValues and UCam.humanoid then
         for scaleName, originalValue in pairs(UCam.Fun._origHumanoidScales) do
             local value = UCam.humanoid:FindFirstChild(scaleName)
@@ -207,8 +272,13 @@ function UCam.funClearPartSnapshots()
     table.clear(UCam.Fun._origMaterials)
     table.clear(UCam.Fun._origParts)
     table.clear(UCam.Fun._origHumanoidScales)
+    if UCam.Fun._origJointData then table.clear(UCam.Fun._origJointData) end
+    if UCam.Fun._origAttachmentData then table.clear(UCam.Fun._origAttachmentData) end
+    if UCam.Fun._origMeshScales then table.clear(UCam.Fun._origMeshScales) end
     UCam.Fun._origModelScale = nil
+    UCam.Fun._origHipHeight = nil
     UCam.Fun._scaleUsingHumanoidValues = false
+    UCam.Fun._scaleUsingManual = false
     UCam.Fun._scaleWarningShown = false
 end
 
@@ -240,8 +310,65 @@ function UCam.funClearHighlight()
     end
 end
 
+-- Escala uniforme visual (solo local, no replica al server):
+-- 1) Intenta Model:ScaleTo (motor, no deforma, escala joints/attachments/meshes).
+--    Es la solución recomendada en foros para client-sided scale (2023+).
+--    Referencias: devforum "CharacterModel:ScaleTo(2) -- all avatar types work"
+--    y docs "Model:ScaleTo scales around pivot, all geometric properties".
+-- 2) Si ScaleTo falla o no está disponible, usa fallback manual que escala
+--    Size + Motor6D.C0/C1 + Attachments + SpecialMesh.Scale + HipHeight de
+--    forma proporcional, sin tocar BasePart.Size aislado (que deformaba).
+--    Referencias: devforum "C0 = CFrame.new((C0.Position*scale))*(C0-C0.Position)"
+--    y "How to size a R6 Player" con AccessoryWeld + Mesh.Scale.
+-- 3) El último fallback (Humanoid NumberValues) existe solo por compatibilidad
+--    pero NO funciona client-sided (forum: "changing BodyScale locally does nothing"),
+--    por eso el manual es el que evita el cuerpo deforme en R6 chiquito/gigante.
+local function applyManualVisualScale(scale)
+    local okAny = false
+    -- Partes: todas menos HumanoidRootPart (mantener hitbox original = solo visual).
+    -- Conservar HRP evita que el personaje crezca de colisión en local y
+    -- que el server lo kickee; el cuerpo visual crece alrededor del HRP via joints.
+    for part, origSize in pairs(UCam.Fun._origPartSizes) do
+        if part and part.Parent and part.Name ~= "HumanoidRootPart" then
+            local ok = pcall(function() part.Size = origSize * scale end)
+            if ok then okAny = true end
+        end
+    end
+    -- Joints: escalar solo la posición de C0/C1, conservar rotación.
+    for joint, data in pairs(UCam.Fun._origJointData or {}) do
+        if joint and joint.Parent then
+            local ok = pcall(function()
+                local c0, c1 = data.c0, data.c1
+                -- (CFrame - Vector3) deja solo rotación; CFrame.new(pos*scale) re-escala offset.
+                joint.C0 = CFrame.new(c0.Position * scale) * (c0 - c0.Position)
+                joint.C1 = CFrame.new(c1.Position * scale) * (c1 - c1.Position)
+            end)
+            if ok then okAny = true end
+        end
+    end
+    -- Attachments (R15 AnimationConstraint): escalar CFrame posición.
+    for att, origCF in pairs(UCam.Fun._origAttachmentData or {}) do
+        if att and att.Parent then
+            pcall(function()
+                att.CFrame = CFrame.new(origCF.Position * scale) * (origCF - origCF.Position)
+            end)
+        end
+    end
+    -- SpecialMesh (cabeza R6 blocky / accesorios): escalar visual sin hitbox.
+    for mesh, origScale in pairs(UCam.Fun._origMeshScales or {}) do
+        if mesh and mesh.Parent then
+            pcall(function() mesh.Scale = origScale * scale end)
+        end
+    end
+    -- HipHeight: mantener pies en el suelo al escalar.
+    if UCam.humanoid and UCam.Fun._origHipHeight ~= nil then
+        pcall(function() UCam.humanoid.HipHeight = UCam.Fun._origHipHeight * scale end)
+    end
+    return okAny
+end
+
 -- Escala uniforme: usa el Model completo para conservar proporciones, joints,
--- attachments, meshes y accesorios. El fallback usa los valores de escala R15.
+-- attachments, meshes y accesorios. El fallback usa escalado manual visual.
 function UCam.funApplyScale(scale)
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
@@ -253,20 +380,38 @@ function UCam.funApplyScale(scale)
     local targetModelScale = originalModelScale * scale
     local scaledModel = false
 
-    -- Model:ScaleTo escala el avatar como una unidad y evita el cuerpo
-    -- estirado que provocaba escribir Size en cada BasePart.
+    -- 1) Model:ScaleTo — escala uniforme real, no deforma.
     local scaleOk = pcall(function()
         UCam.character:ScaleTo(targetModelScale)
     end)
+    -- Verificar que realmente cambió (algunos rigs/exploits devuelven ok pero no escalan).
     if scaleOk then
-        scaledModel = true
-        UCam.Fun._scaleUsingHumanoidValues = false
+        local verifyOk, newScale = pcall(function() return UCam.character:GetScale() end)
+        if verifyOk and type(newScale) == "number" and math.abs(newScale - targetModelScale) < 0.02 then
+            scaledModel = true
+            UCam.Fun._scaleUsingHumanoidValues = false
+            UCam.Fun._scaleUsingManual = false
+        else
+            -- Revertir intento fallido silenciosamente e intentar fallback manual.
+            pcall(function() UCam.character:ScaleTo(originalModelScale) end)
+            scaledModel = false
+        end
     end
 
-    -- Fallback para rigs/clientes sin ScaleTo: solo toca los NumberValues de
-    -- escala de R15, multiplicando desde sus valores originales para no
-    -- destruir proporciones personalizadas del avatar.
-    if not scaledModel and UCam.humanoid then
+    -- 2) Fallback manual visual (no deforma, solo local, no afecta server).
+    -- Prioritario sobre NumberValues porque NumberValues no replican visual
+    -- en LocalScript (forums: "HeadScale locally does nothing").
+    local manualOk = false
+    if not scaledModel then
+        manualOk = applyManualVisualScale(scale)
+        UCam.Fun._scaleUsingManual = manualOk
+        if manualOk then
+            UCam.Fun._scaleUsingHumanoidValues = false
+        end
+    end
+
+    -- 3) Fallback legacy R15 NumberValues (por compatibilidad, raramente visible local).
+    if not scaledModel and not manualOk and UCam.humanoid then
         local changed = false
         for scaleName, originalValue in pairs(UCam.Fun._origHumanoidScales) do
             local value = UCam.humanoid:FindFirstChild(scaleName)
@@ -276,14 +421,12 @@ function UCam.funApplyScale(scale)
             end
         end
         UCam.Fun._scaleUsingHumanoidValues = changed
+        -- Si ni manual ni NumberValues funcionaron, ya se advirtió abajo.
     end
 
     UCam.Fun._currentScale = scale
 
-    -- Si el cliente tampoco ofrece ScaleTo ni escalas R15, no aplicamos el
-    -- antiguo fallback de BasePart.Size: deformaba el cuerpo y era peor que
-    -- dejarlo en su tamaño original.
-    if not scaledModel and not UCam.Fun._scaleUsingHumanoidValues
+    if not scaledModel and not manualOk and not UCam.Fun._scaleUsingHumanoidValues
         and not UCam.Fun._scaleWarningShown then
         warn("[UCam] Este rig no expone una escala uniforme compatible.")
         UCam.Fun._scaleWarningShown = true

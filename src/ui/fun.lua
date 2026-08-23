@@ -185,8 +185,8 @@ function UCam.build_fun(Window)
 
     FunTab:CreateSection("Tamano uniforme del personaje (1x = normal)")
     FunTab:CreateParagraph({
-        Title   = "Escala proporcional",
-        Content = "El personaje completo, sus accesorios y sus articulaciones se escalan juntos para evitar deformaciones.",
+        Title   = "Escala proporcional (solo visual, local)",
+        Content = "Solo tu ves el cambio (no afecta al servidor/juego). Escala uniforme R6/R15: cuerpo, accesorios, joints y altura de cadera. Corrige el modo gigante/chiquito deforme.",
     })
     FunTab:CreateToggle({
         Name         = "Aplicar escala uniforme",
