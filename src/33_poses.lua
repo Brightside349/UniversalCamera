@@ -418,13 +418,33 @@ end
 -- usan joints con nombres propios, no "Right Shoulder"/"RightShoulder".
 -- Si el lookup por nombre falla, se resuelve por ESTRUCTURA: el joint cuyo
 -- Part1 es la cabeza = Neck, brazo superior derecho = Right Shoulder, etc.
+-- v10: alias de NOMBRES de joint. Los morphs (Sonic, etc.) nombran los joints
+-- por la extremidad ("Right Arm", "Left Leg", "Waist") en vez de por la
+-- articulacion R6 ("Right Shoulder", "Right Hip", "RootJoint"). Diagnosticado
+-- con el dump: entries=1 porque solo 'Head' matcheaba.
+local JOINT_NAME_ALIASES = {
+    ["Neck"]           = { "Neck", "Head" },
+    ["Right Shoulder"] = { "Right Shoulder", "RightShoulder", "Right Arm", "RightArm" },
+    ["Left Shoulder"]  = { "Left Shoulder", "LeftShoulder", "Left Arm", "LeftArm" },
+    ["Right Hip"]      = { "Right Hip", "RightHip", "Right Leg", "RightLeg" },
+    ["Left Hip"]       = { "Left Hip", "LeftHip", "Left Leg", "LeftLeg" },
+    ["RootJoint"]      = { "RootJoint", "Root", "Waist", "LowerTorso", "Torso", "Body" },
+}
+
 local JOINT_PART_HINTS = {
-    ["Right Shoulder"]  = { "rightupperarm", "rightarm" },
-    ["Left Shoulder"]   = { "leftupperarm", "leftarm" },
-    ["Right Hip"]       = { "rightupperleg", "rightleg" },
-    ["Left Hip"]        = { "leftupperleg", "leftleg" },
+    ["Right Shoulder"]  = { "rarm", "rightarm", "rightupperarm" },
+    ["Left Shoulder"]   = { "larm", "leftarm", "leftupperarm" },
+    ["Right Hip"]       = { "rleg", "rightleg", "rightupperleg" },
+    ["Left Hip"]        = { "lleg", "lfoot", "leftleg", "leftupperleg" },
     ["Neck"]            = { "head" },
-    ["RootJoint"]       = { "lowertorso", "torso" },
+    ["RootJoint"]       = { "waist", "torso", "body", "lowertorso" },
+}
+-- Partes consideradas "raiz del torso": un joint estructural es mas fiable si
+-- su Part0 cuelga del torso (evita agarrar joints intermedios de cadenas tipo
+-- RArm1->RArm2->RArm3).
+local TORSO_HINTS = {
+    waist = true, body = true, torso = true, lowertorso = true,
+    uppertorso = true, humanoidrootpart = true,
 }
 -- Orden de resolucion: extremidades primero; RootJoint al final porque su
 -- Part1 (torso) tambien podria matchear otros joints.
@@ -432,16 +452,38 @@ local JOINT_RESOLVE_ORDER = {
     "Right Shoulder", "Left Shoulder", "Right Hip", "Left Hip", "Neck", "RootJoint",
 }
 
-local function getPoseJointPart1(joint)
-    local part1
-    -- Motor6D/Weld/Snap expose Part1; AnimationConstraint uses Attachment1.
-    pcall(function() part1 = joint.Part1 end)
-    if not part1 then
-        local attachment1
-        pcall(function() attachment1 = joint.Attachment1 end)
-        if attachment1 and attachment1.Parent then
-            part1 = attachment1.Parent
+local function findJointByPartName(character, hints, used)
+    -- Pass 1: Part1 matchea el hint Y Part0 es torso (joint raiz de la
+    -- extremidad). Pass 2: cualquier Part1 matcheo.
+    for pass = 1, 2 do
+        for _, joint in ipairs(character:GetDescendants()) do
+            if isPoseJoint(joint) and not used[joint] then
+                local part0 = joint.Part0
+                local part1 = joint.Part1
+                if part1 then
+                    local n1 = part1.Name:lower():gsub("%s", "")
+                    local matched = false
+                    for _, hint in ipairs(hints) do
+                        if n1:find(hint, 1, true) then
+                            matched = true
+                            break
+                        end
+                    end
+                    if matched then
+                        if pass == 1 then
+                            local n0 = part0 and part0.Name:lower():gsub("%s", "") or ""
+                            if not TORSO_HINTS[n0] then
+                                continue
+                            end
+                        end
+                        return joint
+                    end
+                end
+            end
         end
+    end
+    return nil
+end
     end
     return part1
 end
@@ -470,9 +512,19 @@ local function resolvePoseJoints(character, poseData)
     local used = {}
     local resolvedNames = {}
 
-    -- 1) Lookup por nombre (R6/R15 estandar).
+    -- 1) Lookup por nombre: nombre estandar R6/R15 + alias de morphs
+    -- ("Right Arm", "Left Leg", "Waist", etc.).
     for jointName, targetCF in pairs(poseData) do
-        local joint = findPoseJoint(character, jointName)
+        local joint = nil
+        local candidates = JOINT_NAME_ALIASES[jointName]
+        if candidates then
+            for _, alias in ipairs(candidates) do
+                joint = findPoseJoint(character, alias)
+                if joint then break end
+            end
+        else
+            joint = findPoseJoint(character, jointName)
+        end
         if joint then
             used[joint] = true
             resolvedNames[jointName] = true
