@@ -28,12 +28,6 @@ local function detectScreenshotSupport()
     return false
 end
 
-local function isCameraUi(gui)
-    local name = gui and tostring(gui.Name or "") or ""
-    return name == "Rayfield" or name:find("Rayfield")
-        or name == "WindUI" or name:find("WindUI")
-end
-
 local function hideRayfieldGuis(capture)
     capture._hiddenGuis = capture._hiddenGuis or {}
     local parents = {}
@@ -45,7 +39,7 @@ local function hideRayfieldGuis(capture)
     end
     for _, parent in ipairs(parents) do
         for _, child in ipairs(parent:GetChildren()) do
-            if child:IsA("ScreenGui") and isCameraUi(child) then
+            if child:IsA("ScreenGui") and (child.Name == "Rayfield" or child.Name:find("Rayfield")) then
                 if child.Enabled then
                     table.insert(capture._hiddenGuis, { gui = child, enabled = child.Enabled })
                     child.Enabled = false

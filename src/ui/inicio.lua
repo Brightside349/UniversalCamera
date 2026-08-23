@@ -99,8 +99,7 @@ function UCam.build_inicio(Window)
             for _, parent in ipairs({game:GetService("CoreGui"), UCam.player:FindFirstChild("PlayerGui")}) do
                 if parent then
                     for _, child in ipairs(parent:GetChildren()) do
-                        local name = tostring(child.Name or "")
-                        if child:IsA("ScreenGui") and (name == "Rayfield" or name:find("Rayfield") or name == "WindUI" or name:find("WindUI") or child:FindFirstChild("Main")) then
+                        if child:IsA("ScreenGui") and (child.Name == "Rayfield" or child.Name:find("Rayfield") or child:FindFirstChild("Main")) then
                             table.insert(guis, child)
                             child.Enabled = false
                         end
