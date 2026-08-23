@@ -83,10 +83,14 @@ end
 -- Captura tamaños / colores / materiales originales + valores de Humanoid.
 -- Se llama la primera vez que se activa un efecto que los modifique.
 -- v7: Ahora también construye el cache optimizado
+-- Forward declarations (se asignan mas abajo)
+local applyManualVisualScale
+local enforceScaleHipHeight
+
 function UCam.funSnapshotCharacter()
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
-    
+
     -- v7: Construir cache de partes
     rebuildCache()
     setupCacheListeners()
@@ -106,6 +110,19 @@ function UCam.funSnapshotCharacter()
     UCam.Fun._scaleUsingHumanoidValues = false
     UCam.Fun._scaleUsingManual = false
     UCam.Fun._scaleWarningShown = false
+    -- Referencia del modelo snapshotado: juegos que morphean/reemplazan el
+    -- personaje a mitad de partida (modelos custom) invalidan las capturas
+    -- viejas; si cambia, funApplyScale re-captura automaticamente.
+    UCam.Fun._snapshottedCharacter = UCam.character
+    -- Valor original de AutomaticScalingEnabled: cuando esta activo, el motor
+    -- recalcula HipHeight/tamanos y PISA nuestra escala local (causa del
+    -- flotar en chiquito y de los pies clavados en gigante).
+    UCam.Fun._origAutoScaling = nil
+    if UCam.humanoid then
+        pcall(function()
+            UCam.Fun._origAutoScaling = UCam.humanoid.AutomaticScalingEnabled
+        end)
+    end
     table.clear(UCam.Fun._origHumanoidScales)
     if UCam.humanoid then
         for _, scaleName in ipairs({
@@ -141,9 +158,11 @@ function UCam.funSnapshotCharacter()
     UCam.Fun._origJointData = UCam.Fun._origJointData or {}
     UCam.Fun._origAttachmentData = UCam.Fun._origAttachmentData or {}
     UCam.Fun._origMeshScales = UCam.Fun._origMeshScales or {}
+    UCam.Fun._origWCData = UCam.Fun._origWCData or {}
     table.clear(UCam.Fun._origJointData)
     table.clear(UCam.Fun._origAttachmentData)
     table.clear(UCam.Fun._origMeshScales)
+    table.clear(UCam.Fun._origWCData)
     UCam.Fun._origHipHeight = UCam.humanoid and UCam.humanoid.HipHeight or nil
 
     for _, desc in ipairs(UCam.character:GetDescendants()) do
@@ -152,6 +171,19 @@ function UCam.funSnapshotCharacter()
             local ok1, c1 = pcall(function() return desc.C1 end)
             if ok0 and ok1 and c0 and c1 then
                 UCam.Fun._origJointData[desc] = {c0 = c0, c1 = c1}
+            end
+        elseif desc:IsA("WeldConstraint") then
+            -- Rigs custom (morpheos tipo juegos de modelos 3D) sueltan las
+            -- partes con WeldConstraint: NO tienen C0/C1, se realinean
+            -- reposicionando la parte y re-activando el constraint.
+            local p0, p1 = desc.Part0, desc.Part1
+            if p0 and p1 and p0.Parent and p1.Parent then
+                local okw, rel = pcall(function()
+                    return p0.CFrame:ToObjectSpace(p1.CFrame)
+                end)
+                if okw and rel then
+                    table.insert(UCam.Fun._origWCData, { wc = desc, p0 = p0, p1 = p1, rel = rel })
+                end
             end
         elseif desc:IsA("Attachment") then
             local ok, cf = pcall(function() return desc.CFrame end)
@@ -174,43 +206,23 @@ function UCam.funRestoreCharacterScale()
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
 
-    -- 1) Intento principal: ScaleTo (uniforme, no deforma). Restaura joints,
-    -- attachments, meshes y accesorios de golpe. Es local (client-sided) y
-    -- no replica al servidor, por lo que es "solo visual" como pide el bug.
-    if UCam.Fun._origModelScale then
+    -- 1) Manual primero: con escala 1 devuelve partes, joints, WeldConstraints,
+    -- meshes e HipHeight exactamente a los valores capturados.
+    local manualRestored = false
+    if UCam.Fun._scaleUsingManual and applyManualVisualScale then
+        applyManualVisualScale(1)
+        UCam.Fun._scaleUsingManual = false
+        manualRestored = true
+    end
+
+    -- 2) ScaleTo solo si el manual no intervino (evita pelear con lo ya restaurado).
+    if not manualRestored and UCam.Fun._origModelScale then
         pcall(function()
             UCam.character:ScaleTo(UCam.Fun._origModelScale)
         end)
     end
 
-    -- 2) Fallback manual visual (foros): si se usó escalado manual por falta
-    -- de ScaleTo, hay que restaurar C0/C1, attachments, meshes e HipHeight.
-    if UCam.Fun._scaleUsingManual then
-        for joint, data in pairs(UCam.Fun._origJointData or {}) do
-            if joint and joint.Parent then
-                pcall(function()
-                    joint.C0 = data.c0
-                    joint.C1 = data.c1
-                end)
-            end
-        end
-        for att, cf in pairs(UCam.Fun._origAttachmentData or {}) do
-            if att and att.Parent then
-                pcall(function() att.CFrame = cf end)
-            end
-        end
-        for mesh, sc in pairs(UCam.Fun._origMeshScales or {}) do
-            if mesh and mesh.Parent then
-                pcall(function() mesh.Scale = sc end)
-            end
-        end
-        if UCam.humanoid and UCam.Fun._origHipHeight ~= nil then
-            pcall(function() UCam.humanoid.HipHeight = UCam.Fun._origHipHeight end)
-        end
-    end
-
-    -- 3) Fallback legacy para clientes/rigs donde Model:ScaleTo no está
-    -- disponible y se tocaron NumberValues de R15.
+    -- 3) Fallback legacy R15 NumberValues.
     if UCam.Fun._scaleUsingHumanoidValues and UCam.humanoid then
         for scaleName, originalValue in pairs(UCam.Fun._origHumanoidScales) do
             local value = UCam.humanoid:FindFirstChild(scaleName)
@@ -218,6 +230,16 @@ function UCam.funRestoreCharacterScale()
                 pcall(function() value.Value = originalValue end)
             end
         end
+    end
+    UCam.Fun._scaleUsingHumanoidValues = false
+
+    -- 4) Devolver AutomaticScalingEnabled a su valor original (lo apagamos
+    -- mientras la escala estaba activa para que el motor no pisara HipHeight).
+    if UCam.humanoid and UCam.Fun._origAutoScaling ~= nil then
+        pcall(function()
+            UCam.humanoid.AutomaticScalingEnabled = UCam.Fun._origAutoScaling
+        end)
+        UCam.Fun._origAutoScaling = nil
     end
 end
 
@@ -271,8 +293,10 @@ function UCam.funClearPartSnapshots()
     if UCam.Fun._origJointData then table.clear(UCam.Fun._origJointData) end
     if UCam.Fun._origAttachmentData then table.clear(UCam.Fun._origAttachmentData) end
     if UCam.Fun._origMeshScales then table.clear(UCam.Fun._origMeshScales) end
+    if UCam.Fun._origWCData then table.clear(UCam.Fun._origWCData) end
     UCam.Fun._origModelScale = nil
     UCam.Fun._origHipHeight = nil
+    UCam.Fun._snapshottedCharacter = nil
     UCam.Fun._scaleUsingHumanoidValues = false
     UCam.Fun._scaleUsingManual = false
     UCam.Fun._scaleWarningShown = false
@@ -319,7 +343,7 @@ end
 -- 3) El último fallback (Humanoid NumberValues) existe solo por compatibilidad
 --    pero NO funciona client-sided (forum: "changing BodyScale locally does nothing"),
 --    por eso el manual es el que evita el cuerpo deforme en R6 chiquito/gigante.
-local function applyManualVisualScale(scale)
+applyManualVisualScale = function(scale)
     local okAny = false
     -- Partes: todas menos HumanoidRootPart (mantener hitbox original = solo visual).
     -- Conservar HRP evita que el personaje crezca de colisión en local y
@@ -350,6 +374,21 @@ local function applyManualVisualScale(scale)
             end)
         end
     end
+    -- WeldConstraint (rigs custom / morpheos): no tienen C0/C1. Se desactiva,
+    -- se recoloca la parte según el offset original escalado y se re-activa
+    -- para que recapture la nueva posición relativa. Sin esto, en juegos que
+    -- cambian el modelo las partes quedan separadas/flotando al escalar.
+    for _, e in ipairs(UCam.Fun._origWCData or {}) do
+        if e.wc and e.wc.Parent and e.p0 and e.p0.Parent and e.p1 and e.p1.Parent then
+            pcall(function()
+                e.wc.Enabled = false
+                e.p1.CFrame = e.p0.CFrame
+                    * CFrame.new(e.rel.Position * scale)
+                    * (e.rel - e.rel.Position)
+                e.wc.Enabled = true
+            end)
+        end
+    end
     -- SpecialMesh: evitar doble escalado. En R6 la cabeza y accesorios
     -- ya escalan visualmente al escalar el Part.Size padre; escalar también
     -- el Mesh duplica (scale^2) y deforma. Solo escalar meshes huérfanos.
@@ -358,11 +397,26 @@ local function applyManualVisualScale(scale)
             pcall(function() mesh.Scale = origScale * scale end)
         end
     end
-    -- HipHeight: mantener pies en el suelo al escalar.
+    -- HipHeight: mantener pies en el suelo al escalar (R6 usa 0 por defecto;
+    -- multiplicar por escala lo mantiene correcto en ambos casos).
     if UCam.humanoid and UCam.Fun._origHipHeight ~= nil then
         pcall(function() UCam.humanoid.HipHeight = UCam.Fun._origHipHeight * scale end)
     end
     return okAny
+end
+
+-- Guardián por-frame de la altura de cadera: AutomaticScalingEnabled u otros
+-- scripts del juego pueden resetear HipHeight cada frame; sin esto el avatar
+-- flota en modo chiquito o hunde los pies en modo gigante. Es una comparación
+-- barata (sin escritura si no hay drift).
+enforceScaleHipHeight = function()
+    if not (UCam.Fun.Scale.Enabled and UCam.Fun._scaleUsingManual) then return end
+    local hum = UCam.humanoid
+    if not hum or UCam.Fun._origHipHeight == nil or not hum.Parent then return end
+    local target = UCam.Fun._origHipHeight * (UCam.Fun._currentScale or 1)
+    if math.abs(hum.HipHeight - target) > 0.01 then
+        pcall(function() hum.HipHeight = target end)
+    end
 end
 
 -- Escala uniforme: usa escalado manual visual como primario (no deforma,
@@ -372,10 +426,21 @@ end
 function UCam.funApplyScale(scale)
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
-    if not next(UCam.Fun._origPartSizes) then UCam.funSnapshotCharacter() end
+    -- Juegos que morphean/reemplazan el modelo invalidan la captura vieja:
+    -- si el personaje cambió (o no hay captura), re-capturar antes de escalar.
+    if UCam.Fun._snapshottedCharacter ~= UCam.character or not next(UCam.Fun._origPartSizes) then
+        UCam.funSnapshotCharacter()
+    end
 
     scale = tonumber(scale) or 1
     scale = math.max(0.1, math.min(scale, 10))
+
+    -- Apagar el auto-escalado del motor mientras escalamos: si queda activo,
+    -- recalcula HipHeight/tamaños y pisa nuestra escala local (flotar en
+    -- chiquito / pies hundidos en gigante). Se restaura al desactivar.
+    if UCam.humanoid then
+        pcall(function() UCam.humanoid.AutomaticScalingEnabled = false end)
+    end
     local originalModelScale = UCam.Fun._origModelScale or 1
     local targetModelScale = originalModelScale * scale
 
@@ -386,6 +451,9 @@ function UCam.funApplyScale(scale)
     if manualOk then
         UCam.Fun._scaleUsingManual = true
         UCam.Fun._scaleUsingHumanoidValues = false
+        -- Reafirmar HipHeight al siguiente frame: el motor puede pisarlo en
+        -- el mismo ciclo en que cambian los tamaños de las partes.
+        task.defer(function() enforceScaleHipHeight() end)
         -- Si manual funcionó, no tocar ScaleTo para no duplicar.
     else
         UCam.Fun._scaleUsingManual = false
@@ -735,6 +803,9 @@ end
 -- se eliminan donde las refs se actualizan en eventos.
 -- ============================================================
 local function funUpdateCore(dt)
+    -- Mantiene los pies en el suelo mientras la escala manual está activa
+    -- (contrarresta overrides de HipHeight de otros scripts del juego).
+    enforceScaleHipHeight()
     funUpdateNoclip()
     funUpdateRainbow(dt)
     funUpdateNeonGlow()
