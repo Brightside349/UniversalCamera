@@ -2,7 +2,7 @@
 
 Cámara libre cinematográfica para Roblox. **18 modos de cámara, 30+ filtros, espectador con 9 estilos, Director con waypoints, Replay Pro local, guías de composición, Clean Shot, escenas ampliadas y herramientas para creadores** — todo envuelto en una UI modular de Rayfield.
 
-> Versión actual: tag `v10.0.1` publicada en GitHub.
+> Versión estable: tag `v10.0.1`; `main` contiene la prueba activa de escala visual local.
 > La versión anterior quedó preservada en la rama `legacy/v6` y en el tag `v6.0.0`.
 > Script original: `Universal Camera.lua` (6292 lineas, 235 KB).
 > Refactorizado en varios archivos siguiendo el plan del documento `PLAN_MODULARIZACION.md`.
