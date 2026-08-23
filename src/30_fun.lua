@@ -811,8 +811,10 @@ local function funUpdateCore(dt)
     funUpdateNeonGlow()
     funUpdateSpeed()
     funUpdateJump()
-    -- v9: funUpdatePose eliminado (sistema de poses unificado en 33_poses)
-    if UCam.updateAdvPoses then UCam.updateAdvPoses(dt) end
+    -- v9: funUpdatePose eliminado (sistema de poses unificado en 33_poses).
+    -- v10: updateAdvPoses corre en PreSimulation desde initPoses (33_poses);
+    -- llamarlo aquí en Heartbeat duplicaba el trabajo y escribía Transform
+    -- tarde (el Animator lo pisa antes del batch de física).
     funUpdateGravity(dt)
     UCam.FunV6.updateTrail(dt)
     UCam.FunV6.updateDisco()

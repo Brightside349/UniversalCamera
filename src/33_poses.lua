@@ -352,10 +352,18 @@ local function unfreezeCharacterControl(character)
     end
 end
 
+-- v10: los rigs R15 nuevos (Avatar Joint Upgrade) usan AnimationConstraint
+-- en vez de Motor6D; ambos exponen .Transform para aplicar poses.
+-- Se declara antes de snapshotJoints porque Lua resuelve locales por alcance
+-- léxico; una declaración posterior no está disponible para esa función.
+local function isPoseJoint(inst)
+    return inst:IsA("Motor6D") or inst:IsA("AnimationConstraint")
+end
+
 local function snapshotJoints(character)
     local snapshot = {}
     for _, joint in ipairs(character:GetDescendants()) do
-        if joint:IsA("Motor6D") then
+        if isPoseJoint(joint) then
             snapshot[joint] = joint.Transform
         end
     end
@@ -379,7 +387,7 @@ local function findPoseJoint(character, jointName)
     if not character then return nil end
     local normalized = jointName:gsub("%s", "")
     for _, joint in ipairs(character:GetDescendants()) do
-        if joint:IsA("Motor6D") then
+        if isPoseJoint(joint) then
             local name = joint.Name
             if name == jointName or name:gsub("%s", "") == normalized then
                 return joint
@@ -387,6 +395,22 @@ local function findPoseJoint(character, jointName)
         end
     end
     return nil
+end
+
+-- v10 FIX (lag): resuelve los joints de una pose UNA VEZ y los cachea.
+-- El loop viejo hacia GetDescendants() por CADA joint y por CADA frame
+-- (6 joints x N descendientes x 60fps = decenas de miles de iteraciones/s)
+-- y eso era el bajón de FPS al seleccionar una pose.
+local function resolvePoseJoints(character, poseData)
+    local entries = {}
+    if not character or not poseData then return entries end
+    for jointName, targetCF in pairs(poseData) do
+        local joint = findPoseJoint(character, jointName)
+        if joint then
+            table.insert(entries, { joint = joint, target = targetCF })
+        end
+    end
+    return entries
 end
 
 -- ============================================================
@@ -398,6 +422,7 @@ function UCam.applyPose(poseName)
     
     if poseName == "Normal" then
         UCam.Poses.Current = "Normal"
+        UCam.Poses._active = nil
         if UCam.Poses._originals[UCam.character] then
             restoreJoints(UCam.Poses._originals[UCam.character])
             UCam.Poses._originals[UCam.character] = nil
@@ -419,7 +444,12 @@ function UCam.applyPose(poseName)
     
     freezeCharacterControl(UCam.character)
     UCam.Poses.Current = poseName
-    UCam.Poses._targetPose = poseData
+    -- v10: resolver joints UNA vez y cachearlos (el loop por frame ya no
+    -- busca joints en GetDescendants).
+    UCam.Poses._active = {
+        character = UCam.character,
+        entries = resolvePoseJoints(UCam.character, poseData),
+    }
 end
 
 -- ============================================================
@@ -449,9 +479,13 @@ function UCam.applyPoseToPlayer(player, poseName)
             originalJoints = snapshotJoints(character),
             targetPose = poseData,
             character = character,
+            entries = resolvePoseJoints(character, poseData),
         }
     else
-        UCam.Poses._playerTargets[player].targetPose = poseData
+        local data = UCam.Poses._playerTargets[player]
+        data.targetPose = poseData
+        data.character = character
+        data.entries = resolvePoseJoints(character, poseData)
     end
     
     freezeCharacterControl(character)
@@ -483,7 +517,7 @@ function UCam.savePoseSnapshot(name)
     
     local snapshot = {}
     for _, joint in ipairs(UCam.character:GetDescendants()) do
-        if joint:IsA("Motor6D") then
+        if isPoseJoint(joint) then
             snapshot[joint.Name] = joint.Transform
         end
     end
@@ -503,35 +537,39 @@ end
 
 -- ============================================================
 -- UPDATE LOOP (transiciones suaves)
+-- v10 FIX (lag): itera joints CACHEADOS (resolvePoseJoints), ya no hace
+-- GetDescendants() por joint por frame.
+-- v10 FIX (no aplicaba): corre en PreSimulation, no Heartbeat. El Animator
+-- reescribe Transform cada frame antes de PreSimulation y el batch se aplica
+-- justo después; escribir en Heartbeat llegaba tarde y el valor era pisado
+-- por la animación antes de verse (docs: "set manually using PreSimulation").
 -- ============================================================
 function UCam.updateAdvPoses(dt)
-    -- Update local character pose
-    if UCam.Poses.Current ~= "Normal" and UCam.Poses._targetPose then
-        UCam.refreshCharacterRefs()
-        if UCam.character then
-            for jointName, targetCF in pairs(UCam.Poses._targetPose) do
-                -- v8.1 FIX: findPoseJoint soporta R6 y R15
-                local joint = findPoseJoint(UCam.character, jointName)
-                
-                if joint and joint:IsA("Motor6D") then
-                    pcall(function()
-                        joint.Transform = joint.Transform:Lerp(targetCF, UCam.Poses.TransitionSpeed)
-                    end)
-                end
+    local alpha = UCam.Poses.TransitionSpeed
+
+    -- Personaje local
+    local active = UCam.Poses._active
+    if active and UCam.Poses.Current ~= "Normal"
+        and active.character and active.character.Parent then
+        for _, e in ipairs(active.entries) do
+            local joint = e.joint
+            if joint and joint.Parent then
+                pcall(function()
+                    joint.Transform = joint.Transform:Lerp(e.target, alpha)
+                end)
             end
         end
     end
-    
-    -- Update other players' poses
+
+    -- Otros jugadores
     for player, data in pairs(UCam.Poses._playerTargets) do
-        if player and player.Character and data.targetPose then
-            local character = player.Character
-            for jointName, targetCF in pairs(data.targetPose) do
-                local joint = findPoseJoint(character, jointName)
-                
-                if joint and joint:IsA("Motor6D") then
+        local character = player and player.Character
+        if character and data.character == character and data.entries then
+            for _, e in ipairs(data.entries) do
+                local joint = e.joint
+                if joint and joint.Parent then
                     pcall(function()
-                        joint.Transform = joint.Transform:Lerp(targetCF, UCam.Poses.TransitionSpeed)
+                        joint.Transform = joint.Transform:Lerp(e.target, alpha)
                     end)
                 end
             end
@@ -544,7 +582,9 @@ end
 -- ============================================================
 function UCam.initPoses()
     if UCam.Poses._connHeartbeat then return end
-    UCam.Poses._connHeartbeat = UCam.RunService.Heartbeat:Connect(function(dt)
+    -- PreSimulation (Stepped): es el único punto donde nuestra escritura de
+    -- Transform gana sobre el Animator y llega al batch de física/render.
+    UCam.Poses._connHeartbeat = UCam.RunService.PreSimulation:Connect(function(dt)
         UCam.updateAdvPoses(dt)
     end)
 end
@@ -558,6 +598,6 @@ function UCam.stopAdvPoses()
     UCam.restorePose()
     UCam.restoreAllPlayerPoses()
     UCam.Poses.Current = "Normal"
-    UCam.Poses._targetPose = nil
+    UCam.Poses._active = nil
     table.clear(UCam.Poses._originals)
 end
