@@ -183,9 +183,13 @@ function UCam.build_fun(Window)
         Callback     = function(v) UCam.Fun.SuperJump.Power = v end,
     })
 
-    FunTab:CreateSection("Tamano del personaje (1x = normal)")
+    FunTab:CreateSection("Tamano uniforme del personaje (1x = normal)")
+    FunTab:CreateParagraph({
+        Title   = "Escala proporcional",
+        Content = "El personaje completo, sus accesorios y sus articulaciones se escalan juntos para evitar deformaciones.",
+    })
     FunTab:CreateToggle({
-        Name         = "Aplicar escala custom",
+        Name         = "Aplicar escala uniforme",
         CurrentValue = false,
         Callback     = function(v)
             UCam.Fun.Scale.Enabled = v
@@ -202,7 +206,7 @@ function UCam.build_fun(Window)
     })
 
     FunTab:CreateSlider({
-        Name         = "Escala",
+        Name         = "Escala uniforme",
         Range        = { 0.1, 10 },
         Increment    = 0.1,
         Suffix       = "x",

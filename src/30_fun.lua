@@ -7,6 +7,7 @@
 -- Dependencias: 00_config, 10_utils
 -- Expone (UCam.*):
 --   funAnyActive, funSnapshotCharacter, funRestorePartVisuals,
+--   funRestoreCharacterScale,
 --   funRestoreHumanoid, funClearPartSnapshots, funEnsureHighlight,
 --   funClearHighlight, funApplyScale, funUpdate, startFun, stopFun,
 --   FunV6 = { clearTrail, updateTrail, destroyDisco, createDisco,
@@ -89,6 +90,32 @@ function UCam.funSnapshotCharacter()
     -- v7: Construir cache de partes
     rebuildCache()
     setupCacheListeners()
+
+    -- La escala anterior multiplicaba BasePart.Size individualmente. Eso
+    -- agranda cada pieza, pero no sus joints/attachments, por lo que R6/R15
+    -- termina deformado. Guardar la escala del Model permite usar ScaleTo()
+    -- y conservar las proporciones completas del avatar.
+    local modelScale = 1
+    local scaleOk, currentModelScale = pcall(function()
+        return UCam.character:GetScale()
+    end)
+    if scaleOk and type(currentModelScale) == "number" and currentModelScale > 0 then
+        modelScale = currentModelScale
+    end
+    UCam.Fun._origModelScale = modelScale
+    UCam.Fun._scaleUsingHumanoidValues = false
+    UCam.Fun._scaleWarningShown = false
+    table.clear(UCam.Fun._origHumanoidScales)
+    if UCam.humanoid then
+        for _, scaleName in ipairs({
+            "BodyHeightScale", "BodyWidthScale", "BodyDepthScale", "HeadScale",
+        }) do
+            local value = UCam.humanoid:FindFirstChild(scaleName)
+            if value and value:IsA("NumberValue") then
+                UCam.Fun._origHumanoidScales[scaleName] = value.Value
+            end
+        end
+    end
     
     table.clear(UCam.Fun._origPartSizes)
     table.clear(UCam.Fun._origBodyColors)
@@ -110,10 +137,38 @@ function UCam.funSnapshotCharacter()
     end
 end
 
+function UCam.funRestoreCharacterScale()
+    UCam.refreshCharacterRefs()
+    if not UCam.character then return end
+
+    -- ScaleTo restaura también joints, attachments, meshes y accesorios.
+    -- Es importante hacerlo antes de limpiar los snapshots de partes.
+    if UCam.Fun._origModelScale then
+        pcall(function()
+            UCam.character:ScaleTo(UCam.Fun._origModelScale)
+        end)
+    end
+
+    -- Fallback para clientes/rigs donde Model:ScaleTo no está disponible.
+    if UCam.Fun._scaleUsingHumanoidValues and UCam.humanoid then
+        for scaleName, originalValue in pairs(UCam.Fun._origHumanoidScales) do
+            local value = UCam.humanoid:FindFirstChild(scaleName)
+            if value and value:IsA("NumberValue") then
+                pcall(function() value.Value = originalValue end)
+            end
+        end
+    end
+end
+
 function UCam.funRestorePartVisuals()
-    for part, size in pairs(UCam.Fun._origPartSizes) do
-        if part and part.Parent then
-            pcall(function() part.Size = size end)
+    -- Restaurar material/color no debe cancelar una escala que sigue activa.
+    -- El botón de tamaño y stopFun desactivan Scale antes de llegar aquí.
+    if not UCam.Fun.Scale.Enabled then
+        UCam.funRestoreCharacterScale()
+        for part, size in pairs(UCam.Fun._origPartSizes) do
+            if part and part.Parent then
+                pcall(function() part.Size = size end)
+            end
         end
     end
     for part, color in pairs(UCam.Fun._origBodyColors) do
@@ -151,6 +206,10 @@ function UCam.funClearPartSnapshots()
     table.clear(UCam.Fun._origBodyColors)
     table.clear(UCam.Fun._origMaterials)
     table.clear(UCam.Fun._origParts)
+    table.clear(UCam.Fun._origHumanoidScales)
+    UCam.Fun._origModelScale = nil
+    UCam.Fun._scaleUsingHumanoidValues = false
+    UCam.Fun._scaleWarningShown = false
 end
 
 -- ============================================================
@@ -181,23 +240,53 @@ function UCam.funClearHighlight()
     end
 end
 
--- Escala: multiplica el Size de cada parte. Persistente hasta que se desactive.
+-- Escala uniforme: usa el Model completo para conservar proporciones, joints,
+-- attachments, meshes y accesorios. El fallback usa los valores de escala R15.
 function UCam.funApplyScale(scale)
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
     if not next(UCam.Fun._origPartSizes) then UCam.funSnapshotCharacter() end
-    for part, origSize in pairs(UCam.Fun._origPartSizes) do
-        if part and part.Parent then
-            pcall(function() part.Size = origSize * scale end)
-        end
+
+    scale = tonumber(scale) or 1
+    scale = math.max(0.1, math.min(scale, 10))
+    local originalModelScale = UCam.Fun._origModelScale or 1
+    local targetModelScale = originalModelScale * scale
+    local scaledModel = false
+
+    -- Model:ScaleTo escala el avatar como una unidad y evita el cuerpo
+    -- estirado que provocaba escribir Size en cada BasePart.
+    local scaleOk = pcall(function()
+        UCam.character:ScaleTo(targetModelScale)
+    end)
+    if scaleOk then
+        scaledModel = true
+        UCam.Fun._scaleUsingHumanoidValues = false
     end
-    UCam.Fun._currentScale = scale
-    if UCam.rootPart and scale > 1.0 then
-        local origRootSize = UCam.Fun._origPartSizes[UCam.rootPart]
-        if origRootSize then
-            local extra = (origRootSize.Y * (scale - 1)) * 0.5
-            pcall(function() UCam.rootPart.CFrame = UCam.rootPart.CFrame + Vector3.new(0, extra, 0) end)
+
+    -- Fallback para rigs/clientes sin ScaleTo: solo toca los NumberValues de
+    -- escala de R15, multiplicando desde sus valores originales para no
+    -- destruir proporciones personalizadas del avatar.
+    if not scaledModel and UCam.humanoid then
+        local changed = false
+        for scaleName, originalValue in pairs(UCam.Fun._origHumanoidScales) do
+            local value = UCam.humanoid:FindFirstChild(scaleName)
+            if value and value:IsA("NumberValue") then
+                local ok = pcall(function() value.Value = originalValue * scale end)
+                if ok then changed = true end
+            end
         end
+        UCam.Fun._scaleUsingHumanoidValues = changed
+    end
+
+    UCam.Fun._currentScale = scale
+
+    -- Si el cliente tampoco ofrece ScaleTo ni escalas R15, no aplicamos el
+    -- antiguo fallback de BasePart.Size: deformaba el cuerpo y era peor que
+    -- dejarlo en su tamaño original.
+    if not scaledModel and not UCam.Fun._scaleUsingHumanoidValues
+        and not UCam.Fun._scaleWarningShown then
+        warn("[UCam] Este rig no expone una escala uniforme compatible.")
+        UCam.Fun._scaleWarningShown = true
     end
 end
 
@@ -537,6 +626,9 @@ local function startFun()
         task.defer(function()
             if UCam.Fun._connHeartbeat then
                 UCam.funSnapshotCharacter()
+                if UCam.Fun.Scale.Enabled then
+                    UCam.funApplyScale(UCam.Fun.Scale.Value)
+                end
             end
         end)
     end), "fun-character-cache")
@@ -593,6 +685,7 @@ local function stopFun()
 
     -- v9: funUnfreezeControl eliminado junto al sistema Fun.Pose; la
     -- restauración de PlatformStand/Animate la hace 33_poses si aplica.
+    UCam.Fun.Scale.Enabled = false
     UCam.funRestorePartVisuals()
     UCam.funRestoreHumanoid()
     UCam.funClearHighlight()
