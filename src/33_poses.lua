@@ -364,16 +364,28 @@ local function snapshotJoints(character)
     local snapshot = {}
     for _, joint in ipairs(character:GetDescendants()) do
         if isPoseJoint(joint) then
-            snapshot[joint] = joint.Transform
+            -- v10: guardar tambien C0 — el motor de poses ahora posa via C0
+            -- (el Animator pisa Transform, C0 no lo pisa nadie) y hay que
+            -- poder restaurarlo exactamente.
+            local c0ok, c0 = pcall(function() return joint.C0 end)
+            snapshot[joint] = {
+                transform = joint.Transform,
+                c0 = (c0ok and joint:IsA("Motor6D")) and c0 or nil,
+            }
         end
     end
     return snapshot
 end
 
 local function restoreJoints(snapshot)
-    for joint, transform in pairs(snapshot) do
+    for joint, data in pairs(snapshot) do
         if joint and joint.Parent then
-            pcall(function() joint.Transform = transform end)
+            pcall(function()
+                joint.Transform = data.transform
+                if data.c0 and joint:IsA("Motor6D") then
+                    joint.C0 = data.c0
+                end
+            end)
         end
     end
 end
@@ -464,7 +476,15 @@ local function resolvePoseJoints(character, poseData)
         if joint then
             used[joint] = true
             resolvedNames[jointName] = true
-            table.insert(entries, { joint = joint, target = targetCF })
+            local c0ok, c0 = pcall(function() return joint.C0 end)
+            table.insert(entries, {
+                joint = joint,
+                target = targetCF,
+                cur = CFrame.identity,
+                -- Motor6D: posar via C0 (el Animator pisa Transform, C0 no).
+                -- AnimationConstraint: C0/C1 read-only -> via Transform.
+                c0 = (c0ok and joint:IsA("Motor6D")) and c0 or nil,
+            })
         end
     end
 
@@ -475,7 +495,13 @@ local function resolvePoseJoints(character, poseData)
             local joint = findJointByPartName(character, JOINT_PART_HINTS[jointName] or {}, used)
             if joint then
                 used[joint] = true
-                table.insert(entries, { joint = joint, target = poseData[jointName] })
+                local c0ok, c0 = pcall(function() return joint.C0 end)
+                table.insert(entries, {
+                    joint = joint,
+                    target = poseData[jointName],
+                    cur = CFrame.identity,
+                    c0 = (c0ok and joint:IsA("Motor6D")) and c0 or nil,
+                })
             end
         end
     end
@@ -647,9 +673,21 @@ function UCam.updateAdvPoses(dt)
             for _, e in ipairs(active.entries) do
                 local joint = e.joint
                 if joint and joint.Parent then
-                    pcall(function()
-                        joint.Transform = joint.Transform:Lerp(e.target, alpha)
-                    end)
+                    e.cur = e.cur:Lerp(e.target, alpha)
+                    if e.c0 then
+                        -- FIX foros (DevForum 3922937): el Animator pisa
+                        -- Transform cada frame; C0 no lo pisa nadie. Posar
+                        -- via C0 y dejar Transform en identidad.
+                        pcall(function()
+                            joint.Transform = CFrame.identity
+                            joint.C0 = e.c0 * e.cur
+                        end)
+                    else
+                        -- AnimationConstraint (R15 nuevo): solo Transform.
+                        pcall(function()
+                            joint.Transform = e.cur
+                        end)
+                    end
                 end
             end
         end
@@ -668,9 +706,17 @@ function UCam.updateAdvPoses(dt)
             for _, e in ipairs(data.entries) do
                 local joint = e.joint
                 if joint and joint.Parent then
-                    pcall(function()
-                        joint.Transform = joint.Transform:Lerp(e.target, alpha)
-                    end)
+                    e.cur = e.cur:Lerp(e.target, alpha)
+                    if e.c0 then
+                        pcall(function()
+                            joint.Transform = CFrame.identity
+                            joint.C0 = e.c0 * e.cur
+                        end)
+                    else
+                        pcall(function()
+                            joint.Transform = e.cur
+                        end)
+                    end
                 end
             end
         end

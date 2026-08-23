@@ -238,4 +238,143 @@ function UCam.build_inicio(Window)
             UCam.notify("Configuracion", "Valores restablecidos.", 4)
         end,
     })
+
+    -- ============================================================
+    -- DEBUG TEMPORAL: volcado de estructura del personaje a consola.
+    -- Diagnostica por que las poses no aplican en rigs custom (morphs):
+    -- joints reales, partes, animator/tracks, scripts y estado de UCam.
+    -- ============================================================
+    InicioTab:CreateSection("Debug temporal (diagnostico poses)")
+    InicioTab:CreateButton({
+        Name     = "Volcar estructura del personaje a consola (F9)",
+        Callback = function()
+            local out = {}
+            local function add(s) table.insert(out, s) end
+            local char = UCam.player and UCam.player.Character
+            if not char then
+                print("[UCam-DEBUG] No hay personaje.")
+                return
+            end
+            add("========== UCam DEBUG DUMP ==========")
+            add("Character: " .. char.Name .. " | class=" .. char.ClassName
+                .. " | parent=" .. (char.Parent and char.Parent.Name or "?"))
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                local rigName = "?"
+                pcall(function() rigName = hum.RigType.Name end)
+                add(string.format(
+                    "Humanoid: RigType=%s PlatformStand=%s AutoRotate=%s HipHeight=%s AutoScaling=%s",
+                    rigName, tostring(hum.PlatformStand), tostring(hum.AutoRotate),
+                    tostring(hum.HipHeight), tostring(hum.AutomaticScalingEnabled)))
+                local animator = hum:FindFirstChildOfClass("Animator")
+                add("Animator: " .. tostring(animator ~= nil))
+                if animator then
+                    local okT, tracks = pcall(function() return animator:GetPlayingAnimationTracks() end)
+                    if okT and tracks then
+                        add("PlayingTracks: " .. #tracks)
+                        for i, t in ipairs(tracks) do
+                            if i > 10 then break end
+                            local animId = "?"
+                            pcall(function() animId = t.Animation.AnimationId end)
+                            local prio = "?"
+                            pcall(function() prio = t.Priority.Name end)
+                            add(string.format("  track '%s' prio=%s anim=%s", t.Name, prio, animId))
+                        end
+                    end
+                end
+            else
+                add("Humanoid: NONE")
+            end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            add("HumanoidRootPart: " .. tostring(root ~= nil)
+                .. (root and (" | anchored=" .. tostring(root.Anchored)) or ""))
+
+            add("---- JOINTS ----")
+            local jointCount = 0
+            for _, d in ipairs(char:GetDescendants()) do
+                if d:IsA("JointInstance") or d:IsA("WeldConstraint")
+                    or d.ClassName == "AnimationConstraint" then
+                    jointCount = jointCount + 1
+                    if jointCount <= 80 then
+                        local p0 = "?"
+                        local p1 = "?"
+                        pcall(function() p0 = d.Part0.Name end)
+                        pcall(function() p1 = d.Part1.Name end)
+                        add(string.format("  %s '%s' parent=%s | %s -> %s",
+                            d.ClassName, d.Name,
+                            d.Parent and d.Parent.Name or "?", p0, p1))
+                    end
+                end
+            end
+            add("total joints: " .. jointCount)
+
+            add("---- PARTS ----")
+            local partCount, anchoredCount, invisible = 0, 0, 0
+            for _, d in ipairs(char:GetDescendants()) do
+                if d:IsA("BasePart") then
+                    partCount = partCount + 1
+                    if d.Anchored then anchoredCount = anchoredCount + 1 end
+                    if d.Transparency >= 1 then invisible = invisible + 1 end
+                    if partCount <= 80 then
+                        add(string.format("  %s '%s' parent=%s anchored=%s transp=%.2f",
+                            d.ClassName, d.Name,
+                            d.Parent and d.Parent.Name or "?",
+                            tostring(d.Anchored), d.Transparency))
+                    end
+                end
+            end
+            add(string.format("total parts: %d | anchored: %d | invisibles: %d",
+                partCount, anchoredCount, invisible))
+
+            add("---- SCRIPTS ----")
+            local scriptCount = 0
+            for _, d in ipairs(char:GetDescendants()) do
+                if d:IsA("Script") or d:IsA("LocalScript") or d:IsA("ModuleScript") then
+                    scriptCount = scriptCount + 1
+                    if scriptCount <= 25 then
+                        local disabled = "?"
+                        if d:IsA("Script") or d:IsA("LocalScript") then
+                            disabled = tostring(d.Disabled)
+                        end
+                        add(string.format("  %s '%s' disabled=%s parent=%s",
+                            d.ClassName, d.Name, disabled,
+                            d.Parent and d.Parent.Name or "?"))
+                    end
+                end
+            end
+            add("total scripts: " .. scriptCount)
+
+            add("---- UCAM POSES ----")
+            if UCam.Poses then
+                add("Current: " .. tostring(UCam.Poses.Current))
+                local active = UCam.Poses._active
+                if active then
+                    local n = active.entries and #active.entries or 0
+                    add("_active: char=" .. (active.character and active.character.Name or "?")
+                        .. " | entries=" .. n)
+                    for _, e in ipairs(active.entries or {}) do
+                        local jn, jc, viaC0 = "?", "?", "false"
+                        if e.joint then
+                            jn = e.joint.Name
+                            jc = e.joint.ClassName
+                            viaC0 = tostring(e.c0 ~= nil)
+                        end
+                        add(string.format("  entry joint='%s' class=%s viaC0=%s", jn, jc, viaC0))
+                    end
+                else
+                    add("_active: nil")
+                end
+            else
+                add("UCam.Poses: nil")
+            end
+            add("========== FIN DUMP ==========")
+            local text = table.concat(out, "\n")
+            print(text)
+            -- Consola externa del executor, si existe
+            pcall(function()
+                if rconsoleprint then rconsoleprint("\n" .. text .. "\n") end
+            end)
+            UCam.notify("Debug", "Dump impreso. Abre consola (F9) o la del executor.", 5)
+        end,
+    })
 end
