@@ -484,26 +484,6 @@ local function findJointByPartName(character, hints, used)
     end
     return nil
 end
-    end
-    return part1
-end
-
-local function findJointByPartName(character, hints, used)
-    for _, joint in ipairs(character:GetDescendants()) do
-        if isPoseJoint(joint) and not used[joint] then
-            local part1 = getPoseJointPart1(joint)
-            if part1 then
-                local n = part1.Name:lower():gsub("%s", "")
-                for _, hint in ipairs(hints) do
-                    if n:find(hint, 1, true) then
-                        return joint
-                    end
-                end
-            end
-        end
-    end
-    return nil
-end
 
 local function resolvePoseJoints(character, poseData)
     local entries = {}
