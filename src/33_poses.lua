@@ -401,16 +401,99 @@ end
 -- El loop viejo hacia GetDescendants() por CADA joint y por CADA frame
 -- (6 joints x N descendientes x 60fps = decenas de miles de iteraciones/s)
 -- y eso era el bajón de FPS al seleccionar una pose.
+--
+-- v10 FIX (morphs custom): los juegos que reemplazan el modelo (Sonic, etc.)
+-- usan joints con nombres propios, no "Right Shoulder"/"RightShoulder".
+-- Si el lookup por nombre falla, se resuelve por ESTRUCTURA: el joint cuyo
+-- Part1 es la cabeza = Neck, brazo superior derecho = Right Shoulder, etc.
+local JOINT_PART_HINTS = {
+    ["Right Shoulder"]  = { "rightupperarm", "rightarm" },
+    ["Left Shoulder"]   = { "leftupperarm", "leftarm" },
+    ["Right Hip"]       = { "rightupperleg", "rightleg" },
+    ["Left Hip"]        = { "leftupperleg", "leftleg" },
+    ["Neck"]            = { "head" },
+    ["RootJoint"]       = { "lowertorso", "torso" },
+}
+-- Orden de resolucion: extremidades primero; RootJoint al final porque su
+-- Part1 (torso) tambien podria matchear otros joints.
+local JOINT_RESOLVE_ORDER = {
+    "Right Shoulder", "Left Shoulder", "Right Hip", "Left Hip", "Neck", "RootJoint",
+}
+
+local function getPoseJointPart1(joint)
+    local part1
+    -- Motor6D/Weld/Snap expose Part1; AnimationConstraint uses Attachment1.
+    pcall(function() part1 = joint.Part1 end)
+    if not part1 then
+        local attachment1
+        pcall(function() attachment1 = joint.Attachment1 end)
+        if attachment1 and attachment1.Parent then
+            part1 = attachment1.Parent
+        end
+    end
+    return part1
+end
+
+local function findJointByPartName(character, hints, used)
+    for _, joint in ipairs(character:GetDescendants()) do
+        if isPoseJoint(joint) and not used[joint] then
+            local part1 = getPoseJointPart1(joint)
+            if part1 then
+                local n = part1.Name:lower():gsub("%s", "")
+                for _, hint in ipairs(hints) do
+                    if n:find(hint, 1, true) then
+                        return joint
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 local function resolvePoseJoints(character, poseData)
     local entries = {}
     if not character or not poseData then return entries end
+
+    local used = {}
+    local resolvedNames = {}
+
+    -- 1) Lookup por nombre (R6/R15 estandar).
     for jointName, targetCF in pairs(poseData) do
         local joint = findPoseJoint(character, jointName)
         if joint then
+            used[joint] = true
+            resolvedNames[jointName] = true
             table.insert(entries, { joint = joint, target = targetCF })
         end
     end
+
+    -- 2) Fallback estructural para rigs custom: emparejar por nombre de la
+    -- parte que mueve el joint (Part1). Cubre morphs con nombres propios.
+    for _, jointName in ipairs(JOINT_RESOLVE_ORDER) do
+        if not resolvedNames[jointName] and poseData[jointName] then
+            local joint = findJointByPartName(character, JOINT_PART_HINTS[jointName] or {}, used)
+            if joint then
+                used[joint] = true
+                table.insert(entries, { joint = joint, target = poseData[jointName] })
+            end
+        end
+    end
+
     return entries
+end
+
+-- Detener animaciones en curso. Se llama CADA frame mientras hay pose activa:
+-- los morphs/juegos re-reproducen animaciones (idle propio del modelo) y el
+-- Animator pisa nuestro Transform con cada frame de esa animacion, dejando el
+-- cuerpo tieso en la pose default del juego en vez de la pose elegida.
+local function stopCharacterAnimations(character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+    if not animator then return end
+    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+        pcall(function() track:Stop(0) end)
+    end
 end
 
 -- ============================================================
@@ -445,9 +528,11 @@ function UCam.applyPose(poseName)
     freezeCharacterControl(UCam.character)
     UCam.Poses.Current = poseName
     -- v10: resolver joints UNA vez y cachearlos (el loop por frame ya no
-    -- busca joints en GetDescendants).
+    -- busca joints en GetDescendants). Se guarda poseData para poder
+    -- re-resolver si el juego reemplaza el modelo (respawn/morph).
     UCam.Poses._active = {
         character = UCam.character,
+        pose = poseData,
         entries = resolvePoseJoints(UCam.character, poseData),
     }
 end
@@ -549,14 +634,23 @@ function UCam.updateAdvPoses(dt)
 
     -- Personaje local
     local active = UCam.Poses._active
-    if active and UCam.Poses.Current ~= "Normal"
-        and active.character and active.character.Parent then
-        for _, e in ipairs(active.entries) do
-            local joint = e.joint
-            if joint and joint.Parent then
-                pcall(function()
-                    joint.Transform = joint.Transform:Lerp(e.target, alpha)
-                end)
+    if active and UCam.Poses.Current ~= "Normal" then
+        local char = UCam.character
+        -- El juego reemplazo el modelo (respawn/morph): re-resolver joints.
+        if char and char.Parent and active.character ~= char then
+            active.character = char
+            active.entries = resolvePoseJoints(char, active.pose)
+        end
+        if active.character and active.character.Parent then
+            -- Cortar animaciones cada frame (el Animator pisa Transform).
+            stopCharacterAnimations(active.character)
+            for _, e in ipairs(active.entries) do
+                local joint = e.joint
+                if joint and joint.Parent then
+                    pcall(function()
+                        joint.Transform = joint.Transform:Lerp(e.target, alpha)
+                    end)
+                end
             end
         end
     end
@@ -564,7 +658,13 @@ function UCam.updateAdvPoses(dt)
     -- Otros jugadores
     for player, data in pairs(UCam.Poses._playerTargets) do
         local character = player and player.Character
-        if character and data.character == character and data.entries then
+        if character and character.Parent then
+            -- Re-resolver si el jugador respawneó o morpheó.
+            if data.character ~= character then
+                data.character = character
+                data.entries = resolvePoseJoints(character, data.targetPose)
+            end
+            stopCharacterAnimations(character)
             for _, e in ipairs(data.entries) do
                 local joint = e.joint
                 if joint and joint.Parent then
