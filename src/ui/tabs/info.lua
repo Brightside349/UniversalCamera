@@ -22,7 +22,7 @@ function UCam.build_info(Window)
         "Inicio: camara libre, ocultar HUD/personaje, auto-HUD y acciones rapidas (captura, teletransporte, restablecer todo).\nCamaras: los 18 modos y todos sus parametros agrupados por modo.\nEspectador: jugadores, auto-ciclo, estilos y FOV.\nReplay: graba el recorrido con camara libre y lo reproduce suavemente (alternativa al Director sin waypoints).\nCinematografico: letterbox, vignette, shake, FOV pulse, director y post-procesado (bloom, DOF, sun rays).\nFiltros: 30 built-in + editor custom + tus presets.\nIluminacion / Estudio / Gimbal: modulos de ambiente y bloqueo.\nDiversion: montar, fisicas, tamano, poses, aspecto y efectos visuales.\nCuerpo / Poses / Jugadores: modifica aspecto de tu personaje y otros.\nPerfiles: guarda/carga setups completos.\nAjustes: teclas + idioma.\nPlugins: extensiones cargadas de la carpeta UniversalCamera/plugins.",
     })
     InfoTab:CreateParagraph({
-        Title = "V10 Creator Update",
+        Title = "V10.5 Reorganizacion de estructura",
         Content = "Creator incluye Clean Shot reversible, guías Thirds/Center/Safe/Vertical, escenas con metadata, marcadores y edición básica de Replay. El Director permite pausar cada waypoint y conserva rutas antiguas al importar. Recuperar sesión devuelve cámara, HUD, personaje, efectos y módulos locales a un estado seguro.",
     })
     InfoTab:CreateParagraph({

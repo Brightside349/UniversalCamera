@@ -6,9 +6,10 @@
 --   de escenas. No crea un sistema externo de proyectos ni reemplaza
 --   Replay, Director o la persistencia actual.
 --
--- Dependencias: 00_config, 05_persistence, 10_utils, 20_filters,
---               50_spectate, 55_replay, 60_director, 70_camcore,
---               80_ui, 85_plugins, 88_v9extras.
+-- Dependencias: core/00_config.lua, core/05_persistence.lua,
+--               core/10_utils.lua, visuals/20_filters.lua,
+--               camera/*, extensions/85_plugins.lua,
+--               runtime/88_v9extras.lua.
 -- Expone (UCam.*):
 --   prepareCapture, restoreCapture, getCaptureStatus,
 --   setGuidesEnabled, setGuidesType, setGuideOpacity, destroyGuides,

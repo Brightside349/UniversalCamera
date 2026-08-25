@@ -16,7 +16,8 @@
 --       stop    = function(UCam) end,-- opcional, se llama en Unload
 --   }
 --
--- Dependencias: 00_config, 10_utils, 80_ui (registerTabBuilder)
+-- Dependencias: core/00_config.lua, core/10_utils.lua,
+--               ui/00_registry.lua (registerTabBuilder)
 -- Expone (UCam.*):
 --   Plugins (lista), loadPluginsFromFolder, registerPlugin,
 --   stopAllPlugins, loadDefaultPlugins

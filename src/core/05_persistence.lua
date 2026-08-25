@@ -623,7 +623,7 @@ function UCam.saveConfig()
 
     local cfg = buildConfigTable()
     -- Campos extra no en SCHEMA pero que queremos persistir
-    cfg._version = "10.0"
+    cfg._version = "10.5"
     cfg._savedAt = os.time()
     -- v8: perfiles slots + quick (copia directa; NO contienen CFrames anidados)
     if UCam.Profiles then

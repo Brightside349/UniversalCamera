@@ -11,7 +11,7 @@
 local UCam = _G.UCam
 
 if type(UCam.buildUI) ~= "function" then
-    warn("[UCam] buildUI() no registrado. 80_ui.lua probablemente no se cargo.")
+    warn("[UCam] buildUI() no registrado. ui/90_builder.lua probablemente no se cargo.")
     return
 end
 
@@ -128,10 +128,10 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v10 By Cocoa Feliz",
-        "V10: herramientas locales para creadores, Replay ampliado y guias de composicion. Presiona Delete para UI."
+        "Universal Camera Pro v10.5 By Cocoa Feliz",
+        "V10.5: estructura reorganizada, herramientas locales para creadores y Replay ampliado. Presiona Delete para UI."
     )
-    print("[UCam] Universal Camera Pro v10 cargado OK. Creator tools + Replay Pro local.")
+    print("[UCam] Universal Camera Pro v10.5 cargado OK. Estructura reorganizada + Creator tools.")
 else
     warn("[UCam] Error al construir la UI: " .. tostring(err))
 end

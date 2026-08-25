@@ -1,198 +1,124 @@
-# Universal Camera Pro v10 · Modular Creator Update
+# Universal Camera Pro v10.5 · Reorganizacion de estructura
 
-Cámara libre cinematográfica para Roblox. **18 modos de cámara, 30+ filtros, espectador con 9 estilos, Director con waypoints, Replay Pro local, guías de composición, Clean Shot, escenas ampliadas y herramientas para creadores** — todo envuelto en una UI modular de Rayfield.
+Camara libre cinematografica para Roblox con modos de camara, espectador,
+Director, Replay Pro local, filtros, guias de composicion, Clean Shot,
+escenas y herramientas locales para creadores.
 
-> Versión estable: tag `v10.0.1`; `main` contiene la prueba activa de escala visual local.
-> La versión anterior quedó preservada en la rama `legacy/v6` y en el tag `v6.0.0`.
-> Script original: `Universal Camera.lua` (6292 lineas, 235 KB).
-> Refactorizado en varios archivos siguiendo el plan del documento `PLAN_MODULARIZACION.md`.
+> Version estable: `v10.5`.
+>
+> Esta version reorganiza el workspace por dominios sin cambiar el contrato
+> principal: un Loader, carga secuencial y estado compartido en `_G.UCam`.
 
----
+## Uso
 
-## Como se usa
+Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
+descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
+La version publicada apunta al tag `v10.5`.
 
-### 1. Pegar el script en el juego
-
-Copia el contenido de `Loader.lua` y pegalo en tu executor / Studio.
-
-El Loader descarga todas las partes desde GitHub raw (o jsdelivr como fallback), las ejecuta en orden y construye la UI. **NO necesitas pegar el script gigante de 6000 lineas** — solo este Loader (~150 lineas).
-
-### 2. Configurar el repo
-
-Antes de usarlo, edita la primera linea del Loader:
+Para probar una rama de desarrollo, cambia temporalmente:
 
 ```lua
-local BASE = "https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/src/"
-local FALLBACK_BASE = "https://cdn.jsdelivr.net/gh/TU_USUARIO/TU_REPO@main/src/"
+local VERSION = "main"
 ```
 
-Sube el contenido de `src/` (incluyendo la subcarpeta `ui/`) a tu repo en la rama `main`. Las URLs raw son publicas, asi que el repo puede ser publico.
-
-### 3. Versionar
-
-Para produccion, **fija la URL a un tag** en vez de `@main`:
+Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-    local BASE = "https://raw.githubusercontent.com/Brightside349/UniversalCamera/v10.0.1/src/"
+local VERSION = "v10.5"
 ```
 
-La rama `main` contiene la version principal actual. Si necesitas la antigua, usa la rama `legacy/v6` o el tag `v6.0.0`.
+## Estructura del workspace
 
----
-
-## Estructura del repo
-
-```
-universal-camera/
-├── README.md                 ← este archivo
-├── Loader.lua                ← el unico script que pegas en el juego
-├── PLAN_MODULARIZACION.md    ← el plan original con la justificacion
-├── Universal Camera.lua      ← script original (6292 lineas, conservado como referencia)
+```text
+Universal Camera/
+├── Loader.lua                  # unico script que se pega en el juego
+├── README.md
+├── LICENSE.md
 └── src/
-    ├── 00_config.lua         ← servicios, Rayfield, notify, TODAS las tablas de estado
-    ├── 10_utils.lua          ← refresh refs, freeze/unfreeze, clamp, easing, path viz, croma, lighting tweaks
-    ├── 20_filters.lua        ← color correction, bloom, DOF, sun rays, vignette, letterbox
-    ├── 30_fun.lua            ← modulo de diversion: montar, noclip, escala, poses, trail, disco, etc.
-    ├── 88_v9extras.lua       ← gamepad, escenas, keyframes, UI y timelapse
-    ├── 89_v10extras.lua      ← capture local, guías, recovery y metadata de escenas
-    ├── 50_spectate.lua       ← espectador (9 modos) + navegacion Q/E
-    ├── 60_director.lua       ← waypoints + reproduccion con easing
-    ├── 70_camcore.lua        ← toggleFreeCam, CrashZoom, Shake, updateCamera (18 modos), input
-    ├── 80_ui.lua             ← orquestador de la UI (arma la Window de Rayfield)
-    ├── 90_init.lua           ← llamada final a buildUI() + notificacion
+    ├── core/
+    │   ├── 00_config.lua       # namespace, servicios y estado base
+    │   ├── 05_persistence.lua  # guardado, carga, export e import
+    │   ├── 06_i18n.lua          # idiomas
+    │   ├── 10_utils.lua         # helpers y cleanup transversal
+    │   └── 90_init.lua          # persistencia, UI y Unload final
+    ├── visuals/
+    │   └── 20_filters.lua       # filtros y postprocesado
+    ├── actors/
+    │   ├── 30_fun.lua           # diversion, escala y efectos locales
+    │   ├── 32_bodycolor.lua     # colores y materiales
+    │   ├── 33_poses.lua         # poses y morphs
+    │   └── 35_playermod.lua     # modificaciones locales a jugadores
+    ├── camera/
+    │   ├── 50_spectate.lua      # espectador
+    │   ├── 55_replay.lua         # grabacion y reproduccion
+    │   ├── 60_director.lua       # waypoints y director
+    │   └── 70_camcore.lua        # nucleo de camara y render loop
+    ├── presets/
+    │   └── 57_profiles.lua      # perfiles completos
+    ├── runtime/
+    │   ├── 85_performance.lua  # diagnostico de frame budget
+    │   ├── 88_v9extras.lua      # eventos, gamepad, escenas y timelapse
+    │   └── 89_v10extras.lua     # captura, guias y recovery
+    ├── extensions/
+    │   └── 85_plugins.lua       # API y carga de plugins
     └── ui/
-        ├── inicio.lua        ← Camara libre, HUD, captura, teletransporte, Restablecer todo
-        ├── camaras.lua       ← los 18 modos y todos sus parametros
-        ├── espectador.lua    ← jugadores, auto-ciclo, 9 estilos
-        ├── creator.lua       ← captura preparada, guías, escenas y Replay Pro
-        ├── cinematic.lua     ← letterbox, vignette, shake, FOV pulse, director, post-procesado
-        ├── filters.lua       ← 30 built-in + editor custom
-        ├── light.lua         ← mezclador de iluminacion / clima
-        ├── estudio.lua       ← pantalla verde / croma
-        ├── gimbal.lua        ← LookAt Lock (bloqueo de objetivo)
-        ├── fun.lua           ← diversion
-        ├── config.lua        ← keybinds
-        └── info.lua          ← ayuda / documentacion
+        ├── 00_registry.lua      # registro de builders y tabs de plugins
+        ├── 90_builder.lua        # ventana, tabs y autosave
+        └── tabs/                 # un builder por pestaña
 ```
 
-### Tamanos (aprox.)
+## Orden de carga
 
-| Archivo | Lineas |
-|---|---|
-| `Loader.lua` | 150 |
-| `00_config.lua` | 530 |
-| `10_utils.lua` | 480 |
-| `20_filters.lua` | 320 |
-| `30_fun.lua` | 580 |
-| `50_spectate.lua` | 410 |
-| `60_director.lua` | 120 |
-| `70_camcore.lua` | 760 |
-| `80_ui.lua` | 60 |
-| `90_init.lua` | 30 |
-| `ui/*.lua` | 100–400 cada uno |
+El orden canonico esta en `Loader.lua`. Las carpetas organizan la propiedad
+de cada dominio, pero no sustituyen el orden de dependencias de Luau:
 
-**Total:** 35 archivos Lua bajo `src/`, ninguno mayor a 1.100 lineas, la mayoria por debajo de 500.
-
----
-
-## Como funciona la arquitectura
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Lo unico que pegas en el juego (Loader.lua)                │
-│  ─ define un namespace _G.UCam (tabla compartida)           │
-│  ─ descarga y ejecuta cada parte en orden desde GitHub raw   │
-│  ─ si fallan 2 seguidas, aborta con warn                    │
-└─────────────────────────────────────────────────────────────┘
-        │ HttpGet + loadstring  (en orden, hay dependencias)
-        ▼
-┌───────────────┐  ┌───────────────┐  ┌───────────────┐  ...
-│ 00_config.lua │  │ 10_funs.lua   │  │ 20_spectate…  │
-│ (estado +     │  │ (funciones    │  │ (espectador + │
-│  servicios)   │  │  auxiliares)  │  │  director)    │
-└───────────────┘  └───────────────┘  └───────────────┘
-        │ todos escriben en UCam.* que el Loader pasa como entorno
-        ▼
-┌─────────────────────────────────────────────────────────────┐
-│  80_ui.lua  → arma la Window y llama a cada build_xxx       │
-│  90_init.lua → llama buildUI() y notifica "Listo"           │
-└─────────────────────────────────────────────────────────────┘
+```text
+core → visuals → actors → camera → presets → runtime/extensions
+     → ui/00_registry → ui/tabs → ui/90_builder → core/90_init
 ```
 
-**Mecanismo de comunicacion entre partes:**
-- El Loader crea una tabla `local UCam = {}` y la expone tambien como `_G.UCam`.
-- Cada parte se carga con `setfenv`/entorno controlado donde `UCam` ya existe, de modo que hacer `UCam.Saved`, `UCam.toggleFreeCam`, etc. funciona entre archivos como si fueran locales del mismo script.
-- Las dependencias se respetan **por orden de carga**: un archivo solo puede referenciar funciones definidas en archivos cargados antes que el.
+Cada modulo puede usar APIs publicas de modulos anteriores y debe exponer
+solo lo que otros modulos necesitan bajo `UCam`.
 
-**Regla practica para renombrar:** toda funcion/variable que se referencia en mas de un archivo se prefija `UCam.`. Las que solo viven dentro de un archivo se quedan como `local` privado.
+## Reglas para futuras features
 
----
+1. Coloca la logica en el dominio que la posee.
+2. Crea el estado inicial en `core/00_config.lua` o en su estado de dominio.
+3. Publica una API pequena en `UCam`.
+4. Registra conexiones con `UCam.trackConnection` e instancias con
+   `UCam.trackInstance`.
+5. Anade serializacion en `core/05_persistence.lua` si debe sobrevivir.
+6. Anade controles en `ui/tabs/`, sin poner logica de runtime en la UI.
+7. Anade el archivo al `ORDER` del Loader en su posicion correcta.
+8. Prueba activacion, desactivacion, respawn, recarga y `Unload()`.
 
-## Como editar / extender
+Los helpers privados deben permanecer como `local function`. Los loops por
+frame deben tener un unico propietario y un objetivo medible.
 
-Cada archivo abre con un encabezado estandar que documenta:
-- sus **dependencias** (que partes debe haber cargado antes)
-- lo que **expone** (que funciones/tablas registra en `UCam`)
+## Plugins
+
+Los plugins pueden registrar una pestaña mediante:
 
 ```lua
--- Universal Camera Pro v6 · 30_fun
--- Modulo de diversion (Fun): montar, noclip, gravedad, ...
---
--- Dependencias: 00_config, 10_utils
--- Expone (UCam.*):
---   funAnyActive, funSnapshotCharacter, funRestorePartVisuals,
---   funRestoreHumanoid, funClearPartSnapshots, funEnsureHighlight,
---   ...
+UCam.registerTabBuilder("mi_tab", function(Window)
+    local Tab = Window:CreateTab("Mi tab", "star")
+    -- controles del plugin
+end)
 ```
 
-Para agregar una nueva pestana de UI:
+La API se registra en `ui/00_registry.lua` antes de cargar
+`extensions/85_plugins.lua`. Las pestañas se construyen en
+`ui/90_builder.lua`.
 
-1. Crea `src/ui/mi_pestana.lua` con `UCam.build_mi_pestana = function(Window) ... end`.
-2. Anade `"mi_pestana"` al array `UCam._uiBuilders` en `src/80_ui.lua`.
-3. Anade `"ui/mi_pestana.lua"` al `ORDER` en `Loader.lua`.
+## Versiones anteriores
 
----
+Los tags historicos permanecen disponibles en Git:
 
-## Atajos en el juego
-
-| Tecla | Accion |
-|---|---|
-| `F` | Activar / desactivar camara libre |
-| `X` | Dejar de espectar |
-| `E` | Siguiente jugador (espectar) |
-| `Q` | Anterior jugador (espectar) |
-| `Z` | Disparar Camera Shake (patron actual) |
-| `Delete` | Mostrar / ocultar UI de Rayfield |
-| `Clic der. + mouse` | Rotar camara |
-| `Rueda del mouse` | Zoom (FOV) |
-| `WASD` | Mover (modos Libre / Handheld) |
-| `Shift` | Sprint |
-| `Espacio / Ctrl` | Subir / bajar (Crane, modo libre) |
-
----
-
-## Diferencias con el script original
-
-El refactor es **funcionalmente identico** al `Universal Camera.lua` original:
-
-- Mismos 18 modos de camara.
-- Mismos 30 filtros built-in + editor custom.
-- V10 añade Replay Pro local, marcadores, guías, recovery, escenas ampliadas,
-  pausas de Director, diagnóstico de limpieza y FOV Pulse seguro.
-- Mismos 9 modos de espectador.
-- UI modular ampliada con pestaña Creator y controles locales nuevos.
-- Mismas teclas y atajos.
-
-Los unicos cambios:
-- Los `local` compartidos entre bloques pasaron a `UCam.*`.
-- El `buildUI()` de 2580 lineas se partio en 12 sub-builders en `ui/*.lua`.
-- El fix v4 de `triggerTransition` (NO usar `local function` que rompe el upvalue) se preserva.
-- Se respeta la regla del compilador de Roblox: ningun chunk pasa de 200 locales.
-
----
+- `v10.0.1`: ultima estructura anterior.
+- `v9.0.0`: version V9.
+- `v6.0.0`: primera modularizacion.
 
 ## Licencia y creditos
 
-- Script original: **Cocoa Feliz** · v6
-- Refactor modular: generado a partir del plan `PLAN_MODULARIZACION.md`
-- UI: [Rayfield](https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua) (Sirius Software)
+- Script original: Cocoa Feliz.
+- UI: [Rayfield](https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua).
