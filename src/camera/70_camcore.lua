@@ -22,6 +22,7 @@ local customHudPaths = {
     "GameUI.Menu.Settings.Ability.Bar",
     "GameUI.Menu.Settings.Game.SurvivorHP",
     "Main.Game.Teams.Teammate",
+    "Round",
     "Round.Game.SurvivorHP",
     "Round.Game.Ability",
     "Round.Game.Time",
