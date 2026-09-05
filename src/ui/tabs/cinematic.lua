@@ -145,6 +145,34 @@ function UCam.build_cinematic(Window)
         Name = "Limpiar todos los waypoints",
         Callback = UCam.directorClearWaypoints,
     })
+    CinematicTab:CreateSection("Navegación individual de waypoints")
+    local selectedWaypoint = "(No hay waypoints)"
+    UCam.UIRefs.WaypointDropdown = CinematicTab:CreateDropdown({
+        Name = "Waypoint de destino",
+        Options = UCam.directorGetWaypointOptions and UCam.directorGetWaypointOptions() or { "(No hay waypoints)" },
+        CurrentOption = { selectedWaypoint },
+        MultipleOptions = false,
+        Callback = function(options)
+            local value = UCam.resolveDropdownValue(options)
+            if value then selectedWaypoint = value end
+        end,
+    })
+    CinematicTab:CreateButton({
+        Name = "Ir directamente al waypoint",
+        Callback = function()
+            if UCam.directorGoToWaypoint then
+                UCam.directorGoToWaypoint(selectedWaypoint)
+            end
+        end,
+    })
+    CinematicTab:CreateButton({
+        Name = "Ir al último waypoint",
+        Callback = function()
+            if UCam.directorGoToWaypoint then
+                UCam.directorGoToWaypoint(#UCam.Waypoint.List)
+            end
+        end,
+    })
     local directorToggle = CinematicTab:CreateToggle({
         Name = "Reproducir / Detener ruta",
         CurrentValue = false,

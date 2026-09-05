@@ -18,6 +18,7 @@
 -- de acceso normalizan ambos formatos.
 -- ============================================================
 local UCam = _G.UCam
+local normalizeList
 
 -- ============================================================
 -- HELPERS DE ACCESO NORMALIZADO A WAYPOINTS
@@ -76,11 +77,79 @@ UCam.directorGetWP = {
     hold = wpHold, label = wpLabel, focusTarget = wpFocusTarget,
 }
 
+local function waypointOptions()
+    local options = {}
+    for i, wp in ipairs(UCam.Waypoint.List) do
+        local label = wpLabel(wp)
+        if label == "" then label = "sin etiqueta" end
+        table.insert(options, string.format("%02d - %s", i, label))
+    end
+    if #options == 0 then table.insert(options, "(No hay waypoints)") end
+    return options
+end
+
+local function refreshWaypointDropdown()
+    if UCam.UIRefs and UCam.UIRefs.WaypointDropdown then
+        pcall(function() UCam.UIRefs.WaypointDropdown:Refresh(waypointOptions()) end)
+    end
+end
+
+function UCam.directorGetWaypointOptions()
+    return waypointOptions()
+end
+
+local function waypointIndexFromOption(option)
+    local index = tonumber(tostring(option or ""):match("^(%d+)"))
+    if not index or not UCam.Waypoint.List[index] then return nil end
+    return index
+end
+
+-- Lleva la cámara directamente a un waypoint sin iniciar la ruta del Director.
+-- El resultado queda en modo Libre para poder ajustar la posición manualmente.
+function UCam.directorGoToWaypoint(indexOrOption)
+    normalizeList()
+    local index = type(indexOrOption) == "number" and math.floor(indexOrOption)
+        or waypointIndexFromOption(indexOrOption)
+    if not index or not UCam.Waypoint.List[index] then
+        UCam.notify("Waypoints", "Selecciona un waypoint válido.", 3)
+        return false
+    end
+
+    local wp = UCam.Waypoint.List[index]
+    local cf = wpCF(wp)
+    if not cf then
+        UCam.notify("Waypoints", "El waypoint no tiene una posición válida.", 3)
+        return false
+    end
+
+    if UCam.Director.Active then UCam.directorTogglePlay(false) end
+    if UCam.Spectate and UCam.Spectate.Active and UCam.stopSpectate then UCam.stopSpectate() end
+    if not UCam.freeCamEnabled then
+        UCam.camMode = "Libre"
+        UCam.toggleFreeCam()
+    else
+        UCam.camMode = "Libre"
+    end
+
+    UCam.CameraTransition.Active = false
+    UCam.camCFrame = cf
+    UCam.syncFreeLookFromCFrame(cf)
+    UCam.camera.CameraType = Enum.CameraType.Scriptable
+    UCam.camera.CameraSubject = nil
+    UCam.camera.CFrame = UCam.Waypoint.UseRoll and cf * CFrame.Angles(0, 0, wpRoll(wp) or 0) or cf
+    if UCam.Waypoint.UseFOV then UCam.camera.FieldOfView = wpFOV(wp) end
+    if UCam.UISliders and UCam.UISliders.modeDropdown then
+        pcall(function() UCam.UISliders.modeDropdown:Set({ "Libre" }) end)
+    end
+    UCam.notify("Waypoints", string.format("Cámara enviada al waypoint #%d.", index))
+    return true
+end
+
 -- ============================================================
 -- NORMALIZA LA LISTA: convierte cualquier CFrame puro en tabla
 -- (se llama al agregar / deserializar para mantener consistencia)
 -- ============================================================
-local function normalizeList()
+normalizeList = function()
     for i, wp in ipairs(UCam.Waypoint.List) do
         if typeof(wp) == "CFrame" then
             UCam.Waypoint.List[i] = {
@@ -238,6 +307,7 @@ function UCam.directorAddWaypoint(cf)
     table.insert(UCam.Waypoint.List, wp)
     UCam.notify("Director",
         string.format("Waypoint #%d guardado (curva: %s).", #UCam.Waypoint.List, UCam.Waypoint.CurveMode))
+    refreshWaypointDropdown()
     UCam.drawPathVisualizer()
 end
 
@@ -248,6 +318,7 @@ function UCam.directorUndoWaypoint()
     end
     table.remove(UCam.Waypoint.List)
     UCam.notify("Director", string.format("Waypoint eliminado (%d restantes).", #UCam.Waypoint.List))
+    refreshWaypointDropdown()
     UCam.drawPathVisualizer()
 end
 
@@ -255,6 +326,7 @@ function UCam.directorClearWaypoints()
     table.clear(UCam.Waypoint.List)
     UCam.Director.Active = false
     UCam.notify("Director", "Waypoints limpiados.")
+    refreshWaypointDropdown()
     UCam.drawPathVisualizer()
 end
 
@@ -415,6 +487,7 @@ function UCam.directorDeserializeRoute(str)
     table.clear(UCam.Waypoint.List)
     for _, w in ipairs(newList) do table.insert(UCam.Waypoint.List, w) end
     UCam.Waypoint.CurveMode = curveMode or UCam.Waypoint.CurveMode
+    refreshWaypointDropdown()
     UCam.drawPathVisualizer()
     return true
 end
