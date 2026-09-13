@@ -128,10 +128,10 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v11 By Cocoa Feliz",
-        "V11: Props locales (decoraciones solo tuyas por ID de asset), limpieza de opciones y autosave real. Presiona Delete para UI."
+        "Universal Camera Pro v12 By Cocoa Feliz",
+        "V12: Runtime estable y herramientas cinematográficas. Props locales y autosave real. Presiona Delete para UI."
     )
-    print("[UCam] Universal Camera Pro v11 cargado OK. Props locales + limpieza v11.")
+    print("[UCam] Universal Camera Pro v12 cargado OK. Runtime estable + herramientas cinematográficas.")
 else
     warn("[UCam] Error al construir la UI: " .. tostring(err))
 end

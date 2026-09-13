@@ -9,8 +9,8 @@ local UCam = _G.UCam
 
 function UCam.buildUI()
     local Window = UCam.Rayfield:CreateWindow({
-        Name = "Universal Camera Pro v11 By Cocoa Feliz",
-        LoadingTitle = "Universal Camera Pro v11",
+        Name = "Universal Camera Pro v12 By Cocoa Feliz",
+        LoadingTitle = "Universal Camera Pro v12",
         LoadingSubtitle = "Cargando herramientas locales + Props...",
         Icon = 4483362458,
         ToggleUIKeybind = Enum.KeyCode.Delete,

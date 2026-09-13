@@ -4,7 +4,7 @@
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v11.0.3"
+local VERSION = "v12.0.0"
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
 local MAX_RETRIES = 3
@@ -140,7 +140,7 @@ end
 table.clear(sources)
 
 if #failedList == 0 then
-    print(("[UCam] Universal Camera Pro v11 cargado OK (%d partes). Local: props, guias, Replay Pro."):format(loaded))
+    print(("[UCam] Universal Camera Pro v12 cargado OK (%d partes). Local: props, guias, Replay Pro."):format(loaded))
 else
     warn(("[UCam] Carga completada con %d errores. Fallaron: %s"):format(
         #failedList,
