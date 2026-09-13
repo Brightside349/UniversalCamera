@@ -83,10 +83,28 @@ local function setCustomHudHidden(hidden)
 end
 
 function UCam.setHudHidden(hidden)
-    UCam.Hud.Hidden = hidden
-    pcall(function()
-        UCam.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, not hidden)
-    end)
+    if hidden and not UCam.Hud.Hidden then
+        UCam.Hud.CoreGuiStates = {}
+        local coreTypes = {
+            Enum.CoreGuiType.Backpack,
+            Enum.CoreGuiType.Chat,
+            Enum.CoreGuiType.Health,
+            Enum.CoreGuiType.PlayerList,
+            Enum.CoreGuiType.EmotesMenu,
+        }
+        for _, coreType in ipairs(coreTypes) do
+            pcall(function()
+                UCam.Hud.CoreGuiStates[coreType] = UCam.StarterGui:GetCoreGuiEnabled(coreType)
+                UCam.StarterGui:SetCoreGuiEnabled(coreType, false)
+            end)
+        end
+    elseif not hidden and UCam.Hud.Hidden then
+        for coreType, enabled in pairs(UCam.Hud.CoreGuiStates or {}) do
+            pcall(function() UCam.StarterGui:SetCoreGuiEnabled(coreType, enabled) end)
+        end
+        UCam.Hud.CoreGuiStates = {}
+    end
+    UCam.Hud.Hidden = hidden == true
     pcall(function()
         setCustomHudHidden(hidden)
     end)
@@ -374,6 +392,16 @@ end
 -- ============================================================
 local AUTOFOCUS_INTERVAL = 0.1  -- segundos entre raycasts
 local autoFocusAccum = 0
+local cameraRaycastParams = RaycastParams.new()
+cameraRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function getCameraRaycastParams()
+    local exclude = {}
+    if UCam.character then table.insert(exclude, UCam.character) end
+    if UCam.camera then table.insert(exclude, UCam.camera) end
+    cameraRaycastParams.FilterDescendantsInstances = exclude
+    return cameraRaycastParams
+end
 
 local function updateAutoFocus(deltaTime)
     if not UCam.DOF.Enabled or not UCam.AutoFocusDOF.Enabled then return end
@@ -387,10 +415,7 @@ local function updateAutoFocus(deltaTime)
         if root then targetPos = root.Position end
     elseif UCam.freeCamEnabled then
         if UCam.camMode == "Libre" or UCam.camMode == "Handheld" or UCam.camMode == "Roll Axis" then
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-            raycastParams.FilterDescendantsInstances = {UCam.character or workspace, UCam.camera}
-            local result = workspace:Raycast(UCam.camera.CFrame.Position, UCam.camera.CFrame.LookVector * 500, raycastParams)
+            local result = workspace:Raycast(UCam.camera.CFrame.Position, UCam.camera.CFrame.LookVector * 500, getCameraRaycastParams())
             if result then
                 UCam.DOF.FocusDistance = UCam.clamp((UCam.camera.CFrame.Position - result.Position).Magnitude, 1, 200)
                 UCam.applyDOF()
@@ -779,10 +804,7 @@ function UCam.updateCamera(deltaTime)
         UCam.CamCore._exposureAccum = (UCam.CamCore._exposureAccum or 0) + deltaTime
         if UCam.CamCore._exposureAccum >= 0.1 then
             UCam.CamCore._exposureAccum = 0
-            local rayParams = RaycastParams.new()
-            rayParams.FilterType = Enum.RaycastFilterType.Exclude
-            rayParams.FilterDescendantsInstances = { UCam.character, UCam.camera }
-            local r = workspace:Raycast(UCam.camera.CFrame.Position, UCam.camera.CFrame.LookVector * 200, rayParams)
+            local r = workspace:Raycast(UCam.camera.CFrame.Position, UCam.camera.CFrame.LookVector * 200, getCameraRaycastParams())
             if r and r.Instance and r.Instance:IsA("BasePart") then
                 -- Heurística simple: partes oscuras (grises bajos) suben el brillo
                 local c = r.Instance.Color

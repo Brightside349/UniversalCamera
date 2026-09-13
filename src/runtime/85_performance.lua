@@ -22,7 +22,13 @@ UCam.Performance = UCam.Performance or {
     MaxHistory      = 60,         -- últimas 60 entradas (5 minuto)
     _lastReportAt   = 0,
     _accum          = {},         -- acumulador por módulo
-    _frames         = 0,
+    _frameCount     = 0,
+    _samples        = 0,
+    _frameTimeTotal = 0,
+    _frameTimeMax   = 0,
+    _frameDeltas    = {},
+    _frameTimes     = {},
+    _lastAlertAt    = {},
 }
 
 -- ============================================================
@@ -41,12 +47,24 @@ local function timecall(fn, ...)
 end
 
 --- Registra una medición. Llamado por los módulos instrumentados.
+function UCam.perfFrame(dt, elapsedMs)
+    local P = UCam.Performance
+    if not P.Enabled then return end
+    P._frameCount = P._frameCount + 1
+    P._frameTimeTotal = P._frameTimeTotal + (elapsedMs or 0)
+    P._frameTimeMax = math.max(P._frameTimeMax, elapsedMs or 0)
+    table.insert(P._frameDeltas, dt or 0)
+    table.insert(P._frameTimes, elapsedMs or 0)
+    if #P._frameDeltas > 600 then table.remove(P._frameDeltas, 1) end
+    if #P._frameTimes > 600 then table.remove(P._frameTimes, 1) end
+end
+
 function UCam.perfRecord(moduleName, ms)
     local P = UCam.Performance
     if not P.Enabled then return end
 
     P._accum[moduleName] = (P._accum[moduleName] or 0) + ms
-    P._frames = P._frames + 1
+    P._samples = P._samples + 1
 
     -- Log inmediato si un módulo supera el umbral (+= 3 ms de una vez)
     if ms >= (P.AlertThreshold * 2) then
@@ -85,7 +103,9 @@ local function installHooks()
         return function(dt)
             local t0 = os.clock()
             local ok, res = pcall(orig, dt)
-            UCam.perfRecord("camcore.updateCamera", (os.clock() - t0) * 1000)
+            local elapsedMs = (os.clock() - t0) * 1000
+            UCam.perfFrame(dt, elapsedMs)
+            UCam.perfRecord("camcore.updateCamera", elapsedMs)
             if not ok then error(res) end
             return res
         end
@@ -129,10 +149,19 @@ end
 --- Devuelve un reporte agregado como string.
 function UCam.getPerfReport()
     local P = UCam.Performance
+    if P._frameCount == 0 then return "Sin datos todavía (activa el monitor)." end
+
+    local frameTimes = {}
+    for i, value in ipairs(P._frameTimes) do frameTimes[i] = value end
+    table.sort(frameTimes)
+    local p95 = frameTimes[math.max(1, math.ceil(#frameTimes * 0.95))] or 0
     if P._frames == 0 then return "Sin datos todavía (activa el monitor)." end
 
     local parts = {}
-    parts[#parts+1] = ("Frames analizados: %d"):format(P._frames)
+    parts[#parts+1] = ("Frames reales: %d | muestras de módulos: %d"):format(P._frameCount, P._samples)
+    parts[#parts+1] = ("Tiempo medio de frame: %.3f ms | máximo: %.3f ms"):format(
+        P._frameTimeTotal / P._frameCount, P._frameTimeMax)
+    parts[#parts+1] = ("P95 de CPU Lua: %.3f ms"):format(p95)
     -- v8 FIX: contar módulos con un loop real (select(2, next()) devolvía
     -- el primer valor acumulado, no el número de módulos)
     local moduleCount = 0
@@ -143,7 +172,7 @@ function UCam.getPerfReport()
     -- Tabla por módulo
     local entries = {}
     for module, totalMs in pairs(P._accum) do
-        table.insert(entries, { name = module, total = totalMs, avg = totalMs / P._frames })
+        table.insert(entries, { name = module, total = totalMs, avg = totalMs / P._frameCount })
     end
     table.sort(entries, function(a, b) return a.total > b.total end)
 
@@ -164,7 +193,12 @@ end
 --- Resetea los acumuladores.
 function UCam.resetPerfTracker()
     UCam.Performance._accum = {}
-    UCam.Performance._frames = 0
+    UCam.Performance._frameCount = 0
+    UCam.Performance._samples = 0
+    UCam.Performance._frameTimeTotal = 0
+    UCam.Performance._frameTimeMax = 0
+    UCam.Performance._frameDeltas = {}
+    UCam.Performance._frameTimes = {}
 end
 
 -- ============================================================
@@ -174,7 +208,12 @@ function UCam.startPerfMonitor()
     local P = UCam.Performance
     if P.Enabled then return end
     P.Enabled        = true
-    P._frames        = 0
+    P._frameCount    = 0
+    P._samples       = 0
+    P._frameTimeTotal = 0
+    P._frameTimeMax  = 0
+    P._frameDeltas   = {}
+    P._frameTimes    = {}
     P._accum         = {}
     P._lastReportAt  = tick()
 
