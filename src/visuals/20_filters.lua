@@ -76,8 +76,8 @@ function UCam.applyFilterByName(name)
     end
     for i, f in ipairs(UCam.CustomFilters) do
         if f.Name == name then
-            UCam.applyColorCorrection(f.Brightness, f.Contrast, f.Saturation, f.TintColor)
             UCam.currentFilterIndex = -i
+            UCam.applyFilter(-i)
             UCam.customFilterLiveApplied = false
             return -i
         end
