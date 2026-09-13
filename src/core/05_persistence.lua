@@ -201,6 +201,12 @@ local SCHEMA = {
         SavedRoutes = nil,
     },
 
+    -- Shot Builder v12.2
+    ShotBuilder = {
+        Template = nil, TargetMode = nil, Duration = nil,
+        ArcDegrees = nil, DistanceScale = nil, HeightOffset = nil,
+    },
+
     -- TimeControl
     -- v8.1: Módulos eliminados (SlowMo, TimeControl, Combos, Macros, AudioReactive, FiltersPro)
     -- Ya no se persisten

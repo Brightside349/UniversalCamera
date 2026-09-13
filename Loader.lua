@@ -4,7 +4,7 @@
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v12.1.1"
+local VERSION = "v12.2.0"
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
 local MAX_RETRIES = 3
@@ -43,6 +43,7 @@ local ORDER = {
     "extensions/85_plugins.lua",
     "runtime/88_v9extras.lua",
     "runtime/89_v10extras.lua",
+    "runtime/90_shotbuilder.lua",
     "ui/tabs/inicio.lua",
     "ui/tabs/camaras.lua",
     "ui/tabs/espectador.lua",

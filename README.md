@@ -12,7 +12,12 @@ que traes por ID de asset y solo tu ves.
 - Guias exactas para 16:9, 9:16, 1:1 y 4:5 que se recalculan al redimensionar el viewport.
 - Parche: la intensidad global tambien se respeta al seleccionar filtros custom.
 
-> Version estable: `v12.1.1`.
+### v12.2
+
+- Shot Builder integrado al Director: Dolly In/Out, Orbit, Crane y Reveal.
+- Las plantillas generan waypoints editables y no comienzan la reproducción automáticamente.
+
+> Version estable: `v12.2.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -22,7 +27,7 @@ que traes por ID de asset y solo tu ves.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.1.1`.
+La version publicada apunta al tag `v12.2.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -33,7 +38,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.1.1"
+local VERSION = "v12.2.0"
 ```
 
 ## Props locales (v11)
