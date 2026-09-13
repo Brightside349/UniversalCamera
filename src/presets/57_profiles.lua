@@ -144,7 +144,7 @@ local function captureState()
     -- CamCore
     S.CamCore = {
         SmoothZoom=UCam.CamCore.SmoothZoom, ZoomSpeed=UCam.CamCore.ZoomSpeed,
-        AutoExposure=UCam.CamCore.AutoExposure, MotionBlur=UCam.CamCore.MotionBlur, MBAmount=UCam.CamCore.MBAmount,
+        AutoExposure=UCam.CamCore.AutoExposure,
     }
 
     -- Waypoint/Director

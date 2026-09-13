@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera Pro v8 · 00_config
+-- Universal Camera Pro v11 · 00_config
 -- Servicios, Rayfield, notify y TODAS las tablas de estado.
 -- Esta parte NO define logica; solo crea el namespace UCam y
 -- expone lo que el resto de archivos necesita.
 --
--- Dependencias: ninguna (es la primera parte).
+-- v11: añadido UCam.Props. Retirado el estado de i18n (Locale).
 -- Expone: UCam.Servicios, UCam.Rayfield, UCam.notify,
 --         UCam.player, UCam.camera, UCam.controls,
 --         UCam.Saved, UCam.Hud, UCam.CamModes, UCam.camMode,
@@ -30,7 +30,8 @@
 --         UCam.cameraYaw, UCam.cameraPitch, UCam.rightMouseHeld,
 --         UCam.dutchRoll, UCam.currentFilterIndex,
 --         UCam.BLOOM_EFFECT_NAME, UCam.DOF_EFFECT_NAME,
---         UCam.SUNRAYS_EFFECT_NAME, UCam.resolveDropdownValue
+--         UCam.SUNRAYS_EFFECT_NAME,
+    UCam.resolveDropdownValue
 -- ============================================================
 local UCam = _G.UCam
 if not UCam then
@@ -138,7 +139,6 @@ UCam.CleanShot = {
 -- imagen si el entorno no expone una API de screenshot.
 UCam.Capture = {
     Prepared            = false,
-    HideAfterSeconds    = 3,
     ScreenshotAvailable = false,
     _previousCleanShot  = nil,
 }
@@ -289,8 +289,7 @@ UCam.CamCore = {
     TargetFOV     = nil,     -- FOV objetivo para smooth zoom
     AutoExposure  = false,  -- ajustar brillo automáticamente según dónde mira la cámara
     ExposureRange = { min = -0.15, max = 0.15 },
-    MotionBlur    = false,  -- blur simulado al girar rápido (overlay de trail)
-    MBAmount      = 0.3,    -- intensidad del motion blur
+    -- v11: MotionBlur/MBAmount eliminados (sin efecto real).
     -- Save/Load de posiciones de cámara (5 slots)
     SavedPositions = {},    -- { [1] = CFrame, ... }
 }
@@ -447,7 +446,7 @@ UCam.Waypoint = {
     CurveModes  = { "Linear", "Catmull-Rom", "Bezier" },
     PreviewArrows = false,    -- v7: dibujar flechas de dirección en el preview 3D
     -- Valores que se aplicarán al SIGUIENTE waypoint que se guarde
-    Next        = { useFOV = false, fov = 70, roll = 0, speed = 1, hold = 0, label = "", focusTarget = "" },
+    Next        = { useFOV = false, fov = 70, roll = 0, speed = 1, hold = 0, label = "" },
 }
 UCam.Director = {
     Active       = false,
@@ -952,11 +951,22 @@ UCam.Profiles = {
     MaxQuick   = 3,
 }
 
--- v8: i18n (es/en/pt)
-UCam.Locale = "es"
-
 -- ============================================================
--- PlayerModule controls (para disableControls / enableControls)
+-- v11: PROPS — objetos locales (solo visibles para ti)
+-- ============================================================
+UCam.Props = {
+    Items          = {},      -- array de registros de props activos
+    Selected       = 0,       -- indice del prop activo en UCam.Props.Items
+    MaxProps       = 50,      -- tope de props por sesión
+    MoveMode       = false,   -- mover con la camara (adjuntar al freecam)
+    MoveDistance   = 12,      -- distancia al colocar/adjuntar
+    SnapToGround   = true,    -- al colocar, apoyar sobre el suelo
+    CanCollide     = false,   -- colisión por defecto de los nuevos props
+    DragOffset     = Vector3.new(), -- offset que arrastras con la rueda
+    _attachedIndex = 0,       -- prop adjuntado a la camara ahora mismo
+    _renderBound   = false,
+}
+
 -- v8.1 FIX (crítico #4): timeout de 5 s. Si el juego no tiene
 -- PlayerModule, WaitForChild colgaría la carga para siempre dentro
 -- del pcall (que no aborta un WaitForChild).
@@ -982,9 +992,6 @@ UCam.controls = controls
 -- DEFAULTS (para el boton "Restablecer todos los valores")
 -- ============================================================
 UCam.DEFAULTS = {
-    -- v8: persistencia de idioma (i18n)
-    Locale               = "es",
-
     currentSpeed         = 50,
     movementSmoothing    = 8,
     mouseSensitivity     = 0.35,

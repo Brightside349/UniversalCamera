@@ -7,7 +7,7 @@ local UCam = _G.UCam
 
 function UCam.build_camaras(Window)
     local CamTab = Window:CreateTab("🎥 Cámaras", "camera")
-    local s = UCam.UISliders
+    local s = UCam.UISliders -- v11: solo comparte modeDropdown con Inicio
 
     CamTab:CreateSection("Modo de camara (18 modos)")
     s.modeDropdown = CamTab:CreateDropdown({
@@ -67,7 +67,7 @@ function UCam.build_camaras(Window)
     })
 
     CamTab:CreateSection("Movimiento libre (Libre / Handheld)")
-    s.speedSlider = CamTab:CreateSlider({
+    local speedSlider = CamTab:CreateSlider({
         Name = "Velocidad",
         Range = { UCam.SLIDER_MIN_SPEED, UCam.SLIDER_MAX_SPEED },
         Increment = 1,
@@ -75,7 +75,7 @@ function UCam.build_camaras(Window)
         CurrentValue = UCam.currentSpeed,
         Callback = function(v) UCam.currentSpeed = v end,
     })
-    s.sprintSlider = CamTab:CreateSlider({
+    local sprintSlider = CamTab:CreateSlider({
         Name = "Multiplicador sprint (Shift)",
         Range = { 1, 5 },
         Increment = 0.1,
@@ -83,7 +83,7 @@ function UCam.build_camaras(Window)
         CurrentValue = UCam.SPRINT_MULTIPLIER,
         Callback = function(v) UCam.SPRINT_MULTIPLIER = v end,
     })
-    s.smoothSlider = CamTab:CreateSlider({
+    local smoothSlider = CamTab:CreateSlider({
         Name = "Suavizado de movimiento",
         Range = { 1, 20 },
         Increment = 1,
@@ -92,7 +92,7 @@ function UCam.build_camaras(Window)
     })
 
     CamTab:CreateSection("Comun (Orbita / Dron / Cenital / Crane)")
-    s.orbitDistSlider = CamTab:CreateSlider({
+    local orbitDistSlider = CamTab:CreateSlider({
         Name = "Distancia",
         Range = { 5, 80 },
         Increment = 1,
@@ -100,7 +100,7 @@ function UCam.build_camaras(Window)
         CurrentValue = UCam.Orbit.Distance,
         Callback = function(v) UCam.Orbit.Distance = v end,
     })
-    s.orbitHeightSlider = CamTab:CreateSlider({
+    local orbitHeightSlider = CamTab:CreateSlider({
         Name = "Altura",
         Range = { -10, 40 },
         Increment = 1,
@@ -108,7 +108,7 @@ function UCam.build_camaras(Window)
         CurrentValue = UCam.Orbit.Height,
         Callback = function(v) UCam.Orbit.Height = v end,
     })
-    s.orbitSpeedSlider = CamTab:CreateSlider({
+    local orbitSpeedSlider = CamTab:CreateSlider({
         Name = "Velocidad",
         Range = { 0, 3 },
         Increment = 0.1,
@@ -325,7 +325,7 @@ function UCam.build_camaras(Window)
         Title   = "Como usar",
         Content = "Selecciona el modo 'Vertigo' en el dropdown de Modo (con camara libre activa). La camara hace dolly in/out mientras el FOV se compensa para que tu personaje mantenga el mismo tamano: el fondo se deforma (efecto Hitchcock). Clic derecho + mouse para orbitar.",
     })
-    s.vertigoMinSlider = CamTab:CreateSlider({
+    local vertigoMinSlider = CamTab:CreateSlider({
         Name = "Distancia minima (dolly in)",
         Range = { 3, 20 },
         Increment = 0.5,
@@ -333,7 +333,7 @@ function UCam.build_camaras(Window)
         CurrentValue = UCam.Vertigo.MinDistance,
         Callback = function(v) UCam.Vertigo.MinDistance = v end,
     })
-    s.vertigoMaxSlider = CamTab:CreateSlider({
+    local vertigoMaxSlider = CamTab:CreateSlider({
         Name = "Distancia maxima (dolly out)",
         Range = { 10, 80 },
         Increment = 1,
@@ -341,7 +341,7 @@ function UCam.build_camaras(Window)
         CurrentValue = UCam.Vertigo.MaxDistance,
         Callback = function(v) UCam.Vertigo.MaxDistance = v end,
     })
-    s.vertigoSpeedSlider = CamTab:CreateSlider({
+    local vertigoSpeedSlider = CamTab:CreateSlider({
         Name = "Velocidad de oscilacion",
         Range = { 0.1, 3 },
         Increment = 0.05,
@@ -349,7 +349,7 @@ function UCam.build_camaras(Window)
         CurrentValue = UCam.Vertigo.Speed,
         Callback = function(v) UCam.Vertigo.Speed = v end,
     })
-    s.vertigoFovSlider = CamTab:CreateSlider({
+    local vertigoFovSlider = CamTab:CreateSlider({
         Name = "FOV base (a distancia media)",
         Range = { 20, 110 },
         Increment = 1,
@@ -359,7 +359,7 @@ function UCam.build_camaras(Window)
     })
 
     CamTab:CreateSection("Lente")
-    s.fovSlider = CamTab:CreateSlider({
+    local fovSlider = CamTab:CreateSlider({
         Name = "FOV",
         Range = { UCam.MIN_FOV, UCam.MAX_FOV },
         Increment = 1,
@@ -375,11 +375,11 @@ function UCam.build_camaras(Window)
         Name = "Reset FOV (NUEVO v6)",
         Callback = function()
             UCam.camera.FieldOfView = UCam.DEFAULT_FOV
-            pcall(function() s.fovSlider:Set(UCam.DEFAULT_FOV) end)
+            pcall(function() fovSlider:Set(UCam.DEFAULT_FOV) end)
             UCam.notify("Lente", "FOV restablecido a " .. tostring(UCam.DEFAULT_FOV) .. " grados.")
         end,
     })
-    s.sensSlider = CamTab:CreateSlider({
+    local sensSlider = CamTab:CreateSlider({
         Name = "Sensibilidad mouse",
         Range = { 0.05, 1.5 },
         Increment = 0.05,
@@ -501,7 +501,8 @@ function UCam.build_camaras(Window)
     })
 
     -- ===== v7: Mejoras del core de cámara =====
-    CamTab:CreateSection("v7 - Zoom, Exposición, Motion Blur")
+    -- v11: MotionBlur retirado (no difuminaba; solo inflaba el FOV al girar)
+    CamTab:CreateSection("Zoom suave y Auto-exposición")
     CamTab:CreateToggle({
         Name = "Zoom suave (interpolar FOV con rueda)",
         CurrentValue = UCam.CamCore.SmoothZoom,
@@ -521,18 +522,6 @@ function UCam.build_camaras(Window)
         Name = "Auto-exposure (ajustar brillo automático)",
         CurrentValue = UCam.CamCore.AutoExposure,
         Callback = function(v) UCam.CamCore.AutoExposure = v end,
-    })
-    CamTab:CreateToggle({
-        Name = "Motion blur simulado (al girar rápido)",
-        CurrentValue = UCam.CamCore.MotionBlur,
-        Callback = function(v) UCam.CamCore.MotionBlur = v end,
-    })
-    CamTab:CreateSlider({
-        Name = "Cantidad de motion blur",
-        Range = { 0, 1 },
-        Increment = 0.05,
-        CurrentValue = UCam.CamCore.MBAmount,
-        Callback = function(v) UCam.CamCore.MBAmount = v end,
     })
 
     CamTab:CreateSection("v7 - Guardar / Cargar posiciones (5 slots)")

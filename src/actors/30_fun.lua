@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v8 · 30_fun
+-- Universal Camera Pro v11 · 30_fun
 -- Modulo de Diversion (Fun) completo: montar, noclip, gravedad,
 -- escala, poses, rainbow, neon, trail, disco, material, invisibilidad.
 -- Se aplica localmente (no se envia al server).
@@ -10,9 +10,7 @@
 --   funRestoreCharacterScale,
 --   funRestoreHumanoid, funClearPartSnapshots, funEnsureHighlight,
 --   funClearHighlight, funApplyScale, funUpdate, startFun, stopFun,
---   FunV6 = { clearTrail, updateTrail, destroyDisco, createDisco,
---             updateDisco, applyMaterial, updateInvisibility,
---             setInvisibility }
+--   FunV7 = { updateTrail, updateDisco, partículas, teleport, fly }
 -- ============================================================
 local UCam = _G.UCam
 
@@ -662,12 +660,11 @@ local function funUpdateNeonGlow()
 end
 
 -- ============================================================
--- EFECTOS VISUALES v6 (trail / disco / material / invisibilidad)
--- Se exponen bajo UCam.FunV6
+-- EFECTOS VISUALES (trail / disco / material / invisibilidad)
+-- v11: API directa UCam.fun* (eliminado el legacy FunV6).
 -- ============================================================
-UCam.FunV6 = {}
 
-function UCam.FunV6.clearTrail()
+function UCam.funClearTrail()
     for _, entry in ipairs(UCam.Fun.Trail._parts) do
         if entry and entry.part then
             pcall(function() entry.part:Destroy() end)
@@ -678,90 +675,14 @@ function UCam.FunV6.clearTrail()
     UCam.Fun.Trail._timer = 0
 end
 
-function UCam.FunV6.updateTrail(dt)
-    if not UCam.Fun.Trail.Enabled then return end
-    UCam.refreshCharacterRefs()
-    if not UCam.rootPart then return end
-
-    UCam.Fun.Trail._timer = UCam.Fun.Trail._timer + dt
-    local interval = 0.08
-    if UCam.Fun.Trail._timer >= interval then
-        UCam.Fun.Trail._timer = 0
-        local p = Instance.new("Part")
-        p.Name = "UCamTrail"
-        p.Shape = Enum.PartType.Ball
-        p.Anchored = true
-        p.CanCollide = false
-        p.CanQuery = false
-        p.CanTouch = false
-        p.Massless = true
-        p.Size = Vector3.new(UCam.Fun.Trail.Width, UCam.Fun.Trail.Width, UCam.Fun.Trail.Width)
-        p.Color = UCam.Fun.Trail.Color
-        p.Material = Enum.Material.Neon
-        p.CFrame = UCam.rootPart.CFrame
-        p.Parent = workspace
-        table.insert(UCam.Fun.Trail._parts, { part = p, born = os.clock() })
-    end
-
-    local now = os.clock()
-    for i = #UCam.Fun.Trail._parts, 1, -1 do
-        local entry = UCam.Fun.Trail._parts[i]
-        local age = now - entry.born
-        if age >= UCam.Fun.Trail.Duration or not (entry.part and entry.part.Parent) then
-            pcall(function() entry.part:Destroy() end)
-            table.remove(UCam.Fun.Trail._parts, i)
-        else
-            local k = 1 - (age / math.max(UCam.Fun.Trail.Duration, 0.05))
-            local s = math.max(UCam.Fun.Trail.Width * k, 0.05)
-            entry.part.Size = Vector3.new(s, s, s)
-            entry.part.Color = UCam.Fun.Trail.Color
-        end
-    end
-end
-
-function UCam.FunV6.destroyDisco()
+function UCam.funDestroyDisco()
     if UCam.Fun.Disco.Part then
         pcall(function() UCam.Fun.Disco.Part:Destroy() end)
         UCam.Fun.Disco.Part = nil
     end
 end
 
-function UCam.FunV6.createDisco()
-    UCam.FunV6.destroyDisco()
-    UCam.refreshCharacterRefs()
-    if not UCam.rootPart or not UCam.Fun.Disco.Enabled then return end
-    local part = Instance.new("Part")
-    part.Name = "UCamDisco"
-    part.Anchored = true
-    part.CanCollide = false
-    part.CanQuery = false
-    part.CanTouch = false
-    part.Massless = true
-    part.Size = Vector3.new(UCam.Fun.Disco.Size, 0.2, UCam.Fun.Disco.Size)
-    part.Color = UCam.Fun.Disco.Color
-    part.Material = Enum.Material.Neon
-    part.CFrame = CFrame.new(UCam.rootPart.Position - Vector3.new(0, 3, 0))
-    part.Parent = workspace
-    UCam.Fun.Disco.Part = part
-end
-
-function UCam.FunV6.updateDisco()
-    if not UCam.Fun.Disco.Enabled then return end
-    UCam.refreshCharacterRefs()
-    if not UCam.rootPart then return end
-    if not (UCam.Fun.Disco.Part and UCam.Fun.Disco.Part.Parent) then
-        UCam.FunV6.createDisco()
-        return
-    end
-    pcall(function()
-        UCam.Fun.Disco.Part.Size = Vector3.new(UCam.Fun.Disco.Size, 0.2, UCam.Fun.Disco.Size)
-        UCam.Fun.Disco.Part.Color = UCam.Fun.Disco.Color
-        UCam.Fun.Disco.Part.CFrame = CFrame.new(UCam.rootPart.Position - Vector3.new(0, 3, 0))
-    end)
-end
-
--- v7: Optimizado con cache
-function UCam.FunV6.applyMaterial(name)
+function UCam.funApplyMaterial(name)
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
     local enumMat = Enum.Material[name]
@@ -776,7 +697,7 @@ function UCam.FunV6.applyMaterial(name)
 end
 
 -- v7: Optimizado con cache
-function UCam.FunV6.updateInvisibility()
+local function funUpdateInvisibility()
     if not UCam.Fun.Invisibility.Enabled then return end
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
@@ -816,9 +737,9 @@ local function funUpdateCore(dt)
     -- llamarlo aquí en Heartbeat duplicaba el trabajo y escribía Transform
     -- tarde (el Animator lo pisa antes del batch de física).
     funUpdateGravity(dt)
-    UCam.FunV6.updateTrail(dt)
-    UCam.FunV6.updateDisco()
-    UCam.FunV6.updateInvisibility()
+    UCam.FunV7.updateTrail(dt)
+    UCam.FunV7.updateDisco(dt)
+    funUpdateInvisibility()
     funUpdateBodySpin(dt)
     funUpdateMount(dt)
 end
@@ -910,8 +831,8 @@ local function stopFun()
     UCam.Fun.BodySpin.Enabled   = false
     UCam.Fun.Rainbow.Enabled    = false
     UCam.Fun.NeonGlow.Enabled   = false
-    UCam.FunV6.clearTrail()
-    UCam.FunV6.destroyDisco()
+    UCam.funClearTrail()
+    UCam.funDestroyDisco()
     for part, trans in pairs(UCam.Fun._origTransparency) do
         if part and part.Parent then
             pcall(function() part.Transparency = trans end)
@@ -928,8 +849,8 @@ local function stopFun()
 end
 UCam.stopFun = stopFun
 
--- v6: setInvisibility DESPUES de stopFun porque la usa
-function UCam.FunV6.setInvisibility(enabled)
+-- v11: setInvisibility DESPUES de stopFun porque la usa
+function UCam.funSetInvisibility(enabled)
     UCam.Fun.Invisibility.Enabled = enabled
     UCam.refreshCharacterRefs()
     if not UCam.character then return end
@@ -1293,7 +1214,7 @@ end
 -- v7: DISCO FLOOR MEJORADO (formas, luces animadas, espejo)
 -- ============================================================
 function UCam.FunV7.createDisco()
-    UCam.FunV6.destroyDisco()
+    UCam.funDestroyDisco()
     UCam.refreshCharacterRefs()
     if not UCam.rootPart or not UCam.Fun.Disco.Enabled then return end
     
@@ -1362,39 +1283,15 @@ function UCam.FunV7.updateDisco(dt)
 end
 
 -- ============================================================
--- v7: ACTUALIZAR funUpdate para incluir nuevas features
+-- UPDATE MAESTRO
+-- v11 FIX: el wrapper antiguo llamaba updateTrail/updateDisco otra vez
+-- AQUI ademas de en funUpdateCore (doble update por frame, trail
+-- spawneaba al doble de velocidad). Ahora solo añade el fly.
 -- ============================================================
--- Guardar la función original
-local originalFunUpdate = funUpdateCore
-
 function UCam.funUpdate(dt)
-    -- Llamar a la original
-    if originalFunUpdate then
-        originalFunUpdate(dt)
-    end
-    
-    -- v7: Nuevas features
+    funUpdateCore(dt)
     funUpdateFly()
-    UCam.FunV7.updateTrail(dt)
-    UCam.FunV7.updateDisco(dt)
 end
 
--- Reemplazar clearTrail para usar la nueva
-UCam.FunV6.clearTrail = function()
-    for _, entry in ipairs(UCam.Fun.Trail._parts) do
-        if entry and entry.part then
-            pcall(function() entry.part:Destroy() end)
-        end
-    end
-    table.clear(UCam.Fun.Trail._parts)
-    UCam.Fun.Trail._timer = 0
-end
-
--- Reemplazar updateTrail para usar la nueva
-UCam.FunV6.updateTrail = UCam.FunV7.updateTrail
-
--- Reemplazar createDisco para usar la nueva
-UCam.FunV6.createDisco = UCam.FunV7.createDisco
-
--- Reemplazar updateDisco para usar la nueva
-UCam.FunV6.updateDisco = UCam.FunV7.updateDisco
+-- Alias público para la UI (createDisco valida que Disco.Enabled)
+UCam.funCreateDisco = UCam.FunV7.createDisco

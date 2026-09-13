@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera PRO v10.5 · Loader
+-- Universal Camera PRO v11 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v10.5"
+local VERSION = "v11.0"
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
 local MAX_RETRIES = 3
@@ -26,13 +26,13 @@ _G.UCam = UCam
 local ORDER = {
     "core/00_config.lua",
     "core/05_persistence.lua",
-    "core/06_i18n.lua",
     "core/10_utils.lua",
     "visuals/20_filters.lua",
     "actors/30_fun.lua",
     "actors/32_bodycolor.lua",
     "actors/33_poses.lua",
     "actors/35_playermod.lua",
+    "props/45_props.lua",
     "camera/50_spectate.lua",
     "camera/60_director.lua",
     "camera/70_camcore.lua",
@@ -51,6 +51,7 @@ local ORDER = {
     "ui/tabs/light.lua",
     "ui/tabs/estudio.lua",
     "ui/tabs/gimbal.lua",
+    "ui/tabs/props.lua",
     "ui/tabs/fun.lua",
     "ui/tabs/bodycolor.lua",
     "ui/tabs/poses.lua",
@@ -139,7 +140,7 @@ end
 table.clear(sources)
 
 if #failedList == 0 then
-    print(("[UCam] Universal Camera Pro v10.5 cargado OK (%d partes)."):format(loaded))
+    print(("[UCam] Universal Camera Pro v11 cargado OK (%d partes). Local: props, guias, Replay Pro."):format(loaded))
 else
     warn(("[UCam] Carga completada con %d errores. Fallaron: %s"):format(
         #failedList,

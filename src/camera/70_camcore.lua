@@ -767,11 +767,6 @@ function UCam.updateCamera(deltaTime)
         local cur = UCam.camera.FieldOfView
         local alpha = UCam.clamp(deltaTime * (UCam.CamCore.ZoomSpeed or 10), 0, 1)
         UCam.camera.FieldOfView = UCam.clamp(UCam.lerpNum(cur, UCam.CamCore.TargetFOV, alpha), UCam.MIN_FOV, UCam.MAX_FOV)
-        -- v9 FIX: el zoom cambia el FOV base; si no, el MotionBlur tira de
-        -- vuelta al FOV obsoleto y ambos efectos pelean.
-        if UCam.CamCore._mbBaseFOV then
-            UCam.CamCore._mbBaseFOV = UCam.camera.FieldOfView
-        end
         if math.abs(UCam.camera.FieldOfView - UCam.CamCore.TargetFOV) < 0.05 then
             UCam.CamCore.TargetFOV = nil
         end
@@ -804,31 +799,8 @@ function UCam.updateCamera(deltaTime)
         end
     end
 
-    -- v7: Motion blur simulado — sobrescribe el FOV levemente o usa la viñeta
-    -- existente como overlay. Aquí solo engrosamos la viñeta si MB está activo.
-    -- (Implementación ligera: no crea GUIs extra para no competir con la viñeta.)
-    -- v8.1 FIX: antes solo SUMABA FOV (subía monótonamente hasta MAX_FOV).
-    -- Ahora guarda el FOV base y lerp de vuelta al FOV base cuando no hay giro.
-    if UCam.CamCore.MotionBlur and not UCam.Spectate.Active then
-        if UCam.CamCore._mbBaseFOV == nil then
-            UCam.CamCore._mbBaseFOV = UCam.camera.FieldOfView
-        end
-        local delta = UCam.cameraYaw - (UCam.CamCore._prevYaw or UCam.cameraYaw)
-        UCam.CamCore._prevYaw = UCam.cameraYaw
-        if math.abs(delta) > 0.02 and UCam.CamCore.MBAmount > 0 then
-            local tmp = UCam.CamCore._mbBaseFOV + math.abs(delta) * UCam.CamCore.MBAmount * 5
-            UCam.camera.FieldOfView = UCam.clamp(tmp, UCam.MIN_FOV, UCam.MAX_FOV)
-        else
-            -- Restaurar suavemente al FOV base (lerp de vuelta)
-            local cur = UCam.camera.FieldOfView
-            local base = UCam.CamCore._mbBaseFOV
-            if math.abs(cur - base) > 0.05 then
-                UCam.camera.FieldOfView = UCam.lerpNum(cur, base, UCam.clamp(deltaTime * 6, 0, 1))
-            end
-        end
-    else
-        UCam.CamCore._mbBaseFOV = nil
-    end
+    -- v11: MotionBlur eliminado — no difuminaba nada (solo subia el FOV al
+    -- girar rapido), un efecto engañoso que además pisaba el FOV del usuario.
 
     if UCam.CameraTransition.Active then
         UCam.CameraTransition.Elapsed = UCam.CameraTransition.Elapsed + deltaTime

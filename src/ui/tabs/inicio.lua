@@ -1,36 +1,35 @@
 -- ============================================================
--- Universal Camera Pro v8 · ui/inicio
+-- Universal Camera Pro v11 · ui/inicio
 -- Pestaña Inicio: camara libre, ocultar HUD/personaje, auto-HUD,
 -- captura de pantalla, teletransporte y "Restablecer todos los valores".
--- v8: migrado a i18n (UCam.T).
+-- v11: texto directo (eliminado i18n).
 -- ============================================================
 local UCam = _G.UCam
 
 function UCam.build_inicio(Window)
-    local T = UCam.T
-    local InicioTab = Window:CreateTab(T("tab_inicio"), "home")
-    InicioTab:CreateSection(T("inicio_section1"))
+    local InicioTab = Window:CreateTab("🎬 Inicio", "home")
+    InicioTab:CreateSection("Cámara Libre")
 
     InicioTab:CreateButton({
-        Name     = T("inicio_toggle_cam"),
+        Name     = "Activar / Desactivar Cámara",
         Callback = UCam.toggleFreeCam,
     })
 
     InicioTab:CreateToggle({
-        Name         = T("inicio_hide_hud"),
+        Name         = "Ocultar HUD",
         CurrentValue = false,
         Callback     = UCam.setHudHidden,
     })
 
     InicioTab:CreateToggle({
-        Name         = T("inicio_hide_char"),
+        Name         = "Ocultar Mi Personaje",
         CurrentValue = false,
         Callback     = UCam.setCharacterHidden,
     })
 
     -- v6: auto-ocultar el HUD al activar la camara libre
     InicioTab:CreateToggle({
-        Name         = T("inicio_auto_hud"),
+        Name         = "Auto-ocultar HUD con cámara libre",
         CurrentValue = UCam.AutoHUD.Enabled,
         Callback     = function(v)
             UCam.AutoHUD.Enabled = v
@@ -86,10 +85,10 @@ function UCam.build_inicio(Window)
         end,
     })
 
-    InicioTab:CreateSection(T("inicio_quick"))
+    InicioTab:CreateSection("Acciones rápidas")
 
     InicioTab:CreateButton({
-        Name     = T("inicio_screenshot"),
+        Name     = "Captura de pantalla (ocultar UI 3s)",
         Callback = function()
             if not UCam.freeCamEnabled and not UCam.Spectate.Active then
                 UCam.notify("Info", "Activa la camara primero.")
@@ -116,7 +115,7 @@ function UCam.build_inicio(Window)
     })
 
     InicioTab:CreateButton({
-        Name     = T("inicio_tp_cam"),
+        Name     = "Teletransportar cámara al personaje",
         Callback = function()
             if not UCam.freeCamEnabled then
                 UCam.notify("Info", "Activa la camara libre primero.")
@@ -134,7 +133,7 @@ function UCam.build_inicio(Window)
 
     -- v8: "Restablecer todos los valores"
     InicioTab:CreateButton({
-        Name     = T("inicio_reset_all"),
+        Name     = "Restablecer todos los valores",
         Callback = function()
             UCam.currentSpeed                                      = UCam.DEFAULTS.currentSpeed
             UCam.MOVEMENT_SMOOTHING                                = UCam.DEFAULTS.movementSmoothing
@@ -166,7 +165,7 @@ function UCam.build_inicio(Window)
             UCam.Waypoint.Roll                                     = 0
             UCam.Waypoint.CurveMode                                = "Linear"
             UCam.Waypoint.PreviewArrows                            = false
-            UCam.Waypoint.Next                                     = { useFOV = false, fov = 70, roll = 0, speed = 1, hold = 0, label = "", focusTarget = "" }
+            UCam.Waypoint.Next                                     = { useFOV = false, fov = 70, roll = 0, speed = 1, hold = 0, label = "" }
             UCam.Crane.Height                                      = UCam.DEFAULTS.craneHeight
             UCam.Crane.SpinSpeed                                   = UCam.DEFAULTS.craneSpinSpeed
             UCam.Dolly.Distance                                    = UCam.DEFAULTS.dollyDistance
@@ -218,20 +217,7 @@ function UCam.build_inicio(Window)
             if UCam.Letterbox.Enabled then UCam.applyLetterbox() end
 
             local s = UCam.UISliders
-            pcall(function() s.speedSlider:Set(UCam.currentSpeed) end)
-            -- v8.1: slowMoIntensitySlider eliminado
-            pcall(function() s.smoothSlider:Set(UCam.MOVEMENT_SMOOTHING) end)
-            pcall(function() s.sensSlider:Set(UCam.MOUSE_SENSITIVITY) end)
-            pcall(function() s.sprintSlider:Set(UCam.SPRINT_MULTIPLIER) end)
-            pcall(function() s.orbitDistSlider:Set(UCam.Orbit.Distance) end)
-            pcall(function() s.orbitHeightSlider:Set(UCam.Orbit.Height) end)
-            pcall(function() s.orbitSpeedSlider:Set(UCam.Orbit.Speed) end)
-            pcall(function() s.fovSlider:Set(UCam.DEFAULTS.defaultFov) end)
             pcall(function() s.modeDropdown:Set({ UCam.camMode }) end)
-            pcall(function() s.vertigoMinSlider:Set(UCam.Vertigo.MinDistance) end)
-            pcall(function() s.vertigoMaxSlider:Set(UCam.Vertigo.MaxDistance) end)
-            pcall(function() s.vertigoSpeedSlider:Set(UCam.Vertigo.Speed) end)
-            pcall(function() s.vertigoFovSlider:Set(UCam.Vertigo.BaseFOV) end)
             pcall(function() UCam.UIRefs.FilterDropdown:Set({ UCam.Filters[UCam.currentFilterIndex].Name }) end)
 
             if UCam.freeCamEnabled then UCam.camera.FieldOfView = UCam.DEFAULTS.defaultFov end

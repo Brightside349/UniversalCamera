@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v10 - extras locales
+-- Universal Camera Pro v11 - extras locales
 --
 -- Integraciones pequeñas que conectan funciones ya existentes:
 --   Capture/Clean Shot, guías de composición, recovery y metadata
@@ -262,6 +262,9 @@ function UCam.recoverSession()
     call("stopBodyColor")
     call("stopPlayerMod")
     call("restoreAllPlayers")
+    if UCam.Props and UCam.Props.MoveMode then
+        call("attachPropToCamera", false)
+    end
     call("destroyGreenScreen")
     call("destroyLetterbox")
     call("destroyVignetteGui")

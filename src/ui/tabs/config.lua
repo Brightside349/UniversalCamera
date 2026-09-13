@@ -1,12 +1,12 @@
 -- ============================================================
--- Universal Camera Pro v8 · ui/config
--- Pestaña Ajustes: keybinds, idioma (i18n) y gestión de plugins.
+-- Universal Camera Pro v11 · ui/config
+-- Pestaña Ajustes: keybinds, notificaciones, gamepad, UI y plugins.
+-- v11: eliminado el selector de idioma (i18n retirado).
 -- ============================================================
 local UCam = _G.UCam
 
 function UCam.build_config(Window)
-    local T = UCam.T
-    local ConfigTab = Window:CreateTab(T("tab_config"), "settings")
+    local ConfigTab = Window:CreateTab("⚙️ Ajustes", "settings")
 
     ConfigTab:CreateSection("Teclas")
     ConfigTab:CreateKeybind({
@@ -181,39 +181,6 @@ function UCam.build_config(Window)
     })
 
     -- ========================================================
-    -- v8: IDIOMA (i18n)
-    -- ========================================================
-    ConfigTab:CreateSection("Idioma / Language / Idioma")
-
-    local localeDisplay = {}
-    local localeCodes   = UCam.getAvailableLocales()
-    for _, code in ipairs(localeCodes) do
-        localeDisplay[#localeDisplay+1] = ("%s (%s)"):format(
-            UCam.getLocaleDisplayName(code), code)
-    end
-
-    ConfigTab:CreateDropdown({
-        Name            = "Seleccionar idioma",
-        Options         = localeDisplay,
-        CurrentOption   = { ("%s (%s)"):format(UCam.getLocaleDisplayName(UCam.Locale), UCam.Locale) },
-        MultipleOptions = false,
-        Callback        = function(o)
-            local v = UCam.resolveDropdownValue(o)
-            if not v then return end
-            -- el codigo está entre paréntesis al final: "Español (es)"
-            local code = v:match("%(([%a]+)%)%s*$")
-            if code then
-                UCam.setLocale(code)
-            end
-        end,
-    })
-
-    ConfigTab:CreateParagraph({
-        Title   = "Nota",
-        Content = "El cambio de idioma se guarda automáticamente. Recarga el script (o reinicia) para que toda la UI se reconstruya en el nuevo idioma.",
-    })
-
-    -- ========================================================
     -- v8: PERFORMANCE MONITOR (debug)
     -- ========================================================
     ConfigTab:CreateSection("Performance (debug)")
@@ -300,27 +267,8 @@ function UCam.build_config(Window)
         CurrentValue = UCam.UISettings.Compact,
         Callback = function(v) UCam.UISettings.Compact = v; UCam.applyUISettings() end,
     })
-    local selectedScene = 1
-    ConfigTab:CreateDropdown({
-        Name = "Ranura de escena",
-        Options = { "Escena 1", "Escena 2", "Escena 3", "Escena 4", "Escena 5" },
-        CurrentOption = { "Escena 1" }, MultipleOptions = false,
-        Callback = function(o)
-            local v = UCam.resolveDropdownValue(o)
-            selectedScene = tonumber(v and v:match("%d+")) or 1
-        end,
-    })
-    ConfigTab:CreateButton({
-        Name = "Guardar escena actual",
-        Callback = function() UCam.captureScene(selectedScene); UCam.notify("Escenas", "Escena guardada.") end,
-    })
-    ConfigTab:CreateButton({
-        Name = "Aplicar escena",
-        Callback = function()
-            if UCam.applyScene(selectedScene) then UCam.notify("Escenas", "Escena aplicada.")
-            else UCam.notify("Escenas", "La ranura está vacía.", 3) end
-        end,
-    })
+    -- v11: la gestión de Escenas vive solo en la pestaña Creator (tenía
+    -- renombrar/metadata; aquí estaba duplicada sin esas funciones).
 
     -- ========================================================
     -- v8: PLUGINS
