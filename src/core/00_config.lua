@@ -231,6 +231,7 @@ UCam.Hud = {
     CharacterHidden = false,
     Transparencies = {},
     CustomStates = {},
+    CoreGuiStates = {},
 }
 
 -- v6: 14 modos de camara

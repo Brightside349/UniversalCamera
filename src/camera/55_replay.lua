@@ -35,7 +35,7 @@ local FRAME_INTERVAL  = 1 / RECORD_FPS
 local _recordConn     = nil         -- conexión Heartbeat para grabar
 local _playConn       = nil         -- conexión Heartbeat para reproducir
 local _recordTimer    = 0           -- acumulador de tiempo entre frames
-local _playHead       = 0           -- índice de frame actual en playback (float)
+local _playTime       = 0           -- tiempo real actual de playback (segundos)
 
 -- ============================================================
 -- HELPERS
@@ -99,6 +99,29 @@ local function sampleFrames(frames, pos)
     local fov = lerpFOV(frames[i1].fov, frames[i2].fov, t)
 
     return cf, fov
+end
+
+-- Muestrea por timestamp real. No asume que la grabación tenga exactamente
+-- RECORD_FPS muestras por segundo.
+local function sampleFramesAtTime(frames, timeSecs)
+    local n = #frames
+    if n == 0 then return nil, 70 end
+    if n == 1 or timeSecs <= (frames[1].t or 0) then return frames[1].cf, frames[1].fov end
+    if timeSecs >= (frames[n].t or 0) then return frames[n].cf, frames[n].fov end
+
+    local lo, hi = 1, n
+    while lo <= hi do
+        local mid = math.floor((lo + hi) / 2)
+        if (frames[mid].t or 0) <= timeSecs then lo = mid + 1 else hi = mid - 1 end
+    end
+    local i1 = math.clamp(hi, 1, n - 1)
+    local i2 = i1 + 1
+    local t1, t2 = frames[i1].t or 0, frames[i2].t or t1
+    local alpha = math.clamp((timeSecs - t1) / math.max(t2 - t1, 0.000001), 0, 1)
+    local i0 = math.max(1, i1 - 1)
+    local i3 = math.min(n, i2 + 1)
+    return catmullRomCFrame(frames[i0].cf, frames[i1].cf, frames[i2].cf, frames[i3].cf, alpha),
+        lerpFOV(frames[i1].fov, frames[i2].fov, alpha)
 end
 
 -- ============================================================
@@ -195,9 +218,10 @@ function UCam.startPlayback()
         UCam.stopRecording()
     end
 
+    if UCam.Replay.Playing then UCam.stopPlayback() end
     UCam.Replay.Playing = true
     UCam.Replay.Paused  = false
-    _playHead = 1
+    _playTime = 0
 
     -- Entrar en modo cámara scriptable (igual que Director)
     UCam.camera.CameraType = Enum.CameraType.Scriptable
@@ -208,25 +232,24 @@ function UCam.startPlayback()
         local frames = UCam.Replay.Frames
         local n      = #frames
 
-        -- Avanzar playhead según velocidad y fps grabado
-        _playHead = _playHead + (dt * RECORD_FPS * UCam.Replay.PlaybackSpeed)
+        -- Avanzar usando segundos reales, no el número supuesto de muestras.
+        _playTime = _playTime + (dt * UCam.Replay.PlaybackSpeed)
+        local totalDuration = frames[n].t or 0
+        UCam.Replay.CurrentTime = _playTime
 
-        -- Actualizar CurrentTime para la UI (en segundos)
-        UCam.Replay.CurrentTime = (_playHead - 1) / RECORD_FPS
-
-        if _playHead > n then
+        if _playTime > totalDuration then
             if UCam.Replay.Loop then
-                _playHead = 1
+                _playTime = 0
                 UCam.Replay.CurrentTime = 0
             else
-                _playHead = n
+                _playTime = totalDuration
                 UCam.stopPlayback()
                 return
             end
         end
 
         -- Samplear y aplicar
-        local cf, fov = sampleFrames(frames, _playHead)
+        local cf, fov = sampleFramesAtTime(frames, _playTime)
         if cf then
             UCam.camera.CFrame = cf
             UCam.camera.FieldOfView = fov
@@ -267,6 +290,7 @@ function UCam.stopPlayback()
     end
 
     UCam.Replay.CurrentTime = 0
+    _playTime = 0
     UCam.notify("Replay", "Reproducción detenida.")
 end
 
@@ -278,12 +302,11 @@ function UCam.seekReplay(timeSecs)
 
     local totalDuration = frames[n].t
     timeSecs = math.clamp(timeSecs, 0, totalDuration)
-    _playHead = 1 + (timeSecs * RECORD_FPS)
-    _playHead = math.clamp(_playHead, 1, n)
-    UCam.Replay.CurrentTime = timeSecs
+    _playTime = math.clamp(timeSecs, 0, totalDuration)
+    UCam.Replay.CurrentTime = _playTime
 
     -- Aplicar el frame inmediatamente para que la UI lo refleje
-    local cf, fov = sampleFrames(frames, _playHead)
+    local cf, fov = sampleFramesAtTime(frames, _playTime)
     if cf then
         UCam.camera.CFrame = cf
         UCam.camera.FieldOfView = fov
