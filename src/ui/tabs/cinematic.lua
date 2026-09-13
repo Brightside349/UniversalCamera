@@ -173,6 +173,55 @@ function UCam.build_cinematic(Window)
             end
         end,
     })
+
+    CinematicTab:CreateSection("v12.2 - Shot Builder")
+    CinematicTab:CreateParagraph({
+        Title = "Crear una toma sobre el Director",
+        Content = "Genera dos waypoints editables usando la cámara actual y un objetivo. No inicia la reproducción automáticamente.",
+    })
+    local shotTemplate = "Dolly In"
+    CinematicTab:CreateDropdown({
+        Name = "Plantilla de toma",
+        Options = { "Dolly In", "Dolly Out", "Orbit", "Crane", "Reveal" },
+        CurrentOption = { UCam.ShotBuilder and UCam.ShotBuilder.Template or shotTemplate },
+        MultipleOptions = false,
+        Callback = function(o)
+            shotTemplate = UCam.resolveDropdownValue(o) or shotTemplate
+            if UCam.ShotBuilder then UCam.ShotBuilder.Template = shotTemplate end
+        end,
+    })
+    CinematicTab:CreateDropdown({
+        Name = "Objetivo de la toma",
+        Options = UCam.getShotBuilderTargetModes and UCam.getShotBuilderTargetModes() or { "Propio", "Punto actual" },
+        CurrentOption = { UCam.ShotBuilder and UCam.ShotBuilder.TargetMode or "Propio" },
+        MultipleOptions = false,
+        Callback = function(o)
+            local value = UCam.resolveDropdownValue(o)
+            if value and UCam.ShotBuilder then UCam.ShotBuilder.TargetMode = value end
+        end,
+    })
+    CinematicTab:CreateSlider({
+        Name = "Duración de la toma",
+        Range = { 1, 30 },
+        Increment = 0.5,
+        Suffix = " s",
+        CurrentValue = UCam.ShotBuilder and UCam.ShotBuilder.Duration or 5,
+        Callback = function(v) if UCam.ShotBuilder then UCam.ShotBuilder.Duration = v end end,
+    })
+    CinematicTab:CreateSlider({
+        Name = "Arco de órbita",
+        Range = { -180, 180 },
+        Increment = 5,
+        Suffix = " grados",
+        CurrentValue = UCam.ShotBuilder and UCam.ShotBuilder.ArcDegrees or 90,
+        Callback = function(v) if UCam.ShotBuilder then UCam.ShotBuilder.ArcDegrees = v end end,
+    })
+    CinematicTab:CreateButton({
+        Name = "Crear toma editable",
+        Callback = function()
+            if UCam.buildShot then UCam.buildShot(shotTemplate) end
+        end,
+    })
     local directorToggle = CinematicTab:CreateToggle({
         Name = "Reproducir / Detener ruta",
         CurrentValue = false,

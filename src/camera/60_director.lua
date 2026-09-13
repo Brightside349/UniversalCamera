@@ -90,6 +90,8 @@ local function refreshWaypointDropdown()
     end
 end
 
+UCam.refreshWaypointDropdown = refreshWaypointDropdown
+
 function UCam.directorGetWaypointOptions()
     return waypointOptions()
 end
