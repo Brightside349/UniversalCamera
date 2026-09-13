@@ -1,11 +1,17 @@
-# Universal Camera Pro v12 · Runtime estable + herramientas cinematográficas
+# Universal Camera Pro v12.1 · Runtime estable + herramientas cinematográficas
 
 Camara libre cinematografica para Roblox con modos de camara, espectador,
 Director, Replay Pro local, filtros, guias de composicion, Clean Shot,
 escenas, herramientas locales para creadores y **Props**: decoraciones
 que traes por ID de asset y solo tu ves.
 
-> Version estable: `v12.0.0`.
+### v12.1
+
+- Intensidad global del look entre 0% y 100%, aplicable a filtros built-in y custom.
+- Intensidad de desenfoque cercano del DOF configurable.
+- Guias exactas para 16:9, 9:16, 1:1 y 4:5 que se recalculan al redimensionar el viewport.
+
+> Version estable: `v12.1.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -15,7 +21,7 @@ que traes por ID de asset y solo tu ves.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.0.0`.
+La version publicada apunta al tag `v12.1.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -26,7 +32,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.0.0"
+local VERSION = "v12.1.0"
 ```
 
 ## Props locales (v11)

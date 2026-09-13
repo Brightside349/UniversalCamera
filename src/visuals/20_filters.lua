@@ -86,11 +86,13 @@ function UCam.applyFilterByName(name)
 end
 
 function UCam.applyCustomEditingLive()
+    local intensity = UCam.clamp(tonumber(UCam.LookIntensity) or 1, 0, 1)
+    local customTint = Color3.fromRGB(UCam.customEditing.R, UCam.customEditing.G, UCam.customEditing.B)
     UCam.applyColorCorrection(
-        UCam.customEditing.Brightness,
-        UCam.customEditing.Contrast,
-        UCam.customEditing.Saturation,
-        Color3.fromRGB(UCam.customEditing.R, UCam.customEditing.G, UCam.customEditing.B)
+        UCam.customEditing.Brightness * intensity,
+        UCam.customEditing.Contrast * intensity,
+        UCam.customEditing.Saturation * intensity,
+        Color3.new(1 + (customTint.R - 1) * intensity, 1 + (customTint.G - 1) * intensity, 1 + (customTint.B - 1) * intensity)
     )
     UCam.customFilterLiveApplied = true
 end
@@ -121,9 +123,9 @@ function UCam.applyDOF()
     local effect         = UCam.getOrCreateEffect(UCam.Lighting, UCam.DOF_EFFECT_NAME, "DepthOfFieldEffect")
     effect.Enabled       = UCam.DOF.Enabled
     effect.FarIntensity  = UCam.DOF.FarIntensity
+    effect.NearIntensity = UCam.DOF.NearIntensity or 0
     effect.FocusDistance = UCam.DOF.FocusDistance
     effect.InFocusRadius = UCam.DOF.InFocusRadius
-    effect.NearIntensity = 0
 end
 
 function UCam.applySunRays()
@@ -332,6 +334,7 @@ UCam._viewportResizeConn = UCam.trackConnection(
         pcall(function()
             if UCam.Letterbox.Enabled then UCam.applyLetterbox() end
             if UCam.Vignette.Enabled then UCam.applyVignette() end
+            if UCam.refreshGuides then UCam.refreshGuides() end
         end)
     end),
     "filters.viewportResize"
@@ -379,6 +382,12 @@ local function blendFilters(fA, fB, mix)
     }
 end
 
+local function applyLookIntensity(filter)
+    local intensity = UCam.clamp(tonumber(UCam.LookIntensity) or 1, 0, 1)
+    local neutral = { Brightness = 0, Contrast = 0, Saturation = 0, TintColor = Color3.new(1, 1, 1) }
+    return blendFilters(neutral, filter, intensity)
+end
+
 -- v9: ChromaticAberration eliminado — el overlay (dos frames tintados con
 -- BackgroundTransparency 0.92) apenas se veía y no era una aberración real.
 
@@ -403,6 +412,8 @@ UCam.applyFilter = function(index, instant)
         local fB = UCam.Filters[UCam.clamp(UCam.FilterCombine.IndexB, 1, #UCam.Filters)]
         if fB then target = blendFilters(target, fB, UCam.FilterCombine.Mix) end
     end
+
+    target = applyLookIntensity(target)
 
     -- Filtro temporal: registra el inicio si está activo
     if UCam.FilterTemporal.Active then
@@ -429,8 +440,21 @@ UCam.applyFilter = function(index, instant)
     end
 end
 
+function UCam.setLookIntensity(value)
+    UCam.LookIntensity = UCam.clamp(tonumber(value) or 1, 0, 1)
+    if UCam.customFilterLiveApplied then
+        UCam.applyCustomEditingLive()
+    else
+        UCam.applyFilter(UCam.currentFilterIndex, true)
+    end
+    if UCam.scheduleSave then UCam.scheduleSave() end
+    return UCam.LookIntensity
+end
+
 -- Update de filtros (transición lerp + temporal auto-fade). Se llama desde
 -- el loop de cámara (updateCamera) o un heartbeat dedicado.
+UCam.applyFilter(UCam.currentFilterIndex, true)
+
 function UCam.updateFilters(deltaTime)
     if UCam.FilterTransition.Active then
         UCam.FilterTransition.Elapsed = UCam.FilterTransition.Elapsed + (deltaTime or 0)

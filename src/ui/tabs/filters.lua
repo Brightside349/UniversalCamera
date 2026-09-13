@@ -42,6 +42,21 @@ function UCam.build_filters(Window)
         end,
     })
 
+    FilterTab:CreateSlider({
+        Name = "Intensidad global del look",
+        Range = { 0, 100 },
+        Increment = 5,
+        Suffix = "%",
+        CurrentValue = (UCam.LookIntensity or 1) * 100,
+        Callback = function(v)
+            UCam.setLookIntensity((tonumber(v) or 100) / 100)
+        end,
+    })
+    FilterTab:CreateParagraph({
+        Title = "Look no destructivo",
+        Content = "0% deja la imagen neutra; 100% aplica el preset completo.",
+    })
+
     FilterTab:CreateSection("Filtros built-in (botones)")
     for _, f in ipairs(UCam.Filters) do
         FilterTab:CreateButton({
