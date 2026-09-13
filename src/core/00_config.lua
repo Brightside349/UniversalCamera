@@ -31,7 +31,7 @@
 --         UCam.dutchRoll, UCam.currentFilterIndex,
 --         UCam.BLOOM_EFFECT_NAME, UCam.DOF_EFFECT_NAME,
 --         UCam.SUNRAYS_EFFECT_NAME,
-    UCam.resolveDropdownValue
+--         UCam.resolveDropdownValue
 -- ============================================================
 local UCam = _G.UCam
 if not UCam then
