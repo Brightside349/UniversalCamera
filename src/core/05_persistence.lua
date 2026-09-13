@@ -107,10 +107,11 @@ local SCHEMA = {
     Shake = { Intensity = nil, Pattern = nil },
     FovPulse = { Amplitude = nil, Speed = nil },
 
-    -- CamCore (smooth zoom, motion blur, etc.)
+    -- CamCore (smooth zoom, auto-exposure)
+    -- v11: MotionBlur/MBAmount retirados del schema (feature eliminada).
     CamCore = {
         SmoothZoom = nil, ZoomSpeed = nil,
-        AutoExposure = nil, MotionBlur = nil, MBAmount = nil,
+        AutoExposure = nil,
         ExposureRange = { min = nil, max = nil },
         -- SavedPositions NO va aquí: ver serializeCameraPositions
     },
@@ -119,7 +120,6 @@ local SCHEMA = {
     AutoHUD = { Enabled = nil },
     LookAtLock = { HeightOffset = nil, Smoothing = nil },
     Guides = { Enabled = nil, Type = nil, Opacity = nil },
-    Capture = { HideAfterSeconds = nil },
 
     -- Lighting
     LightingTweaks = {
@@ -178,9 +178,6 @@ local SCHEMA = {
         Notifications = { Mode = nil, Duration = nil, MuteOnCapture = nil },
     },
 
-    -- v8: Perfiles (Slots se serializa aparte por su tamaño)
-    Locale = nil,
-
     -- Poses / BodyColor / PlayerMod (presets custom del usuario)
     -- v8.1: CustomPoses y Presets se serializan con funciones especiales
     -- (contienen CFrames y Color3 que el deepCopy genérico descarta)
@@ -197,7 +194,7 @@ local SCHEMA = {
         Duration = nil, Loop = nil, Easing = nil,
         UseFOV = nil, FOV = nil, UseRoll = nil, Roll = nil,
         CurveMode = nil, PreviewArrows = nil,
-        Next = { useFOV = nil, fov = nil, roll = nil, speed = nil, hold = nil, label = nil, focusTarget = nil },
+        Next = { useFOV = nil, fov = nil, roll = nil, speed = nil, hold = nil, label = nil },
     },
     Director = {
         SavedRoutes = nil,
@@ -555,8 +552,50 @@ local function serFavorites(favs)
 end
 
 -- ============================================================
--- NÚCLEO: construir tabla JSON-safe desde UCam.* según SCHEMA
+-- v11: Serializador de PROPS locales
+-- Cada prop: { assetId (number), cf (12 componentes), scale, canCollide, name }
 -- ============================================================
+local function serializeProps(items)
+    if type(items) ~= "table" or #items == 0 then return nil end
+    local out = {}
+    for i, item in ipairs(items) do
+        if type(item) == "table" and item.assetId and typeof(item.cf) == "CFrame" then
+            out[#out + 1] = {
+                assetId   = item.assetId,
+                cf        = serCFrame(item.cf),
+                scale     = tonumber(item.scale) or 1,
+                canCollide = item.canCollide == true,
+                name      = tostring(item.name or ""):sub(1, 60),
+            }
+        end
+    end
+    if #out == 0 then return nil end
+    return out
+end
+
+local function deserializeProps(saved)
+    if type(saved) ~= "table" then return nil end
+    local out = {}
+    for _, p in ipairs(saved) do
+        if type(p) == "table" and tonumber(p.assetId) and type(p.cf) == "table" then
+            local ok, cf = pcall(desCFrame, p.cf)
+            if ok then
+                out[#out + 1] = {
+                    assetId    = tonumber(p.assetId),
+                    cf         = cf,
+                    scale      = tonumber(p.scale) or 1,
+                    canCollide = p.canCollide == true,
+                    name       = tostring(p.name or ""),
+                }
+            end
+        end
+    end
+    if #out == 0 then return nil end
+    return out
+end
+
+-- ============================================================
+-- NÚCLEO: construir tabla JSON-safe desde UCam.* según SCHEMA
 local function buildConfigTable()
     local cfg = {}
     for topKey, schemaEntry in pairs(SCHEMA) do
@@ -623,7 +662,7 @@ function UCam.saveConfig()
 
     local cfg = buildConfigTable()
     -- Campos extra no en SCHEMA pero que queremos persistir
-    cfg._version = "10.5"
+    cfg._version = "11.0"
     cfg._savedAt = os.time()
     -- v8: perfiles slots + quick (copia directa; NO contienen CFrames anidados)
     if UCam.Profiles then
@@ -632,6 +671,8 @@ function UCam.saveConfig()
             QuickSlots = UCam.Profiles.QuickSlots or {},
         }
     end
+    -- v11: props locales (assetId + CFrame + escala + colisión)
+    cfg._props = serializeProps(UCam.Props and UCam.Props.Items)
     if UCam.Scenes then cfg._scenes = UCam.Scenes.Slots or {} end
     if UCam.UISettings then cfg._uiSettings = UCam.UISettings end
     if UCam.Gamepad then cfg._gamepad = { Enabled = UCam.Gamepad.Enabled } end
@@ -740,6 +781,17 @@ function UCam.loadConfig()
         if UCam.applyUISettings then UCam.applyUISettings() end
     end
     if cfg._gamepad and UCam.Gamepad then UCam.Gamepad.Enabled = cfg._gamepad.Enabled == true end
+    -- v11: re-spawnear props guardados de este place
+    if cfg._props then
+        local restored = deserializeProps(cfg._props)
+        if restored and UCam.spawnPropsFromData then
+            task.spawn(function()
+                -- Esperar a que el mundo exista antes de colocar los props
+                task.wait(2)
+                UCam.spawnPropsFromData(restored)
+            end)
+        end
+    end
     -- v8.1 FIX: restaurar favoritos desde nombres resueltos a instancias Player
     if cfg.SpectateNames and type(cfg.SpectateNames) == "table" and UCam.Spectate then
         local favs = {}
@@ -836,6 +888,16 @@ function UCam.importConfig(base64)
     if cfg._profiles and UCam.Profiles then
         UCam.Profiles.Slots      = cfg._profiles.Slots      or {}
         UCam.Profiles.QuickSlots = cfg._profiles.QuickSlots or {}
+    end
+    -- v11: props de una config importada (solo si el usuario no tiene props aún)
+    if cfg._props and UCam.Props and #UCam.Props.Items == 0 then
+        local restored = deserializeProps(cfg._props)
+        if restored and UCam.spawnPropsFromData then
+            task.spawn(function()
+                task.wait(2)
+                UCam.spawnPropsFromData(restored)
+            end)
+        end
     end
     -- v8.1 FIX: restaurar favoritos desde nombres
     if cfg.SpectateNames and type(cfg.SpectateNames) == "table" and UCam.Spectate then

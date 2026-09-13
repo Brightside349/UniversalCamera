@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v10.5 · UI builder
+-- Universal Camera Pro v11 · UI builder
 -- Construye la ventana, tabs estáticos/dinámicos y autosave.
 --
 -- Dependencias: core/00_config.lua, core/05_persistence.lua,
@@ -9,9 +9,9 @@ local UCam = _G.UCam
 
 function UCam.buildUI()
     local Window = UCam.Rayfield:CreateWindow({
-        Name = "Universal Camera Pro v10.5 By Cocoa Feliz",
-        LoadingTitle = "Universal Camera Pro v10.5",
-        LoadingSubtitle = "Cargando Creator tools locales...",
+        Name = "Universal Camera Pro v11 By Cocoa Feliz",
+        LoadingTitle = "Universal Camera Pro v11",
+        LoadingSubtitle = "Cargando herramientas locales + Props...",
         Icon = 4483362458,
         ToggleUIKeybind = Enum.KeyCode.Delete,
         DisableRayfieldPrompts = true,
@@ -41,33 +41,13 @@ function UCam.buildUI()
         end
     end
 
-    if UCam.scheduleSave and UCam.trackConnection then
-        local function snapNow()
-            local parts = {}
-            parts[#parts+1] = tostring(UCam.camMode)
-            parts[#parts+1] = tostring(UCam.currentSpeed)
-            parts[#parts+1] = tostring(UCam.MOUSE_SENSITIVITY)
-            parts[#parts+1] = tostring(UCam.currentFilterIndex)
-            parts[#parts+1] = tostring(UCam.Orbit and UCam.Orbit.Distance)
-            parts[#parts+1] = tostring(UCam.Follow and UCam.Follow.Distance)
-            parts[#parts+1] = tostring(UCam.Bloom and UCam.Bloom.Intensity)
-            parts[#parts+1] = tostring(UCam.DOF and UCam.DOF.FocusDistance)
-            parts[#parts+1] = tostring(UCam.Spectate and UCam.Spectate.Mode)
-            parts[#parts+1] = tostring(UCam.LightingTweaks and UCam.LightingTweaks.ClockTime)
-            parts[#parts+1] = tostring(UCam.Keybinds and UCam.Keybinds.Forward)
-            parts[#parts+1] = tostring(UCam.Keybinds and UCam.Keybinds.Sprint)
-            return table.concat(parts, "|")
-        end
-        local lastHash = snapNow()
-        UCam.trackConnection(
-            UCam.RunService.Heartbeat:Connect(function()
-                local h = snapNow()
-                if h ~= lastHash then
-                    lastHash = h
-                    UCam.scheduleSave()
-                end
-            end),
-            "Autosave:Watcher"
-        )
+    -- v11 FIX: el watcher antiguo comparaba un hash de tostring() de valores
+    -- numéricos cada Heartbeat: con floats (3.0000001) disparaba saves falsos
+    -- en bucle, y con valores estables nunca ahorraba nada real. El autosave
+    -- real ya lo disparan los módulos (persistence: scheduleSave en cada
+    -- mutación relevante, incluidos los props); aquí solo se garantiza un
+    -- guardado tras construir la UI por si loadConfig cambió algo.
+    if UCam.scheduleSave then
+        UCam.scheduleSave()
     end
 end

@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v8 · ui/info
+-- Universal Camera Pro v11 · ui/info
 -- Pestaña Info / Ayuda: documentacion de controles, modos y modulos.
 -- ============================================================
 local UCam = _G.UCam
@@ -17,9 +17,9 @@ function UCam.build_info(Window)
         "Libre: WASD + rotacion con clic derecho.\nOrbita: gira alrededor del personaje.\nTripode: fijo, solo rotacion.\nCenital: vista de pajaro (top-down).\nLateral: side-scroller cinematico.\nDron: orbitas suaves (circulo o figura 8).\nFollow: chase cam estilo hombro.\nCrashZoom: dolly-in dramatico.\nDirector: ruta de waypoints para intros/outros.\nCrane: plano de grua (sube/baja con Space/Ctrl + giro opcional).\nDolly Glide: carril cinematico (lateral / forward / diagonal).\nHandheld: camara en mano con sacudida procedural.\nRoll Axis: rotacion continua sobre el eje forward (barrel roll).\nVertigo: dolly zoom Hitchcock - el FOV se compensa mientras la camara se acerca/aleja y el fondo se deforma.\nFPV Dron: drone acrobatico con inercia y roll extremo.\nSnorricam: camara atada al personaje mirando hacia su cara.\nCable Cam: camara restringida a una linea entre dos puntos.\nSecurity Cam: camara estatica con paneo automatico lento.",
     })
     InfoTab:CreateParagraph({
-        Title   = "Como esta organizada la UI (v10)",
+        Title   = "Como esta organizada la UI (v11)",
         Content =
-        "Inicio: camara libre, ocultar HUD/personaje, auto-HUD y acciones rapidas (captura, teletransporte, restablecer todo).\nCamaras: los 18 modos y todos sus parametros agrupados por modo.\nEspectador: jugadores, auto-ciclo, estilos y FOV.\nReplay: graba el recorrido con camara libre y lo reproduce suavemente (alternativa al Director sin waypoints).\nCinematografico: letterbox, vignette, shake, FOV pulse, director y post-procesado (bloom, DOF, sun rays).\nFiltros: 30 built-in + editor custom + tus presets.\nIluminacion / Estudio / Gimbal: modulos de ambiente y bloqueo.\nDiversion: montar, fisicas, tamano, poses, aspecto y efectos visuales.\nCuerpo / Poses / Jugadores: modifica aspecto de tu personaje y otros.\nPerfiles: guarda/carga setups completos.\nAjustes: teclas + idioma.\nPlugins: extensiones cargadas de la carpeta UniversalCamera/plugins.",
+        "Inicio: camara libre, ocultar HUD/personaje, auto-HUD y acciones rapidas (captura, teletransporte, restablecer todo).\nCamaras: los 18 modos y todos sus parametros agrupados por modo.\nEspectador: jugadores, auto-ciclo, estilos y FOV.\nReplay: graba el recorrido con camara libre y lo reproduce suavemente (alternativa al Director sin waypoints).\nCinematografico: letterbox, vignette, shake, FOV pulse, director y post-procesado (bloom, DOF, sun rays).\nFiltros: 30 built-in + editor custom + tus presets.\nIluminacion / Estudio / Gimbal: modulos de ambiente y bloqueo.\nProps: coloca decoraciones locales (solo tu las ves) con ID de asset; mueve, rota y escala.\nDiversion: montar, fisicas, tamano, poses, aspecto y efectos visuales.\nCuerpo / Poses / Jugadores: modifica aspecto de tu personaje y otros.\nPerfiles: guarda/carga setups completos.\nAjustes: teclas y notificaciones.\nPlugins: extensiones cargadas de la carpeta UniversalCamera/plugins.",
     })
     InfoTab:CreateParagraph({
         Title = "V10.5 Reorganizacion de estructura",

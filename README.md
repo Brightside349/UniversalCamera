@@ -1,19 +1,21 @@
-# Universal Camera Pro v10.5 · Reorganizacion de estructura
+# Universal Camera Pro v11 · Props locales + limpieza
 
 Camara libre cinematografica para Roblox con modos de camara, espectador,
 Director, Replay Pro local, filtros, guias de composicion, Clean Shot,
-escenas y herramientas locales para creadores.
+escenas, herramientas locales para creadores y **Props**: decoraciones
+que traes por ID de asset y solo tu ves.
 
-> Version estable: `v10.5`.
+> Version estable: `v11.0`.
 >
-> Esta version reorganiza el workspace por dominios sin cambiar el contrato
-> principal: un Loader, carga secuencial y estado compartido en `_G.UCam`.
+> Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
+> escalar, snap al suelo, colisión y persistencia), eliminación de opciones
+> muertas (i18n, FunV6, MotionBlur, duplicados) y autosave real.
 
 ## Uso
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v10.5`.
+La version publicada apunta al tag `v11.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -24,8 +26,18 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v10.5"
+local VERSION = "v11.0"
 ```
+
+## Props locales (v11)
+
+1. Abre la pestaña **🪑 Props**, pega el ID del asset (mesh/modelo) y colocalo.
+2. Todo se crea en tu cliente: **nadie mas lo ve** y no se envia al servidor.
+3. Muevelo con **Mover con camara** (rueda = acercar/alejar), **Colocar donde
+   miro** (raycast) o **Apoyar en el suelo**.
+4. Rota ±15° por eje, escala 0.1x–20x y activa colision si lo necesitas.
+5. Los props se guardan en tu config por juego y **reaparecen solos** la
+   proxima sesion. `Eliminar TODOS` los borra y tambien limpia el guardado.
 
 ## Estructura del workspace
 
@@ -38,7 +50,6 @@ Universal Camera/
     ├── core/
     │   ├── 00_config.lua       # namespace, servicios y estado base
     │   ├── 05_persistence.lua  # guardado, carga, export e import
-    │   ├── 06_i18n.lua          # idiomas
     │   ├── 10_utils.lua         # helpers y cleanup transversal
     │   └── 90_init.lua          # persistencia, UI y Unload final
     ├── visuals/
@@ -53,6 +64,8 @@ Universal Camera/
     │   ├── 55_replay.lua         # grabacion y reproduccion
     │   ├── 60_director.lua       # waypoints y director
     │   └── 70_camcore.lua        # nucleo de camara y render loop
+    ├── props/
+    │   └── 45_props.lua          # props locales por ID de asset (v11)
     ├── presets/
     │   └── 57_profiles.lua      # perfiles completos
     ├── runtime/
@@ -73,7 +86,7 @@ El orden canonico esta en `Loader.lua`. Las carpetas organizan la propiedad
 de cada dominio, pero no sustituyen el orden de dependencias de Luau:
 
 ```text
-core → visuals → actors → camera → presets → runtime/extensions
+core → visuals → actors → camera → props → presets → runtime/extensions
      → ui/00_registry → ui/tabs → ui/90_builder → core/90_init
 ```
 
@@ -114,6 +127,7 @@ La API se registra en `ui/00_registry.lua` antes de cargar
 
 Los tags historicos permanecen disponibles en Git:
 
+- `v10.5`: estructura por dominios + Creator tools.
 - `v10.0.1`: ultima estructura anterior.
 - `v9.0.0`: version V9.
 - `v6.0.0`: primera modularizacion.

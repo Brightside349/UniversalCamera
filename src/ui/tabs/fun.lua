@@ -390,7 +390,7 @@ function UCam.build_fun(Window)
         Callback        = function(o)
             local v = UCam.resolveDropdownValue(o)
             if not v then return end
-            UCam.FunV6.applyMaterial(v)
+            UCam.funApplyMaterial(v)
             UCam.notify("Diversion", "Material: " .. v)
         end,
     })
@@ -408,7 +408,7 @@ function UCam.build_fun(Window)
         Name         = "Invisibilidad (local)",
         CurrentValue = false,
         Callback     = function(v)
-            UCam.FunV6.setInvisibility(v)
+            UCam.funSetInvisibility(v)
             UCam.notify("Diversion", v and "Eres invisible (solo local)." or "Visible de nuevo.")
         end,
     })
@@ -421,7 +421,7 @@ function UCam.build_fun(Window)
             if v then
                 UCam.startFun()
             else
-                UCam.FunV6.clearTrail()
+                UCam.funClearTrail()
                 if not UCam.funAnyActive() then UCam.stopFun() end
             end
             UCam.notify("Diversion", v and "Trail activado" or "Trail desactivado")
@@ -482,9 +482,9 @@ function UCam.build_fun(Window)
             UCam.Fun.Disco.Enabled = v
             if v then
                 UCam.startFun()
-                UCam.FunV6.createDisco()
+                UCam.funCreateDisco()
             else
-                UCam.FunV6.destroyDisco()
+                UCam.funDestroyDisco()
                 if not UCam.funAnyActive() then UCam.stopFun() end
             end
             UCam.notify("Diversion", v and "Disco floor activado" or "Disco floor desactivado")

@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v8 · 90_init
+-- Universal Camera Pro v11 · 90_init
 -- Paso final: carga la configuracion persistida, llama a
 -- UCam.buildUI(), notifica que arranco, declara
 -- UCam.Initialized = true y define UCam.Unload().
@@ -128,10 +128,10 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v10.5 By Cocoa Feliz",
-        "V10.5: estructura reorganizada, herramientas locales para creadores y Replay ampliado. Presiona Delete para UI."
+        "Universal Camera Pro v11 By Cocoa Feliz",
+        "V11: Props locales (decoraciones solo tuyas por ID de asset), limpieza de opciones y autosave real. Presiona Delete para UI."
     )
-    print("[UCam] Universal Camera Pro v10.5 cargado OK. Estructura reorganizada + Creator tools.")
+    print("[UCam] Universal Camera Pro v11 cargado OK. Props locales + limpieza v11.")
 else
     warn("[UCam] Error al construir la UI: " .. tostring(err))
 end

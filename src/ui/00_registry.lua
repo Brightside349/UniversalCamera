@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v10.5 · UI registry
+-- Universal Camera Pro v11 · UI registry
 -- Registra builders estáticos, tabs dinámicos de plugins y referencias
 -- de controles compartidas. La ventana se construye en 90_builder.lua.
 --
@@ -18,6 +18,7 @@ UCam._uiBuilders = {
     "light",
     "estudio",
     "gimbal",
+    "props",
     "fun",
     "bodycolor",
     "poses",
@@ -77,18 +78,8 @@ function UCam.unregisterTabBuilder(name)
     return false
 end
 
+-- v11: solo el dropdown de modo se comparte entre tabs (los 12 sliders
+-- restantes nunca se registraban ni se leían — eliminados).
 UCam.UISliders = {
     modeDropdown = nil,
-    speedSlider = nil,
-    sprintSlider = nil,
-    smoothSlider = nil,
-    fovSlider = nil,
-    sensSlider = nil,
-    orbitDistSlider = nil,
-    orbitHeightSlider = nil,
-    orbitSpeedSlider = nil,
-    vertigoMinSlider = nil,
-    vertigoMaxSlider = nil,
-    vertigoSpeedSlider = nil,
-    vertigoFovSlider = nil,
 }

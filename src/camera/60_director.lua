@@ -67,14 +67,10 @@ local function wpLabel(wp)
     return ""
 end
 
-local function wpFocusTarget(wp)
-    if type(wp) == "table" then return tostring(wp.focusTarget or "") end
-    return ""
-end
-
+-- v11: wpFocusTarget eliminado — el campo nunca afectó la reproducción.
 UCam.directorGetWP = {
     cf = wpCF, fov = wpFOV, roll = wpRoll, speed = wpSpeed,
-    hold = wpHold, label = wpLabel, focusTarget = wpFocusTarget,
+    hold = wpHold, label = wpLabel,
 }
 
 local function waypointOptions()
@@ -159,7 +155,6 @@ normalizeList = function()
                 speed = 1,
                 hold  = 0,
                 label = "",
-                focusTarget = "",
             }
         end
     end
@@ -302,7 +297,6 @@ function UCam.directorAddWaypoint(cf)
         speed = UCam.Waypoint.Next.speed or 1,
         hold  = math.clamp(tonumber(UCam.Waypoint.Next.hold) or 0, 0, 60),
         label = tostring(UCam.Waypoint.Next.label or ""):gsub("[%c;]", " "):sub(1, 60),
-        focusTarget = tostring(UCam.Waypoint.Next.focusTarget or ""):gsub("[%c;]", " "):sub(1, 60),
     }
     table.insert(UCam.Waypoint.List, wp)
     UCam.notify("Director",
@@ -477,7 +471,6 @@ function UCam.directorDeserializeRoute(str)
                     speed = #v >= 12 and v[12] or 1,
                     hold  = #v >= 13 and math.max(v[13], 0) or 0,
                     label = "",
-                    focusTarget = "",
                 })
             end
         end
