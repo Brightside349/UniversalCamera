@@ -98,7 +98,7 @@ local SCHEMA = {
     -- Cinematic
     Letterbox = { HeightRatio = nil },
     Bloom = { Intensity = nil, Size = nil, Threshold = nil },
-    DOF = { FarIntensity = nil, FocusDistance = nil, InFocusRadius = nil },
+    DOF = { FarIntensity = nil, NearIntensity = nil, FocusDistance = nil, InFocusRadius = nil },
     SunRays = { Intensity = nil, Spread = nil },
     Vignette = {
         Intensity = nil, Smoothness = nil,
@@ -135,6 +135,7 @@ local SCHEMA = {
 
     -- Filtros
     currentFilterIndex = nil,
+    LookIntensity = nil,
     FilterTransition = { Enabled = nil, Speed = nil },
     FilterCombine = { Enabled = nil, IndexA = nil, IndexB = nil, Mix = nil },
     -- CustomFilters NO va aquí: se serializa con funciones especiales

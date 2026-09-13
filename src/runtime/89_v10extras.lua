@@ -141,6 +141,27 @@ local function addGuideLine(gui, name, size, position, opacity)
     line.Parent = gui
 end
 
+local function addAspectGuide(gui, name, ratio, opacity)
+    local camera = workspace.CurrentCamera
+    local vp = camera and camera.ViewportSize or Vector2.new(16, 9)
+    local viewportRatio = vp.X / math.max(vp.Y, 1)
+    local frameW, frameH
+    if viewportRatio >= ratio then
+        frameH = vp.Y
+        frameW = frameH * ratio
+    else
+        frameW = vp.X
+        frameH = frameW / ratio
+    end
+    local left = (vp.X - frameW) * 0.5
+    local top = (vp.Y - frameH) * 0.5
+    local thickness = 2
+    addGuideLine(gui, name .. "Left", UDim2.fromOffset(thickness, frameH), UDim2.fromOffset(left, top), opacity)
+    addGuideLine(gui, name .. "Right", UDim2.fromOffset(thickness, frameH), UDim2.fromOffset(left + frameW - thickness, top), opacity)
+    addGuideLine(gui, name .. "Top", UDim2.fromOffset(frameW, thickness), UDim2.fromOffset(left, top), opacity)
+    addGuideLine(gui, name .. "Bottom", UDim2.fromOffset(frameW, thickness), UDim2.fromOffset(left, top + frameH - thickness), opacity)
+end
+
 local function buildGuides()
     UCam.destroyGuides()
     local parent = overlayParent()
@@ -165,12 +186,14 @@ local function buildGuides()
         addGuideLine(gui, "SafeRight", UDim2.fromOffset(1, 0) + UDim2.fromScale(0, 1), UDim2.fromScale(0.9, 0), opacity)
         addGuideLine(gui, "SafeTop", UDim2.fromOffset(0, 1) + UDim2.fromScale(1, 0), UDim2.fromScale(0, 0.1), opacity)
         addGuideLine(gui, "SafeBottom", UDim2.fromOffset(0, 1) + UDim2.fromScale(1, 0), UDim2.fromScale(0, 0.9), opacity)
-    elseif kind == "Vertical" then
-        -- Marco de seguridad aproximado para Shorts/Reels dentro del viewport.
-        addGuideLine(gui, "VerticalLeft", UDim2.fromOffset(1, 0) + UDim2.fromScale(0, 1), UDim2.fromScale(0.22, 0), opacity)
-        addGuideLine(gui, "VerticalRight", UDim2.fromOffset(1, 0) + UDim2.fromScale(0, 1), UDim2.fromScale(0.78, 0), opacity)
-        addGuideLine(gui, "VerticalTop", UDim2.fromOffset(0, 1) + UDim2.fromScale(1, 0), UDim2.fromScale(0, 0.1), opacity)
-        addGuideLine(gui, "VerticalBottom", UDim2.fromOffset(0, 1) + UDim2.fromScale(1, 0), UDim2.fromScale(0, 0.9), opacity)
+    elseif kind == "16:9" then
+        addAspectGuide(gui, "Aspect16x9", 16 / 9, opacity)
+    elseif kind == "9:16" or kind == "Vertical" then
+        addAspectGuide(gui, "Aspect9x16", 9 / 16, opacity)
+    elseif kind == "1:1" then
+        addAspectGuide(gui, "Aspect1x1", 1, opacity)
+    elseif kind == "4:5" then
+        addAspectGuide(gui, "Aspect4x5", 4 / 5, opacity)
     else
         addGuideLine(gui, "ThirdVerticalA", UDim2.fromOffset(1, 0) + UDim2.fromScale(0, 1), UDim2.fromScale(1 / 3, 0), opacity)
         addGuideLine(gui, "ThirdVerticalB", UDim2.fromOffset(1, 0) + UDim2.fromScale(0, 1), UDim2.fromScale(2 / 3, 0), opacity)
@@ -199,8 +222,15 @@ function UCam.setGuidesEnabled(enabled)
     return true
 end
 
+function UCam.refreshGuides()
+    if UCam.Guides and UCam.Guides.Enabled then
+        return buildGuides()
+    end
+    return true
+end
+
 function UCam.setGuidesType(kind)
-    local valid = { Thirds = true, Center = true, Safe = true, Vertical = true }
+    local valid = { Thirds = true, Center = true, Safe = true, Vertical = true, ["16:9"] = true, ["9:16"] = true, ["1:1"] = true, ["4:5"] = true }
     if not valid[kind] then return false end
     UCam.Guides.Type = kind
     if UCam.scheduleSave then UCam.scheduleSave() end

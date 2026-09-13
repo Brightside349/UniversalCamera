@@ -149,6 +149,8 @@ function UCam.build_inicio(Window)
             UCam.Letterbox.HeightRatio                             = UCam.DEFAULTS.letterboxHeightRatio
             UCam.Bloom.Intensity                                   = UCam.DEFAULTS.bloomIntensity
             UCam.DOF.FocusDistance                                 = UCam.DEFAULTS.dofFocusDistance
+            UCam.DOF.NearIntensity                                 = 0
+            UCam.LookIntensity                                     = 1
             UCam.SunRays.Intensity                                 = UCam.DEFAULTS.sunraysIntensity
             UCam.Follow.Distance                                   = UCam.DEFAULTS.followDistance
             UCam.Follow.Height                                     = UCam.DEFAULTS.followHeight
@@ -212,6 +214,7 @@ function UCam.build_inicio(Window)
             UCam.applyFilter(UCam.currentFilterIndex)
             UCam.applyBloom()
             UCam.applyDOF()
+            if UCam.setLookIntensity then UCam.setLookIntensity(1) end
             UCam.applySunRays()
             UCam.applyVignette()
             if UCam.Letterbox.Enabled then UCam.applyLetterbox() end

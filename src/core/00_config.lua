@@ -480,6 +480,7 @@ UCam.Bloom = {
 UCam.DOF = {
     Enabled       = false,
     FarIntensity  = 0.2,
+    NearIntensity = 0,
     FocusDistance = 20,
     InFocusRadius = 10,
 }
@@ -832,6 +833,7 @@ UCam.Filters = {
 -- ============================================================
 UCam.CustomFilters = {}
 UCam.MAX_CUSTOM_FILTERS = 12
+UCam.LookIntensity = 1.0
 UCam.customEditing = {
     Brightness = 0,
     Contrast   = 0,

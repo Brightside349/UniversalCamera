@@ -50,7 +50,7 @@ function UCam.build_creator(Window)
 
     Tab:CreateDropdown({
         Name = "Tipo de guía",
-        Options = { "Thirds", "Center", "Safe", "Vertical" },
+        Options = { "Thirds", "Center", "Safe", "16:9", "9:16", "1:1", "4:5" },
         CurrentOption = { UCam.Guides.Type or "Thirds" },
         MultipleOptions = false,
         Flag = "V10GuidesType",

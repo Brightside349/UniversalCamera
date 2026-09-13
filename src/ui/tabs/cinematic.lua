@@ -448,6 +448,16 @@ function UCam.build_cinematic(Window)
             UCam.DOF.FarIntensity = v; UCam.applyDOF()
         end,
     })
+    CinematicTab:CreateSlider({
+        Name = "Intensidad de primer plano",
+        Range = { 0, 1 },
+        Increment = 0.05,
+        Suffix = "x",
+        CurrentValue = UCam.DOF.NearIntensity or 0,
+        Callback = function(v)
+            UCam.DOF.NearIntensity = v; UCam.applyDOF()
+        end,
+    })
 
     CinematicTab:CreateSection("Post-procesado: Rayos de Sol")
     CinematicTab:CreateToggle({
