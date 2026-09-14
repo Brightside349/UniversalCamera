@@ -4,14 +4,65 @@
 -- ============================================================
 local UCam = _G.UCam
 
-UCam.ShotBuilder = UCam.ShotBuilder or {
+local shotDefaults = {
     Template = "Dolly In",
     TargetMode = "Propio",
     Duration = 5,
     ArcDegrees = 90,
     DistanceScale = 1.6,
     HeightOffset = 1.5,
+    Library = {},
 }
+UCam.ShotBuilder = UCam.ShotBuilder or {}
+for key, value in pairs(shotDefaults) do
+    if UCam.ShotBuilder[key] == nil then UCam.ShotBuilder[key] = value end
+end
+
+local function shotOptions()
+    local options = {}
+    for i, shot in ipairs(UCam.ShotBuilder.Library) do
+        table.insert(options, string.format("%02d - %s", i, shot.Name or "Toma"))
+    end
+    if #options == 0 then table.insert(options, "(Biblioteca vacía)") end
+    return options
+end
+
+function UCam.getShotLibraryOptions()
+    return shotOptions()
+end
+
+function UCam.saveShotToLibrary(name, description)
+    if #UCam.Waypoint.List < 2 or not UCam.directorSerializeRoute then
+        return false, "Crea una ruta con al menos 2 waypoints."
+    end
+    name = tostring(name or ""):gsub("[%c]", " "):sub(1, 60)
+    if name == "" then return false, "Escribe un nombre para la toma." end
+    local entry = {
+        Name = name,
+        Description = tostring(description or ""):gsub("[%c]", " "):sub(1, 180),
+        Route = UCam.directorSerializeRoute(),
+        Duration = UCam.Waypoint.Duration,
+        Modified = os.time(),
+    }
+    table.insert(UCam.ShotBuilder.Library, entry)
+    while #UCam.ShotBuilder.Library > 12 do table.remove(UCam.ShotBuilder.Library, 1) end
+    if UCam.scheduleSave then UCam.scheduleSave() end
+    return true, entry
+end
+
+function UCam.loadShotFromLibrary(indexOrOption)
+    local index = tonumber(tostring(indexOrOption or ""):match("^(%d+)")) or tonumber(indexOrOption)
+    local entry = index and UCam.ShotBuilder.Library[index]
+    if not entry or not entry.Route or not UCam.directorDeserializeRoute then
+        return false, "Selecciona una toma válida."
+    end
+    local ok = UCam.directorDeserializeRoute(entry.Route)
+    if ok then
+        UCam.Waypoint.Duration = tonumber(entry.Duration) or UCam.Waypoint.Duration
+        return true, entry
+    end
+    return false, "La ruta guardada no se pudo cargar."
+end
 
 local function targetPosition()
     local mode = UCam.ShotBuilder.TargetMode
