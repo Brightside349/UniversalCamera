@@ -63,19 +63,37 @@ end
 
 UCam.Capture = UCam.Capture or {}
 UCam.Capture.ScreenshotAvailable = detectScreenshotSupport()
+UCam.Capture.Countdown = UCam.Capture.Countdown or 3
+UCam.Capture.HideGuides = UCam.Capture.HideGuides ~= false
 
-function UCam.prepareCapture()
+function UCam.prepareCapture(options)
     local capture = UCam.Capture
     if capture.Prepared then return true end
+    options = type(options) == "table" and options or {}
     capture._previousCleanShot = UCam.CleanShot and UCam.CleanShot.Enabled or false
+    capture._previousGuidesEnabled = UCam.Guides and UCam.Guides.Enabled or false
     capture.ScreenshotAvailable = detectScreenshotSupport()
     hideRayfieldGuis(capture)
     if UCam.setCleanShot then UCam.setCleanShot(true) end
+    if options.hideGuides ~= false and UCam.Guides and UCam.Guides.Enabled and UCam.setGuidesEnabled then
+        UCam.setGuidesEnabled(false)
+    end
     capture.Prepared = true
     if UCam.emit then
         UCam.emit("capturePrepared", {
             screenshotAvailable = capture.ScreenshotAvailable,
         })
+    end
+    local countdown = UCam.clamp(tonumber(options.countdown or 0) or 0, 0, 10)
+    if countdown > 0 then
+        task.spawn(function()
+            for remaining = countdown, 1, -1 do
+                if not capture.Prepared then return end
+                print(("[UCam] Captura comienza en %d..."):format(remaining))
+                task.wait(1)
+            end
+            if capture.Prepared then print("[UCam] Captura lista.") end
+        end)
     end
     return true
 end
@@ -85,9 +103,13 @@ function UCam.restoreCapture()
     if UCam.setCleanShot then
         UCam.setCleanShot(capture._previousCleanShot == true)
     end
+    if capture._previousGuidesEnabled and UCam.setGuidesEnabled then
+        UCam.setGuidesEnabled(true)
+    end
     restoreRayfieldGuis(capture)
     capture.Prepared = false
     capture._previousCleanShot = nil
+    capture._previousGuidesEnabled = nil
     return true
 end
 

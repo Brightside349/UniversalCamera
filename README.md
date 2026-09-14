@@ -17,7 +17,13 @@ que traes por ID de asset y solo tu ves.
 - Shot Builder integrado al Director: Dolly In/Out, Orbit, Crane y Reveal.
 - Las plantillas generan waypoints editables y no comienzan la reproducción automáticamente.
 
-> Version estable: `v12.2.0`.
+### v12.3
+
+- Biblioteca local de tomas con nombre, descripción, duración y rutas editables.
+- Preparación de captura con cuenta atrás configurable.
+- Ocultación opcional de guías durante la toma y restauración del estado anterior.
+
+> Version estable: `v12.3.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -27,7 +33,7 @@ que traes por ID de asset y solo tu ves.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.2.0`.
+La version publicada apunta al tag `v12.3.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -38,7 +44,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.2.0"
+local VERSION = "v12.3.0"
 ```
 
 ## Props locales (v11)

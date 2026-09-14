@@ -14,12 +14,82 @@ function UCam.build_creator(Window)
         Content = "Clean Shot silencia la UI y prepara la escena. Si tu entorno no ofrece screenshot, graba con OBS o la captura del sistema. Presiona Escape para restaurar la interfaz.",
     })
 
+    local captureCountdown = UCam.Capture.Countdown or 3
+    local captureHideGuides = UCam.Capture.HideGuides ~= false
+    Tab:CreateSlider({
+        Name = "Cuenta atrás de captura",
+        Range = { 0, 10 },
+        Increment = 1,
+        Suffix = " s",
+        CurrentValue = captureCountdown,
+        Callback = function(v)
+            captureCountdown = v
+            UCam.Capture.Countdown = v
+        end,
+    })
+    Tab:CreateToggle({
+        Name = "Ocultar guías durante la toma",
+        CurrentValue = captureHideGuides,
+        Callback = function(v)
+            captureHideGuides = v
+            UCam.Capture.HideGuides = v
+        end,
+    })
+
     Tab:CreateButton({
         Name = "🎬 Preparar toma / Clean Shot",
         Callback = function()
-            UCam.prepareCapture()
+            UCam.prepareCapture({ countdown = captureCountdown, hideGuides = captureHideGuides })
             local status = UCam.getCaptureStatus()
             UCam.notify("Creator", status.message, 4, { important = true })
+        end,
+    })
+
+    Tab:CreateSection("Biblioteca de tomas")
+    Tab:CreateParagraph({
+        Title = "Guardar variantes sin perder la ruta actual",
+        Content = "La biblioteca conserva rutas de cámara locales. No reproduce eventos del mundo ni sincroniza props con otros jugadores.",
+    })
+    local shotName = ""
+    local shotDescription = ""
+    local selectedShot = "(Biblioteca vacía)"
+    local shotLibraryDropdown = Tab:CreateDropdown({
+        Name = "Toma guardada",
+        Options = UCam.getShotLibraryOptions and UCam.getShotLibraryOptions() or { "(Biblioteca vacía)" },
+        CurrentOption = { selectedShot },
+        MultipleOptions = false,
+        Callback = function(o) selectedShot = UCam.resolveDropdownValue(o) or selectedShot end,
+    })
+    Tab:CreateInput({
+        Name = "Nombre de la toma",
+        PlaceholderText = "Ej: Intro Neon",
+        RemoveTextAfterFocusLost = false,
+        Callback = function(v) shotName = v or "" end,
+    })
+    Tab:CreateInput({
+        Name = "Descripción de la toma",
+        PlaceholderText = "Uso o variante",
+        RemoveTextAfterFocusLost = false,
+        Callback = function(v) shotDescription = v or "" end,
+    })
+    Tab:CreateButton({
+        Name = "Guardar ruta actual en biblioteca",
+        Callback = function()
+            local ok, result = UCam.saveShotToLibrary(shotName, shotDescription)
+            if ok then
+                pcall(function() shotLibraryDropdown:Refresh(UCam.getShotLibraryOptions()) end)
+                UCam.notify("Creator", "Toma guardada en la biblioteca.")
+            else
+                UCam.notify("Creator", result or "No se pudo guardar la toma.", 3)
+            end
+        end,
+    })
+    Tab:CreateButton({
+        Name = "Cargar toma seleccionada",
+        Callback = function()
+            local ok, result = UCam.loadShotFromLibrary(selectedShot)
+            if ok then UCam.notify("Creator", "Toma cargada en el Director.")
+            else UCam.notify("Creator", result or "No se pudo cargar la toma.", 3) end
         end,
     })
 

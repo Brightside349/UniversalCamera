@@ -118,6 +118,7 @@ local SCHEMA = {
 
     -- Auto-HUD
     AutoHUD = { Enabled = nil },
+    Capture = { Countdown = nil, HideGuides = nil },
     LookAtLock = { HeightOffset = nil, Smoothing = nil },
     Guides = { Enabled = nil, Type = nil, Opacity = nil },
 
@@ -205,6 +206,7 @@ local SCHEMA = {
     ShotBuilder = {
         Template = nil, TargetMode = nil, Duration = nil,
         ArcDegrees = nil, DistanceScale = nil, HeightOffset = nil,
+        Library = nil,
     },
 
     -- TimeControl
