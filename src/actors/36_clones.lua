@@ -511,10 +511,15 @@ local function updateClones(dt)
                     -- Cacheados por jugador: muchos clones comparten original.
                     -- Se reutiliza la tabla para no generar basura cada tick.
                     local key = clone.source
-                    local entry = invCache[key]
+                    if key == nil then
+                        -- Defensivo: un clon nunca puede quedar sin origen.
+                        clone.source = clone.source or C.SourcePlayer
+                        key = clone.source
+                    end
+                    local entry = key and invCache[key]
                     if not entry then
                         entry = {}
-                        invCache[key] = entry
+                        if key ~= nil then invCache[key] = entry end
                     end
                     local rootCF = root.CFrame
                     if entry.cf ~= rootCF then
@@ -673,6 +678,10 @@ function UCam.spawnClones(opts)
         local anchor = formationAnchor(baseCF, i, count, layout, spacing)
         local clone = instantiateClone(char, root, anchor, root.CFrame, footOffset)
         if clone then
+            -- v12.6.1: faltaba fijar el jugador de origen. Sin esto la cache
+            -- de inversas (y las etiquetas, el respawn y el borrado) recibian
+            -- nil como clave y el loop de espejo fallaba cada frame.
+            clone.source = player
             table.insert(C.Items, clone)
             ensureSourceTracking(player)
             placed = placed + 1
