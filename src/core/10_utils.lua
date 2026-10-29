@@ -587,7 +587,9 @@ function UCam.updateGreenScreen()
     part.CanQuery     = false
     part.CanTouch     = false
     part.Massless     = true
-    part.CFrame       = CFrame.new(UCam.GreenScreen.Position)
+    -- v12.5: giro configurable para encuadrar la pantalla a la camara
+    local rot = math.rad(UCam.GreenScreen.Rotation or 0)
+    part.CFrame       = CFrame.new(UCam.GreenScreen.Position) * CFrame.Angles(0, rot, 0)
     part.Size         = UCam.GreenScreen.Size
     part.Color        = UCam.GreenScreen.Color
     part.Material     = Enum.Material.Neon

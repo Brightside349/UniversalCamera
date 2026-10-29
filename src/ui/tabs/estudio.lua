@@ -1,203 +1,215 @@
 -- ============================================================
--- Universal Camera Pro v6 · ui/estudio
--- Pestaña Estudio / Croma: pantalla verde con colocacion configurable.
+-- Universal Camera Pro v12.5 · ui/estudio
+-- Pestaña Estudio: pantalla de croma local (solo tú la ves).
+--
+-- v12.5: se unificó el croma (color, tamaño, posición y acciones),
+-- se agregó rotación y ajuste automático al encuadre de la cámara.
 -- ============================================================
 local UCam = _G.UCam
 
 function UCam.build_estudio(Window)
-    local CromaTab = Window:CreateTab("🟩 Estudio", "tv")
+    local Tab = Window:CreateTab("🟩 Estudio", "tv")
+    local G = UCam.GreenScreen
 
-    CromaTab:CreateSection("Pantalla Verde / Estudio de Croma")
-    CromaTab:CreateParagraph({
-        Title   = "Como usar",
-        Content = "Genera un panel solido de color detras de tu personaje. Perfecto para grabaciones en las que necesitas un fondo uniforme para chroma key en edicion de video.",
+    -- v12.5: normaliza el grosor de configuraciones antiguas (60st).
+    if (G.Size.Z or 1) > 2 then
+        G.Size = Vector3.new(G.Size.X, G.Size.Y, 1)
+        if G.Enabled then pcall(UCam.updateGreenScreen) end
+    end
+
+    Tab:CreateSection("Pantalla de croma")
+    Tab:CreateParagraph({
+        Title = "Fondo uniforme para grabar",
+        Content = "Crea un panel sólido detrás de tu personaje para hacer chroma key en edición. Solo lo ves tú y nunca se envía al servidor.",
     })
-
-    CromaTab:CreateToggle({
-        Name         = "Activar pantalla de croma",
-        CurrentValue = UCam.GreenScreen.Enabled,
-        Callback     = function(v)
-            UCam.GreenScreen.Enabled = v
+    Tab:CreateToggle({
+        Name = "Activar pantalla",
+        CurrentValue = G.Enabled,
+        Callback = function(v)
+            G.Enabled = v
             UCam.updateGreenScreen()
-            if v then
-                UCam.notify("Estudio / Croma", "Pantalla creada detras del personaje.")
-            else
-                UCam.notify("Estudio / Croma", "Pantalla eliminada.")
-            end
+            UCam.notify("Estudio", v and "Pantalla creada." or "Pantalla eliminada.")
         end,
     })
 
-    CromaTab:CreateSection("Color de fondo")
-    CromaTab:CreateDropdown({
-        Name            = "Preajuste de color",
-        Options         = { "Verde Croma", "Azul Croma", "Blanco Estudio", "Negro Estudio", "Personalizado" },
-        CurrentOption   = { "Verde Croma" },
+    -- ------------------------------------------------------------
+    -- COLOR
+    -- ------------------------------------------------------------
+    Tab:CreateSection("Color")
+    local colorPresets = {
+        ["Verde croma"]    = Color3.fromRGB(0, 255, 0),
+        ["Azul croma"]     = Color3.fromRGB(0, 0, 255),
+        ["Blanco estudio"] = Color3.fromRGB(255, 255, 255),
+        ["Negro estudio"]  = Color3.fromRGB(0, 0, 0),
+        ["Gris neutro"]    = Color3.fromRGB(128, 128, 128),
+    }
+    Tab:CreateDropdown({
+        Name = "Preajuste",
+        Options = { "Verde croma", "Azul croma", "Blanco estudio", "Negro estudio", "Gris neutro", "Personalizado" },
+        CurrentOption = { "Verde croma" },
         MultipleOptions = false,
-        Callback        = function(options)
-            local value = UCam.resolveDropdownValue(options)
-            if value == "Verde Croma" then
-                UCam.GreenScreen.Color = Color3.fromRGB(0, 255, 0)
-            elseif value == "Azul Croma" then
-                UCam.GreenScreen.Color = Color3.fromRGB(0, 0, 255)
-            elseif value == "Blanco Estudio" then
-                UCam.GreenScreen.Color = Color3.fromRGB(255, 255, 255)
-            elseif value == "Negro Estudio" then
-                UCam.GreenScreen.Color = Color3.fromRGB(0, 0, 0)
-            end
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
-            if value ~= "Personalizado" then
-                UCam.notify("Estudio / Croma", "Color: " .. value)
+        Callback = function(o)
+            local v = UCam.resolveDropdownValue(o)
+            local color = v and colorPresets[v]
+            if color then
+                G.Color = color
+                if G.Enabled then UCam.updateGreenScreen() end
+                UCam.notify("Estudio", "Color: " .. v)
             end
         end,
     })
-
-    local cromaR, cromaG, cromaB = 0, 255, 0
-    CromaTab:CreateSlider({
-        Name         = "Rojo",
-        Range        = { 0, 255 },
-        Increment    = 1,
-        CurrentValue = cromaR,
-        Callback     = function(v)
-            cromaR = math.floor(v)
-            UCam.GreenScreen.Color = Color3.fromRGB(cromaR, cromaG, cromaB)
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
+    Tab:CreateSlider({
+        Name = "Rojo", Range = { 0, 255 }, Increment = 1,
+        CurrentValue = math.floor(G.Color.R * 255),
+        Callback = function(v)
+            G.Color = Color3.fromRGB(math.floor(v), math.floor(G.Color.G * 255), math.floor(G.Color.B * 255))
+            if G.Enabled then UCam.updateGreenScreen() end
         end,
     })
-    CromaTab:CreateSlider({
-        Name         = "Verde",
-        Range        = { 0, 255 },
-        Increment    = 1,
-        CurrentValue = cromaG,
-        Callback     = function(v)
-            cromaG = math.floor(v)
-            UCam.GreenScreen.Color = Color3.fromRGB(cromaR, cromaG, cromaB)
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
+    Tab:CreateSlider({
+        Name = "Verde", Range = { 0, 255 }, Increment = 1,
+        CurrentValue = math.floor(G.Color.G * 255),
+        Callback = function(v)
+            G.Color = Color3.fromRGB(math.floor(G.Color.R * 255), math.floor(v), math.floor(G.Color.B * 255))
+            if G.Enabled then UCam.updateGreenScreen() end
         end,
     })
-    CromaTab:CreateSlider({
-        Name         = "Azul",
-        Range        = { 0, 255 },
-        Increment    = 1,
-        CurrentValue = cromaB,
-        Callback     = function(v)
-            cromaB = math.floor(v)
-            UCam.GreenScreen.Color = Color3.fromRGB(cromaR, cromaG, cromaB)
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
+    Tab:CreateSlider({
+        Name = "Azul", Range = { 0, 255 }, Increment = 1,
+        CurrentValue = math.floor(G.Color.B * 255),
+        Callback = function(v)
+            G.Color = Color3.fromRGB(math.floor(G.Color.R * 255), math.floor(G.Color.G * 255), math.floor(v))
+            if G.Enabled then UCam.updateGreenScreen() end
         end,
     })
-
-    CromaTab:CreateSection("Tamano y opacidad")
-    CromaTab:CreateSlider({
-        Name         = "Ancho",
-        Range        = { 10, 200 },
-        Increment    = 5,
-        Suffix       = "st",
-        CurrentValue = UCam.GreenScreen.Size.X,
-        Callback     = function(v)
-            UCam.GreenScreen.Size = Vector3.new(v, UCam.GreenScreen.Size.Y, UCam.GreenScreen.Size.Z)
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
-        end,
-    })
-    CromaTab:CreateSlider({
-        Name         = "Alto",
-        Range        = { 5, 100 },
-        Increment    = 5,
-        Suffix       = "st",
-        CurrentValue = UCam.GreenScreen.Size.Y,
-        Callback     = function(v)
-            UCam.GreenScreen.Size = Vector3.new(UCam.GreenScreen.Size.X, v, UCam.GreenScreen.Size.Z)
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
-        end,
-    })
-    CromaTab:CreateSlider({
-        Name         = "Profundidad",
-        Range        = { 1, 30 },
-        Increment    = 1,
-        Suffix       = "st",
-        CurrentValue = UCam.GreenScreen.Size.Z,
-        Callback     = function(v)
-            UCam.GreenScreen.Size = Vector3.new(UCam.GreenScreen.Size.X, UCam.GreenScreen.Size.Y, v)
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
-        end,
-    })
-    CromaTab:CreateSlider({
-        Name         = "Transparencia",
-        Range        = { 0, 0.95 },
-        Increment    = 0.05,
-        Suffix       = "",
-        CurrentValue = UCam.GreenScreen.Transparency,
-        Callback     = function(v)
-            UCam.GreenScreen.Transparency = v
-            if UCam.GreenScreen.Enabled and UCam.GreenScreen.Part then
-                pcall(function() UCam.GreenScreen.Part.Transparency = v end)
-            end
-        end,
-    })
-
-    CromaTab:CreateSection("Posicion de la pantalla")
-    CromaTab:CreateDropdown({
-        Name            = "Colocacion vertical",
-        Options         = UCam.GreenScreen.VerticalModes,
-        CurrentOption   = { UCam.GreenScreen.Vertical },
-        MultipleOptions = false,
-        Callback        = function(options)
-            local value = UCam.resolveDropdownValue(options) or "Detras"
-            UCam.GreenScreen.Vertical = value
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
-            UCam.notify("Estudio / Croma", "Colocacion: " .. value)
-        end,
-    })
-    CromaTab:CreateSlider({
-        Name         = "Distancia horizontal",
-        Range        = { 4, 60 },
-        Increment    = 1,
-        Suffix       = "st",
-        CurrentValue = UCam.GreenScreen.Distance,
-        Callback     = function(v)
-            UCam.GreenScreen.Distance = v
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
-        end,
-    })
-    CromaTab:CreateSlider({
-        Name         = "Separacion vertical",
-        Range        = { 2, 60 },
-        Increment    = 1,
-        Suffix       = "st",
-        CurrentValue = UCam.GreenScreen.VerticalOffset,
-        Callback     = function(v)
-            UCam.GreenScreen.VerticalOffset = v
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
-        end,
-    })
-    CromaTab:CreateToggle({
-        Name         = "Evitar puntos de spawn",
-        CurrentValue = UCam.GreenScreen.AvoidSpawns,
-        Callback     = function(v)
-            UCam.GreenScreen.AvoidSpawns = v
-            UCam.GreenScreen._spawnCache = nil -- fuerza recache
-            if UCam.GreenScreen.Enabled then UCam.updateGreenScreen() end
-            UCam.notify("Estudio / Croma", v and "Pantalla esquivara los SpawnLocation." or "Evitar spawns desactivado.")
-        end,
-    })
-
-    CromaTab:CreateSection("Acciones")
-    CromaTab:CreateButton({
-        Name     = "Mover croma al frente del personaje",
+    Tab:CreateButton({
+        Name = "Usar el color del cielo",
         Callback = function()
-            if not UCam.GreenScreen.Enabled then
-                UCam.notify("Estudio / Croma", "Activa la pantalla de croma primero.")
+            G.Color = UCam.Lighting.OutdoorAmbient
+            if G.Enabled then UCam.updateGreenScreen() end
+            UCam.notify("Estudio", "Color tomado de la luz ambiental del juego.")
+        end,
+    })
+
+    -- ------------------------------------------------------------
+    -- TAMAÑO
+    -- ------------------------------------------------------------
+    Tab:CreateSection("Tamaño")
+    Tab:CreateSlider({
+        Name = "Ancho", Range = { 10, 300 }, Increment = 5, Suffix = "st",
+        CurrentValue = G.Size.X,
+        Callback = function(v)
+            -- v12.5: el panel siempre es fino; el grosor viejo (60st) se
+            -- veía como un bloque desde los lados.
+            G.Size = Vector3.new(v, G.Size.Y, 1)
+            if G.Enabled then UCam.updateGreenScreen() end
+        end,
+    })
+    Tab:CreateSlider({
+        Name = "Alto", Range = { 5, 200 }, Increment = 5, Suffix = "st",
+        CurrentValue = G.Size.Y,
+        Callback = function(v)
+            G.Size = Vector3.new(G.Size.X, v, 1)
+            if G.Enabled then UCam.updateGreenScreen() end
+        end,
+    })
+    Tab:CreateSlider({
+        Name = "Opacidad (0 = sólido)", Range = { 0, 0.95 }, Increment = 0.05,
+        CurrentValue = G.Transparency,
+        Callback = function(v)
+            G.Transparency = v
+            if G.Enabled and G.Part then
+                pcall(function() G.Part.Transparency = v end)
+            end
+        end,
+    })
+    Tab:CreateButton({
+        Name = "📐 Ajustar al encuadre de la cámara",
+        Callback = function()
+            local cam = workspace.CurrentCamera
+            if not cam then return end
+            local dist = math.max(G.Distance, 2)
+            local halfV = math.rad(cam.FieldOfView * 0.5)
+            local aspect = cam.ViewportSize.X / math.max(cam.ViewportSize.Y, 1)
+            local height = 2 * dist * math.tan(halfV) * 1.25
+            local width = height * aspect * 1.25
+            G.Size = Vector3.new(UCam.clamp(width, 10, 300), UCam.clamp(height, 5, 200), 1)
+            G.AutoFit = true
+            if G.Enabled then UCam.updateGreenScreen() end
+            UCam.notify("Estudio", "Pantalla ajustada al encuadre.")
+        end,
+    })
+
+    -- ------------------------------------------------------------
+    -- POSICIÓN
+    -- ------------------------------------------------------------
+    Tab:CreateSection("Posición")
+    Tab:CreateDropdown({
+        Name = "Colocación",
+        Options = G.VerticalModes,
+        CurrentOption = { G.Vertical },
+        MultipleOptions = false,
+        Callback = function(o)
+            local v = UCam.resolveDropdownValue(o) or "Detras"
+            G.Vertical = v
+            if G.Enabled then UCam.updateGreenScreen() end
+        end,
+    })
+    Tab:CreateSlider({
+        Name = "Distancia horizontal", Range = { 4, 80 }, Increment = 1, Suffix = "st",
+        CurrentValue = G.Distance,
+        Callback = function(v)
+            G.Distance = v
+            if G.Enabled then UCam.updateGreenScreen() end
+        end,
+    })
+    Tab:CreateSlider({
+        Name = "Separación vertical", Range = { 2, 80 }, Increment = 1, Suffix = "st",
+        CurrentValue = G.VerticalOffset,
+        Callback = function(v)
+            G.VerticalOffset = v
+            if G.Enabled then UCam.updateGreenScreen() end
+        end,
+    })
+    Tab:CreateSlider({
+        Name = "Rotación", Range = { -180, 180 }, Increment = 5, Suffix = "°",
+        CurrentValue = G.Rotation or 0,
+        Callback = function(v)
+            G.Rotation = v
+            if G.Enabled then UCam.updateGreenScreen() end
+        end,
+    })
+    Tab:CreateToggle({
+        Name = "Evitar puntos de spawn",
+        CurrentValue = G.AvoidSpawns,
+        Callback = function(v)
+            G.AvoidSpawns = v
+            G._spawnCache = nil
+            if G.Enabled then UCam.updateGreenScreen() end
+        end,
+    })
+
+    -- ------------------------------------------------------------
+    -- ACCIONES
+    -- ------------------------------------------------------------
+    Tab:CreateSection("Acciones")
+    Tab:CreateButton({
+        Name = "🔄 Recentrar en el personaje",
+        Callback = function()
+            if not G.Enabled then
+                UCam.notify("Estudio", "Activa la pantalla primero.")
                 return
             end
             UCam.updateGreenScreen()
-            UCam.notify("Estudio / Croma", "Croma reposicionado al personaje.")
+            UCam.notify("Estudio", "Pantalla recolocada.")
         end,
     })
-    CromaTab:CreateButton({
-        Name     = "Eliminar croma",
+    Tab:CreateButton({
+        Name = "🗑 Eliminar pantalla",
         Callback = function()
-            UCam.GreenScreen.Enabled = false
+            G.Enabled = false
             UCam.destroyGreenScreen()
-            UCam.notify("Estudio / Croma", "Pantalla eliminada.")
+            UCam.notify("Estudio", "Pantalla eliminada.")
         end,
     })
 end

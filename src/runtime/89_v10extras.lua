@@ -4,7 +4,7 @@
 -- Integraciones pequeñas que conectan funciones ya existentes:
 --   Capture/Clean Shot, guías de composición, recovery y metadata
 --   de escenas. No crea un sistema externo de proyectos ni reemplaza
---   Replay, Director o la persistencia actual.
+--   Director, props o la persistencia actual.
 --
 -- Dependencias: core/00_config.lua, core/05_persistence.lua,
 --               core/10_utils.lua, visuals/20_filters.lua,
@@ -304,15 +304,11 @@ function UCam.recoverSession()
         end
     end
 
-    if UCam.Replay and UCam.Replay.Recording then call("stopRecording") end
-    if UCam.Replay and UCam.Replay.Playing then call("stopPlayback") end
     if UCam.Director and UCam.Director.Active then call("directorTogglePlay", false) end
     if UCam.Spectate and UCam.Spectate.Active then call("stopSpectate") end
     call("forceRestoreCamera")
     call("stopFun")
-    call("stopAdvPoses")
     call("stopBodyColor")
-    call("stopPlayerMod")
     call("restoreAllPlayers")
     if UCam.Props and UCam.Props.MoveMode then
         call("attachPropToCamera", false)

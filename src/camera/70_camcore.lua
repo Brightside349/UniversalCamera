@@ -110,6 +110,18 @@ function UCam.setHudHidden(hidden)
     end)
 end
 
+-- v12.5: HUD unificado. Un solo comportamiento automatico (se oculta al
+-- activar la camara libre y vuelve al salir) mas un toggle manual que
+-- funciona sin camara libre.
+function UCam.setHudManual(hidden)
+    UCam.Hud.ManualHidden = hidden == true
+    if hidden then
+        UCam.setHudHidden(true)
+    elseif not UCam.freeCamEnabled then
+        UCam.setHudHidden(false)
+    end
+end
+
 function UCam.setCharacterHidden(hidden)
     UCam.Hud.CharacterHidden = hidden
     UCam.refreshCharacterRefs()
@@ -163,7 +175,7 @@ function UCam.forceRestoreCamera()
         UCam.rightMouseHeld                 = false
         UCam.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
         UCam.unfreezeCharacter()
-        if UCam.Hud.Hidden then UCam.setHudHidden(false) end
+        if UCam.Hud.Hidden and not UCam.Hud.ManualHidden then UCam.setHudHidden(false) end
         UCam.Saved._hudHiddenBeforeFreeCam = false
         if UCam.Hud.CharacterHidden then UCam.setCharacterHidden(false) end
         -- v8.1: SlowMo/BulletTime eliminado
@@ -200,8 +212,8 @@ function UCam.toggleFreeCam()
         UCam.rightMouseHeld                 = false
         UCam.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
         UCam.freezeCharacter()
-        -- NUEVO v6: Auto-HUD
-        if UCam.AutoHUD.Enabled and not UCam.Hud.Hidden then
+        -- v12.5: Auto-HUD unico (sin toggle): oculta al entrar en camara libre
+        if not UCam.Hud.Hidden then
             UCam.Saved._hudHiddenBeforeFreeCam = true
             UCam.setHudHidden(true)
         end
@@ -216,7 +228,7 @@ function UCam.toggleFreeCam()
         UCam.rightMouseHeld                 = false
         UCam.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
         UCam.unfreezeCharacter()
-        if UCam.Hud.Hidden then UCam.setHudHidden(false) end
+        if UCam.Hud.Hidden and not UCam.Hud.ManualHidden then UCam.setHudHidden(false) end
         UCam.Saved._hudHiddenBeforeFreeCam = false
         if UCam.Hud.CharacterHidden then UCam.setCharacterHidden(false) end
         -- v8.1: SlowMo/BulletTime eliminado
@@ -442,8 +454,6 @@ local fovPulseT = 0
 local fovPulseBaseFOV = nil
 
 function UCam.updateCamera(deltaTime)
-    -- v7: updateReplay no necesita tick global
-    -- porque usa su propio Heartbeat en startPlayback/startRecording.
     -- v8.1: updateTimeControl eliminado — ya no se tickea en cada frame.
     -- v7: transiciones de filtro / temporal
     if UCam.updateFilters then
@@ -480,13 +490,6 @@ function UCam.updateCamera(deltaTime)
                 UCam.CameraTransition.Active = false
             end
         end
-        updateAutoFocus(deltaTime)
-        return
-    end
-
-    -- v9 FIX: durante la reproducción de Replay el Heartbeat del replay
-    -- controla la cámara; el freecam no debe pisarle el CFrame cada frame.
-    if UCam.Replay and UCam.Replay.Playing then
         updateAutoFocus(deltaTime)
         return
     end
@@ -753,6 +756,31 @@ function UCam.updateCamera(deltaTime)
             -- Auto-configurar: A = posición actual, B = 40 studs hacia adelante
             UCam.CableCam.PointA = UCam.camCFrame or CFrame.new()
             UCam.CableCam.PointB = (UCam.CableCam.PointA or CFrame.new()) * CFrame.new(0, 0, -40)
+        end
+    elseif UCam.camMode == "Personalizada" then
+        -- v12.5: modo armado por el usuario (orbita con valores propios)
+        local C = UCam.CustomCam
+        local pivot = UCam.Saved.RootCFrame and UCam.Saved.RootCFrame.Position
+            or (UCam.rootPart and UCam.rootPart.Position)
+        if pivot then
+            C.Angle = C.Angle + deltaTime * C.OrbitSpeed * math.pi * 2
+            local yaw = C.Angle + (C.Manual and UCam.Orbit.ManualYaw or 0)
+            local tilt = math.rad(C.Tilt) + (C.Manual and UCam.Orbit.ManualPitch or 0)
+            local s = C.Sway > 0 and math.sin(os.clock() * C.SwaySpeed * math.pi * 2) * C.Sway or 0
+            local target = pivot + Vector3.new(0, 2, 0)
+            local hDist = C.Distance * math.cos(tilt)
+            local offset = Vector3.new(
+                math.sin(yaw) * hDist,
+                C.Height + math.sin(tilt) * C.Distance + s,
+                math.cos(yaw) * hDist
+            )
+            UCam.camCFrame = CFrame.lookAt(target + offset, target)
+            UCam.holdCharacterPosition()
+            local rolled = UCam.applyDutchRoll(UCam.camCFrame * CFrame.Angles(0, 0, math.rad(C.Roll)))
+            UCam.camera.CFrame = rolled
+            if C.UseFOV then
+                UCam.camera.FieldOfView = UCam.clamp(C.FOV, UCam.MIN_FOV, UCam.MAX_FOV)
+            end
         end
     elseif UCam.camMode == "Security Cam" then
         -- v7: cámara estática con paneo automático lento
@@ -1045,7 +1073,7 @@ UCam.trackConnection(
         UCam.freeCamEnabled     = false
         UCam.camera.CameraType  = Enum.CameraType.Custom
         UCam.camera.FieldOfView = UCam.Saved.FOV
-        if UCam.Hud.Hidden then UCam.setHudHidden(false) end
+        if UCam.Hud.Hidden and not UCam.Hud.ManualHidden then UCam.setHudHidden(false) end
         UCam.Saved._hudHiddenBeforeFreeCam = false
         if UCam.Hud.CharacterHidden then UCam.setCharacterHidden(false) end
         -- v8.1: SlowMo/BulletTime eliminado
@@ -1080,7 +1108,6 @@ UCam.trackConnection(
     -- Sin esto, _playerTargets / _snapshots seguían apuntando a personajes
     -- muertos tras el respawn (informe §4) y los efectos no se revertían.
     pcall(function()
-        if UCam.restoreAllPlayerPoses then UCam.restoreAllPlayerPoses() end
         if UCam.restoreAllPlayerBodyColors then UCam.restoreAllPlayerBodyColors() end
         if UCam.restoreAllPlayers then UCam.restoreAllPlayers() end
     end)

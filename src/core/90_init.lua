@@ -25,12 +25,10 @@ function UCam.Unload()
 
         -- Stop all active modules
         if UCam.stopFun then UCam.stopFun() end
-        if UCam.stopAdvPoses then UCam.stopAdvPoses() end
         if UCam.stopBodyColor then UCam.stopBodyColor() end
-        if UCam.stopPlayerMod then UCam.stopPlayerMod() end
         if UCam.stopClones then UCam.stopClones() end
         if UCam.restoreAllPlayers then UCam.restoreAllPlayers() end
-        if UCam.stopReplay then UCam.stopReplay() end
+        if UCam.propAnimStop then UCam.propAnimStop() end
         if UCam.destroyGreenScreen then UCam.destroyGreenScreen() end
         if UCam.destroyLetterbox then UCam.destroyLetterbox() end
         if UCam.destroyVignetteGui then UCam.destroyVignetteGui() end
@@ -39,12 +37,11 @@ function UCam.Unload()
         if UCam.stopSpectate then UCam.stopSpectate() end
         -- v8.1 FIX: restauración forzada que NO pasa por el debounce de
         -- toggleFreeCam (que podía dejar cámara Scriptable + personaje anclado).
-        -- También cubre el caso de solo Director/Replay activos.
+        -- También cubre el caso de solo Director activo.
         if UCam.forceRestoreCamera then pcall(UCam.forceRestoreCamera) end
         if UCam.directorTogglePlay and UCam.Director and UCam.Director.Active then
             pcall(function() UCam.directorTogglePlay(false) end)
         end
-        if UCam.stopPlayback then pcall(UCam.stopPlayback) end
         if UCam.Spectate and UCam.Spectate.Active and UCam.stopSpectate then UCam.stopSpectate() end
         -- v8: detener todos los plugins (llama a su stop() si lo tienen)
         if UCam.stopAllPlugins then UCam.stopAllPlugins() end
@@ -59,17 +56,9 @@ function UCam.Unload()
             pcall(function() UCam.Fun._connHeartbeat:Disconnect() end)
             UCam.Fun._connHeartbeat = nil
         end
-        if UCam.Poses._connHeartbeat then
-            pcall(function() UCam.Poses._connHeartbeat:Disconnect() end)
-            UCam.Poses._connHeartbeat = nil
-        end
         if UCam.BodyColor._connHeartbeat then
             pcall(function() UCam.BodyColor._connHeartbeat:Disconnect() end)
             UCam.BodyColor._connHeartbeat = nil
-        end
-        if UCam.PlayerMod._connHeartbeat then
-            pcall(function() UCam.PlayerMod._connHeartbeat:Disconnect() end)
-            UCam.PlayerMod._connHeartbeat = nil
         end
         if UCam._viewportResizeConn then
             pcall(function() UCam._viewportResizeConn:Disconnect() end)
@@ -129,10 +118,10 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v12.1 By Cocoa Feliz",
-        "V12: Runtime estable y herramientas cinematográficas. Props locales y autosave real. Presiona Delete para UI."
+        "Universal Camera Pro v12.5 By Cocoa Feliz",
+        "V12.5: HUD unificado, cámaras por modo, modo Personalizada y animador de props. Presiona Delete para la UI."
     )
-    print("[UCam] Universal Camera Pro v12.1 cargado OK. Runtime estable + herramientas cinematográficas.")
+    print("[UCam] Universal Camera Pro v12.5 cargado OK. Cámaras por modo + animador de props.")
 else
     warn("[UCam] Error al construir la UI: " .. tostring(err))
 end

@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v11 · UI builder
+-- Universal Camera Pro v12.5 · UI builder
 -- Construye la ventana, tabs estáticos/dinámicos y autosave.
 --
 -- Dependencias: core/00_config.lua, core/05_persistence.lua,
@@ -9,9 +9,9 @@ local UCam = _G.UCam
 
 function UCam.buildUI()
     local Window = UCam.Rayfield:CreateWindow({
-        Name = "Universal Camera Pro v12.1 By Cocoa Feliz",
-        LoadingTitle = "Universal Camera Pro v12.1",
-        LoadingSubtitle = "Cargando herramientas locales + Props...",
+        Name = "Universal Camera Pro v12.5 By Cocoa Feliz",
+        LoadingTitle = "Universal Camera Pro v12.5",
+        LoadingSubtitle = "Cargando cámaras, props y animador...",
         Icon = 4483362458,
         ToggleUIKeybind = Enum.KeyCode.Delete,
         DisableRayfieldPrompts = true,

@@ -191,48 +191,6 @@ function UCam.loadPluginsFromFolder()
 end
 
 -- ============================================================
--- PLUGINS POR DEFECTO (demo / ejemplo)
--- ============================================================
-local function loadExamplePlugin()
-    local example = {
-        name    = "Demo Plugin",
-        author  = "UCam",
-        version = "1.0",
-        icon    = 4483362458,
-        build = function(Window)
-            local DemoTab = Window:CreateTab("🧩 Demo", "puzzle")
-            DemoTab:CreateParagraph({
-                Title   = "Plugin de ejemplo",
-                Content = "Esto está hecho con UCam.registerPlugin({...}). Crea tu propio .lua en UniversalCamera/plugins/ y pon 'return { name=..., build=function(Window)... end }' dentro.",
-            })
-            DemoTab:CreateButton({
-                Name     = "Notificación demo",
-                Callback = function()
-                    UCam.notify("Demo Plugin", "El plugin funciona. Borra plugins/ si no lo quieres.")
-                end,
-            })
-            DemoTab:CreateButton({
-                Name     = "Ver plugins cargados",
-                Callback = function()
-                    local list = {}
-                    for name, p in pairs(UCam.Plugins.Loaded) do
-                        list[#list+1] = ("%s v%s (%s)"):format(name, p.version, p.author)
-                    end
-                    UCam.notify("Plugins", (#list > 0) and table.concat(list, "\n") or "Ninguno cargado.")
-                end,
-            })
-        end,
-        start = function(UC)
-            UC.notify("Plugins", "Demo Plugin iniciado.")
-        end,
-        stop = function(UC)
-            print("[UCam] Demo Plugin detenido.")
-        end,
-    }
-    UCam.registerPlugin(example, "demo_plugin.lua")
-end
-
--- ============================================================
 -- DETENER TODOS LOS PLUGINS (llamado desde Unload)
 -- ============================================================
 function UCam.stopAllPlugins()
@@ -254,14 +212,12 @@ function UCam.stopAllPlugins()
 end
 
 -- ============================================================
--- ARRANQUE: cargar carpeta + demo si está vacía
+-- ARRANQUE: cargar la carpeta de plugins del usuario
 -- v8 FIX: carga SÍNCRONA (no task.defer) para que los plugins se
 -- registren ANTES de que 90_init llame a buildUI(). Con defer, el
 -- registro ocurría tras buildUI() y sus pestañas nunca se creaban.
+-- v12.5: se retiró el plugin de demostración (pestaña Demo).
 -- ============================================================
 local loadedCount = UCam.loadPluginsFromFolder()
-if loadedCount == 0 then
-    loadExamplePlugin()
-end
 
 print("[UCam] Sistema de plugins listo.")
