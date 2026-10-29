@@ -65,7 +65,16 @@ gente.
   distancia de detalle, sombras, Humanoid y un botón **Ver coste actual**
   (clones, partes, CFrames/s y si el lote está activo).
 
-> Version estable: `v12.6.0`.
+### v12.6.1
+
+- Corregido el error `table index is nil` en el espejo de clones: el jugador de
+  origen no se guardaba al crear cada clon, así que la caché de inversas
+  fallaba en cada tick.
+- Efecto secundario arreglado: los clones vuelven a mostrar el nombre del
+  jugador en la lista, se borran correctamente al liberar el seguimiento y se
+  reconstruyen solos cuando el original respawnea.
+
+> Version estable: `v12.6.1`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -75,7 +84,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.6.0`.
+La version publicada apunta al tag `v12.6.1`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -86,7 +95,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.6.0"
+local VERSION = "v12.6.1"
 ```
 
 ## Props locales (v11)
