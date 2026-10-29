@@ -1,4 +1,4 @@
-# Universal Camera Pro v12.5 · Cámaras por modo + animador de props
+# Universal Camera Pro v12.6 · Clones optimizados + cámaras por modo
 
 Camara libre cinematografica para Roblox con modos de camara, espectador,
 Director, filtros, iluminacion, guias de composicion, Clean Shot, escenas,
@@ -52,7 +52,20 @@ gente.
 - Eliminadas las pestañas **Poses**, **Mod Jugadores**, **Replay**, **Perfiles**
   y **Demo** (y su estado, persistencia y referencias).
 
-> Version estable: `v12.5.0`.
+### v12.6
+
+- **Clones**: el espejo de movimiento ya no copia a 60 Hz. Se limita a la tasa
+  elegida (60/30/20), solo escribe las partes que cambiaron, agrupa todas las
+  escrituras en un `BulkMoveTo` por tick y actualiza menos a los clones lejanos
+  (LOD por distancia, configurable).
+- Los clones llevan el **Humanoid apagado**, sin `Animator`, sin colisión, sin
+  raycast, sin eventos de toque y con sombras opcionales: menos trabajo por
+  personaje sin cambiar su aspecto.
+- Nueva sección **Rendimiento** en la pestaña Clones con tasa del espejo,
+  distancia de detalle, sombras, Humanoid y un botón **Ver coste actual**
+  (clones, partes, CFrames/s y si el lote está activo).
+
+> Version estable: `v12.6.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -62,7 +75,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.5.0`.
+La version publicada apunta al tag `v12.6.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -73,7 +86,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.5.0"
+local VERSION = "v12.6.0"
 ```
 
 ## Props locales (v11)
@@ -99,7 +112,7 @@ local VERSION = "v12.5.0"
 
 La animacion vive en la sesion actual; los props en si siguen guardandose.
 
-## Clones locales (v12.4)
+## Clones locales (v12.6)
 
 1. Abre la pestaña **👥 Clones** y elige a quien clonar (tu o cualquier jugador).
 2. Ajusta cantidad, formacion y separacion, y pulsa **Clonar jugador**.
@@ -113,6 +126,10 @@ La animacion vive en la sesion actual; los props en si siguen guardandose.
    **Colocar donde miro**, **Apoyar en el suelo** y girar ±15°.
 5. Si el jugador original respawnea, sus clones se reconstruyen solos en la
    misma posicion. `Eliminar TODOS` los borra de tu cliente.
+6. Con muchos clones, abre **Rendimiento**: baja la tasa del espejo a 20/s,
+   reduce la distancia de detalle, desactiva sombras y pulsa **Ver coste
+   actual** para ver cuantas partes se estan moviendo realmente. El coste que
+   queda es de dibujado: cada clon sigue siendo un personaje completo.
 
 ## Estructura del workspace
 
@@ -132,7 +149,7 @@ Universal Camera/
     ├── actors/
     │   ├── 30_fun.lua           # diversion, escala y efectos locales
     │   ├── 32_bodycolor.lua     # colores y materiales
-    │   └── 36_clones.lua        # clones locales de jugadores (v12.4)
+    │   └── 36_clones.lua        # clones locales y espejo optimizado (v12.6)
     ├── camera/
     │   ├── 50_spectate.lua      # espectador
     │   ├── 60_director.lua      # waypoints y director

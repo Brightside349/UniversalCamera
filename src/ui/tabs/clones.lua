@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v12.4 · ui/clones
+-- Universal Camera Pro v12.6 · ui/clones
 -- Pestaña Clones: copias locales de un jugador (solo las ves tú)
 -- para grabar tomas con más gente que el límite de la partida.
 -- Sin lógica de runtime: solo UI que llama a actors/36_clones.lua.
@@ -166,6 +166,58 @@ function UCam.build_clones(Window)
         Callback     = function(v) UCam.setCloneLabels(v) end,
     })
 
+    -- ============================================================
+    -- v12.6: RENDIMIENTO
+    -- ============================================================
+    ClonesTab:CreateSection("Rendimiento")
+    ClonesTab:CreateParagraph({
+        Title   = "Cómo se mantienen los FPS",
+        Content = "El espejo no copia a 60 Hz: se limita a la tasa elegida, salta las partes que no cambiaron, agrupa todas las escrituras en un solo lote (BulkMoveTo) y actualiza menos a los clones lejanos. Los clones no colisionan, no se pueden rayear, no proyectan sombras si lo desactivas y su Humanoid/Animator están apagados. Aun así cada clon es un personaje completo: 40 siempre cuestan más que 10, y el resto del coste es dibujarlos.",
+    })
+
+    local rateLabels = { [60] = "Alta (60/s)", [30] = "Equilibrada (30/s)", [20] = "Rendimiento (20/s)" }
+    ClonesTab:CreateDropdown({
+        Name            = "Actualización del espejo",
+        Options         = { "Alta (60/s)", "Equilibrada (30/s)", "Rendimiento (20/s)" },
+        CurrentOption   = { rateLabels[C.UpdateHz] or "Equilibrada (30/s)" },
+        MultipleOptions = false,
+        Callback        = function(options)
+            local value = UCam.resolveDropdownValue(options)
+            if value and value:match("^Alta") then UCam.setCloneUpdateRate(60)
+            elseif value and value:match("^Rendimiento") then UCam.setCloneUpdateRate(20)
+            else UCam.setCloneUpdateRate(30) end
+        end,
+    })
+    ClonesTab:CreateSlider({
+        Name         = "Distancia de detalle",
+        Range        = { 80, 800 },
+        Increment    = 20,
+        Suffix       = "st",
+        CurrentValue = C.FarDistance,
+        Callback     = function(v)
+            C.FarDistance = v
+            UCam.notify("Clones", ("Los clones a más de %d st se actualizan 1 de cada %d ticks."):format(v, C.FarSkip or 2), 4)
+        end,
+    })
+    ClonesTab:CreateToggle({
+        Name         = "Proyectar sombras",
+        CurrentValue = C.CastShadows,
+        Callback     = function(v) UCam.setCloneShadows(v) end,
+    })
+    ClonesTab:CreateToggle({
+        Name         = "Apagar Humanoid de los clones (mejor FPS)",
+        CurrentValue = C.DisableHumanoid,
+        Callback     = function(v) UCam.setCloneHumanoid(v) end,
+    })
+    ClonesTab:CreateButton({
+        Name     = "📊 Ver coste actual",
+        Callback = function()
+            local s = UCam.getCloneStats()
+            UCam.notify("Clones", ("%d clones · %d partes (%d por clon) · %d Hz · ~%d CFrames/s · lote: %s"):format(
+                s.clones, s.parts, s.averageParts, s.hz, s.writesPerSecond, s.bulk and "sí" or "no"), 7)
+        end,
+    })
+
     ClonesTab:CreateSection("Mantenimiento")
     ClonesTab:CreateButton({
         Name     = "🔄 Actualizar apariencia de los clones",
@@ -192,7 +244,7 @@ function UCam.build_clones(Window)
 
     ClonesTab:CreateParagraph({
         Title   = "Consejos para la toma",
-        Content = "• Los clones no bloquean la cámara ni tus raycasts: puedes colocar a uno encima de otro sin que estorben.\n• Si el juego va lento, baja la cantidad o usa 'Fijar en el sitio' (solo actualiza la pose, no el desplazamiento).\n• Al respawnear el jugador original, sus clones se reconstruyen solos en la misma posición.\n• Todo se borra al recargar el script o al pulsar 'Eliminar TODOS'.",
+        Content = "• Los clones no bloquean la cámara ni tus raycasts: puedes colocar a uno encima de otro sin que estorben.\n• Para muchos clones usa 'Rendimiento (20/s)' y baja la distancia de detalle.\n• 'Fijar en el sitio' evita el desplazamiento, pero sigue copiando la pose.\n• Al respawnear el jugador original, sus clones se reconstruyen solos en la misma posición.\n• Todo se borra al recargar el script o al pulsar 'Eliminar TODOS'.",
     })
 
     -- Mantener la lista de jugadores al día.

@@ -975,8 +975,22 @@ UCam.Clones = {
     PlaceWithCursor = false,  -- clic en el mapa coloca el clon seleccionado
     SnapToGround    = true,   -- al colocar, apoyar sobre el suelo
     ShowLabels      = false,  -- números sobre cada clon
+    -- v12.6: rendimiento. El espejo se limita a UpdateHz (no necesita 60),
+    -- se salta lo que no cambió, se agrupa con BulkMoveTo y los clones
+    -- lejanos se actualizan cada FarSkip ticks.
+    UpdateHz        = 30,     -- 60 / 30 / 20 actualizaciones por segundo
+    FarDistance     = 300,    -- studs a partir de los cuales baja el detalle
+    FarSkip         = 2,      -- 1 de cada N actualizaciones para clones lejanos
+    CastShadows     = true,   -- proyectar sombras (desactivar sube FPS)
+    DisableHumanoid = true,   -- apagar el Humanoid de los clones (mejor FPS)
     _renderConn     = nil,
     _charConns      = {},     -- { [Player] = RBXScriptConnection }
+    _accum          = 0,      -- acumulador del limitador de tasa
+    _tick           = 0,      -- contador para el LOD
+    _bulkSupported  = nil,    -- nil = sin comprobar, false = fallback directo
+    _bulkParts      = nil,
+    _bulkCFrames    = nil,
+    _invCache       = {},
 }
 
 -- v8.1 FIX (crítico #4): timeout de 5 s. Si el juego no tiene
