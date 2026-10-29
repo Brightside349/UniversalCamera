@@ -1,4 +1,4 @@
-# Universal Camera Pro v12.6 · Clones optimizados + cámaras por modo
+# Universal Camera Pro v12.8 · Director con salto a waypoints
 
 Camara libre cinematografica para Roblox con modos de camara, espectador,
 Director, filtros, iluminacion, guias de composicion, Clean Shot, escenas,
@@ -90,7 +90,19 @@ gente.
   `Clon 03 · Nombre` y se les aplica color, material, transparencia, HEX,
   presets y restaurar igual que a un jugador.
 
-> Version estable: `v12.7.0`.
+### v12.8
+
+- **Cinematografico → Director: ir a un waypoint**: vuelve el salto individual
+  que se habia perdido al simplificar la pestaña. Lista de waypoints, boton
+  **🎯 Ir al waypoint seleccionado** y botones **◀ anterior / siguiente ▶**
+  que recorren la ruta de uno en uno con ciclo.
+- El salto no reproduce la ruta: detiene el Director si estaba activo, entra en
+  camara libre y deja el encuadre exacto del waypoint para ajustarlo a mano
+  (aplica FOV y roll cuando esos toggles estan activos).
+- La lista se refresca al guardar, deshacer o limpiar waypoints, y se
+  autocorrige cuando la seleccion ya no existe.
+
+> Version estable: `v12.8.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -100,7 +112,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.7.0`.
+La version publicada apunta al tag `v12.8.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -111,7 +123,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.7.0"
+local VERSION = "v12.8.0"
 ```
 
 ## Props locales (v11)
