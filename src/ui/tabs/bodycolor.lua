@@ -162,18 +162,31 @@ function UCam.build_bodycolor(Window)
     -- ============================================================
     -- OTROS JUGADORES
     -- ============================================================
-    Tab:CreateSection("Otros jugadores (solo local)")
+    Tab:CreateSection("Otros jugadores y clones (solo local)")
+
+    -- v12.7: los clones locales también son objetivos editables, igual que
+    -- cualquier otro jugador. Se listan como "Clon 03 · Nombre".
     local function getPlayerNames()
         local names = {}
         for _, p in ipairs(UCam.Players:GetPlayers()) do
             if p ~= UCam.player then table.insert(names, p.Name) end
         end
+        for _, entry in ipairs(UCam.getCloneTargets and UCam.getCloneTargets() or {}) do
+            table.insert(names, entry.label)
+        end
         if #names == 0 then names[1] = "(Sin otros jugadores)" end
         return names
     end
 
+    local function resolveBodyTarget(label)
+        if not label then return nil end
+        local player = UCam.Players:FindFirstChild(label)
+        if player then return player end
+        return UCam.getCloneByLabel and UCam.getCloneByLabel(label) or nil
+    end
+
     local targetDropdown = UCam.registerTargetPlayerDropdown(Tab:CreateDropdown({
-        Name = "Jugador objetivo",
+        Name = "Jugador o clon objetivo",
         Options = getPlayerNames(),
         CurrentOption = { "(Sin otros jugadores)" },
         MultipleOptions = false,
@@ -181,19 +194,21 @@ function UCam.build_bodycolor(Window)
         Callback = function(opt)
             local name = UCam.resolveDropdownValue(opt)
             if not name or name == "(Sin otros jugadores)" then return end
-            local target = UCam.Players:FindFirstChild(name)
-            if target then UCam.setTargetPlayer(target) end
+            local target = resolveBodyTarget(name)
+            if target then UCam.setBodyTarget(target) end
         end,
     }))
+    -- v12.7: la pestaña Clones llama a este hook al crear o borrar clones.
+    UCam.refreshBodyTargets = function()
+        pcall(function() targetDropdown:Refresh(getPlayerNames()) end)
+    end
     Tab:CreateButton({
-        Name = "🔄 Actualizar lista de jugadores",
-        Callback = function()
-            pcall(function() targetDropdown:Refresh(getPlayerNames()) end)
-        end,
+        Name = "🔄 Actualizar lista de jugadores y clones",
+        Callback = function() UCam.refreshBodyTargets() end,
     })
 
     Tab:CreateDropdown({
-        Name = "Parte del otro jugador",
+        Name = "Parte del objetivo",
         Options = B.PartOptions,
         CurrentOption = { B.TargetSelectedPart or "Todo" },
         MultipleOptions = false,
@@ -204,13 +219,13 @@ function UCam.build_bodycolor(Window)
         end,
     })
     local targetColor = Tab:CreateColorPicker({
-        Name = "Color para el jugador",
+        Name = "Color del objetivo",
         Color = Color3.fromRGB(255, 255, 255),
         Flag = "TargetPlayerPartColor",
         Callback = function() end,
     })
     local targetMaterial = Tab:CreateDropdown({
-        Name = "Material para el jugador",
+        Name = "Material del objetivo",
         Options = { "Plastic", "Neon", "Metal", "Glass", "Wood", "Slate", "Marble", "Granite", "Ice", "ForceField" },
         CurrentOption = { "Plastic" },
         MultipleOptions = false,
@@ -218,23 +233,23 @@ function UCam.build_bodycolor(Window)
         Callback = function() end,
     })
     Tab:CreateButton({
-        Name = "🎨 Aplicar color y material al jugador",
+        Name = "🎨 Aplicar color y material al objetivo",
         Callback = function()
             local target = B.TargetPlayer
             if not target then
-                UCam.notify("Cuerpo", "Selecciona un jugador objetivo.", 3)
+                UCam.notify("Cuerpo", "Selecciona un objetivo.", 3)
                 return
             end
             local part = B.TargetSelectedPart or "Todo"
             local mat = UCam.resolveDropdownValue(targetMaterial.CurrentOption) or "Plastic"
             UCam.applyBodyColorToPlayer(target, part, targetColor.Color, mat, nil)
-            UCam.notify("Cuerpo", string.format("%s → %s de %s", mat, part, target.Name))
+            UCam.notify("Cuerpo", string.format("%s → %s de %s", mat, part, UCam.bodyTargetName(target)))
         end,
     })
 
     local lastTargetHex = nil
     Tab:CreateInput({
-        Name = "HEX para el jugador",
+        Name = "HEX del objetivo",
         PlaceholderText = "Ej: #00AAFF",
         RemoveTextAfterFocusLost = false,
         Flag = "TargetPlayerHexColor",
@@ -243,11 +258,11 @@ function UCam.build_bodycolor(Window)
         end,
     })
     Tab:CreateButton({
-        Name = "Aplicar HEX al jugador",
+        Name = "Aplicar HEX al objetivo",
         Callback = function()
             local target = B.TargetPlayer
             if not target then
-                UCam.notify("Cuerpo", "Selecciona un jugador objetivo.", 3)
+                UCam.notify("Cuerpo", "Selecciona un objetivo.", 3)
                 return
             end
             local color = lastTargetHex and UCam.hexToColor(lastTargetHex)
@@ -256,12 +271,12 @@ function UCam.build_bodycolor(Window)
                 return
             end
             UCam.applyBodyColorToPlayer(target, B.TargetSelectedPart or "Todo", color, nil, nil)
-            UCam.notify("Cuerpo", "HEX aplicado a " .. target.Name)
+            UCam.notify("Cuerpo", "HEX aplicado a " .. UCam.bodyTargetName(target))
         end,
     })
 
     local targetPreset = Tab:CreateDropdown({
-        Name = "Preset para el jugador",
+        Name = "Preset para el objetivo",
         Options = B.PresetOptions,
         CurrentOption = { B.PresetOptions[1] },
         MultipleOptions = false,
@@ -269,26 +284,26 @@ function UCam.build_bodycolor(Window)
         Callback = function() end,
     })
     Tab:CreateButton({
-        Name = "Aplicar preset al jugador",
+        Name = "🎭 Aplicar preset al objetivo",
         Callback = function()
             local target = B.TargetPlayer
             if not target then
-                UCam.notify("Cuerpo", "Selecciona un jugador objetivo.", 3)
+                UCam.notify("Cuerpo", "Selecciona un objetivo.", 3)
                 return
             end
             local preset = UCam.resolveDropdownValue(targetPreset.CurrentOption)
             if preset then
                 UCam.applyPresetToPlayer(target, preset)
-                UCam.notify("Cuerpo", "Preset '" .. preset .. "' → " .. target.Name)
+                UCam.notify("Cuerpo", "Preset '" .. preset .. "' → " .. UCam.bodyTargetName(target))
             end
         end,
     })
     Tab:CreateButton({
-        Name = "Copiar mi aspecto al jugador",
+        Name = "Copiar mi aspecto al objetivo",
         Callback = function()
             local target = B.TargetPlayer
             if not target then
-                UCam.notify("Cuerpo", "Selecciona un jugador objetivo.", 3)
+                UCam.notify("Cuerpo", "Selecciona un objetivo.", 3)
                 return
             end
             local nameMap = {
@@ -302,20 +317,21 @@ function UCam.build_bodycolor(Window)
                         data.Color, data.Material, data.Transparency)
                 end
             end
-            UCam.notify("Cuerpo", "Aspecto copiado a " .. target.Name)
+            UCam.notify("Cuerpo", "Aspecto copiado a " .. UCam.bodyTargetName(target))
         end,
     })
     Tab:CreateButton({
-        Name = "↩ Restaurar jugador seleccionado",
+        Name = "↩ Restaurar objetivo seleccionado",
         Callback = function()
             if B.TargetPlayer then
+                local name = UCam.bodyTargetName(B.TargetPlayer)
                 UCam.restorePlayerBodyColor(B.TargetPlayer)
-                UCam.notify("Cuerpo", "Restaurado: " .. B.TargetPlayer.Name)
+                UCam.notify("Cuerpo", "Restaurado: " .. name)
             end
         end,
     })
     Tab:CreateButton({
-        Name = "🧹 Restaurar TODOS los jugadores",
+        Name = "🧹 Restaurar TODOS los jugadores y clones",
         Callback = function()
             UCam.restoreAllPlayerBodyColors()
             UCam.notify("Cuerpo", "Todos restaurados.")

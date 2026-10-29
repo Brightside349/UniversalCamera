@@ -74,7 +74,23 @@ gente.
   jugador en la lista, se borran correctamente al liberar el seguimiento y se
   reconstruyen solos cuando el original respawnea.
 
-> Version estable: `v12.6.1`.
+### v12.7
+
+- **Diseño capturado en los clones**: cada clon guarda el modelo que tenía el
+  jugador al crearlo. Si el juego permite cambiar de personaje con su propio
+  panel (por ejemplo 10 diseños y 7 cupos), el clon sigue mostrando el diseño
+  viejo y aun así copia el movimiento del personaje nuevo.
+- El emparejamiento de partes es por **rol de rig** (cabeza, torso, brazos,
+  piernas) en vez de por ruta exacta, así que funciona aunque el jugador pase
+  de R6 a R15, de R15 a R6 o a un modelo con otro orden de partes. Las piezas
+  sin equivalente se mueven rígidas junto a su parte de apoyo.
+- Toggle **Conservar diseño capturado** y botones para recapturar el diseño del
+  clon seleccionado o de todos.
+- **Cuerpo** acepta clones como objetivo: aparecen en la lista como
+  `Clon 03 · Nombre` y se les aplica color, material, transparencia, HEX,
+  presets y restaurar igual que a un jugador.
+
+> Version estable: `v12.7.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -84,7 +100,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.6.1`.
+La version publicada apunta al tag `v12.7.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -95,7 +111,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.6.1"
+local VERSION = "v12.7.0"
 ```
 
 ## Props locales (v11)
@@ -121,7 +137,7 @@ local VERSION = "v12.6.1"
 
 La animacion vive en la sesion actual; los props en si siguen guardandose.
 
-## Clones locales (v12.6)
+## Clones locales (v12.7)
 
 1. Abre la pestaña **👥 Clones** y elige a quien clonar (tu o cualquier jugador).
 2. Ajusta cantidad, formacion y separacion, y pulsa **Clonar jugador**.
@@ -135,7 +151,11 @@ La animacion vive en la sesion actual; los props en si siguen guardandose.
    **Colocar donde miro**, **Apoyar en el suelo** y girar ±15°.
 5. Si el jugador original respawnea, sus clones se reconstruyen solos en la
    misma posicion. `Eliminar TODOS` los borra de tu cliente.
-6. Con muchos clones, abre **Rendimiento**: baja la tasa del espejo a 20/s,
+6. **Diseño capturado**: con `Conservar diseño capturado` activo, el clon
+   mantiene el modelo con el que se creó aunque el jugador cambie de personaje
+   en el panel del juego, y sigue copiando su movimiento. Los clones también
+   se pintan desde la pestaña **Cuerpo** (`Clon 03 · Nombre`).
+7. Con muchos clones, abre **Rendimiento**: baja la tasa del espejo a 20/s,
    reduce la distancia de detalle, desactiva sombras y pulsa **Ver coste
    actual** para ver cuantas partes se estan moviendo realmente. El coste que
    queda es de dibujado: cada clon sigue siendo un personaje completo.
@@ -158,7 +178,7 @@ Universal Camera/
     ├── actors/
     │   ├── 30_fun.lua           # diversion, escala y efectos locales
     │   ├── 32_bodycolor.lua     # colores y materiales
-    │   └── 36_clones.lua        # clones locales y espejo optimizado (v12.6)
+    │   └── 36_clones.lua        # clones locales, espejo optimizado y diseño (v12.7)
     ├── camera/
     │   ├── 50_spectate.lua      # espectador
     │   ├── 60_director.lua      # waypoints y director
