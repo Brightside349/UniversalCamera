@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v12.4 · actors/36_clones
+-- Universal Camera Pro v12.6 · actors/36_clones
 -- Clones locales de un jugador: copias de su personaje que SOLO
 -- existen en tu cliente (nadie más las ve) y que no cuentan para el
 -- límite de jugadores de la partida. Sirven para grabar tomas con
@@ -63,23 +63,37 @@ local function relativePath(model, inst)
 end
 
 --- Empareja cada BasePart del original con su equivalente en el clon.
+-- v12.6: indices por cubo en vez de table.remove(1), que era O(n) por
+-- parte y se notaba al clonar 30 personajes de golpe.
 local function buildPartPairs(char, clone)
     local buckets = {}
     for _, desc in ipairs(clone:GetDescendants()) do
         if desc:IsA("BasePart") then
             local key = relativePath(clone, desc)
-            buckets[key] = buckets[key] or {}
-            table.insert(buckets[key], desc)
+            local bucket = buckets[key]
+            if bucket then
+                bucket[#bucket + 1] = desc
+            else
+                buckets[key] = { desc }
+            end
         end
     end
 
+    local cursor = {}
     local pairs_ = {}
+    local count = 0
     for _, desc in ipairs(char:GetDescendants()) do
         if desc:IsA("BasePart") then
-            local bucket = buckets[relativePath(char, desc)]
-            local match = bucket and table.remove(bucket, 1)
-            if match then
-                table.insert(pairs_, { orig = desc, clone = match })
+            local key = relativePath(char, desc)
+            local bucket = buckets[key]
+            if bucket then
+                local index = (cursor[key] or 0) + 1
+                local match = bucket[index]
+                if match then
+                    cursor[key] = index
+                    count = count + 1
+                    pairs_[count] = { orig = desc, clone = match }
+                end
             end
         end
     end
@@ -109,6 +123,8 @@ local function prepareCloneModel(model)
             desc.CanQuery = false
             desc.CanTouch = false
             desc.Massless = true
+            -- v12.6: las sombras de 40 personajes son caras en el shadow map.
+            desc.CastShadow = (C.CastShadows ~= false)
         elseif desc:IsA("Script") or desc:IsA("LocalScript") then
             table.insert(doomed, desc)
         end
@@ -125,6 +141,24 @@ local function prepareCloneModel(model)
         humanoid.WalkSpeed = 0
         humanoid.JumpPower = 0
         humanoid.AutoRotate = false
+        -- v12.6: al copiar CFrames no necesitamos la maquina de estados,
+        -- salud, nametag ni fisica del Humanoid. Apagarlo quita trabajo
+        -- por personaje sin cambiar el aspecto del clon.
+        if C.DisableHumanoid ~= false then
+            pcall(function()
+                humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                humanoid.Enabled = false
+                -- Evaluar la maquina de estados cuesta por personaje incluso
+                -- con el Humanoid apagado; en clientes nuevos se puede cortar.
+                humanoid.EvaluateStateMachine = false
+            end)
+            -- El Animator evalua pistas cada frame y nosotros ya escribimos
+            -- los CFrames absolutos: sin animador no se pelea con el espejo.
+            local animator = humanoid:FindFirstChildOfClass("Animator")
+            if animator then
+                pcall(function() animator:Destroy() end)
+            end
+        end
     end
 
     local root = model:FindFirstChild("HumanoidRootPart")
@@ -392,9 +426,59 @@ end
 -- LOOP DE ESPEJO
 -- ============================================================
 
-local function updateClones()
+--- Copia las poses a todos los clones.
+-- Optimizaciones v12.6:
+--   1) limite de tasa (UpdateHz): no hace falta copiar a 60 Hz.
+--   2) LOD por distancia: los clones lejanos se actualizan 1 de cada N ticks.
+--   3) solo se escribe la parte si su CFrame de origen o la base cambiaron.
+--   4) una sola llamada a BulkMoveTo por tick en vez de cientos de escrituras.
+local function updateClones(dt)
     if #C.Items == 0 then return end
+
+    local rate = math.clamp(tonumber(C.UpdateHz) or 30, 10, 60)
+    C._accum = (C._accum or 0) + (dt or 0)
+    if C._accum + 1e-4 < (1 / rate) then return end
+    C._accum = 0
+    -- Solo para diagnostico: escrituras del ultimo tick (no cuesta nada).
+    C._lastWrites = 0
+
+    local cam = workspace.CurrentCamera
+    local camPos = cam and cam.CFrame.Position
+    C._tick = (C._tick or 0) + 1
+
+    -- BulkMoveTo mueve partes ancladas y sin colision en un solo lote.
+    local useBulk = C._bulkSupported
+    if useBulk == nil then
+        useBulk = type(workspace.BulkMoveTo) == "function"
+        C._bulkSupported = useBulk
+    end
+
+    local bulkParts, bulkCFrames
+    if useBulk then
+        bulkParts = C._bulkParts
+        bulkCFrames = C._bulkCFrames
+        if not bulkParts then
+            bulkParts = {}
+            bulkCFrames = {}
+            C._bulkParts = bulkParts
+            C._bulkCFrames = bulkCFrames
+        else
+            table.clear(bulkParts)
+            table.clear(bulkCFrames)
+        end
+    end
+
     local follow = (C.Mode == MODE_FOLLOW)
+    local invCache = C._invCache
+    if not invCache then
+        invCache = {}
+        C._invCache = invCache
+    else
+        table.clear(invCache)
+    end
+
+    local farDistance = tonumber(C.FarDistance) or 0
+    local farSkip = math.max(1, math.floor(tonumber(C.FarSkip) or 2))
 
     for _, clone in ipairs(C.Items) do
         local model = clone.model
@@ -404,8 +488,7 @@ local function updateClones()
         if model and model.Parent and char and char.Parent and root then
             clone.sourceRoot = root
 
-            -- Si el original se teletransporta (respawn, comando), no
-            -- arrastrar los clones por todo el mapa: reanclar la base.
+            -- Si el original se teletransporta, reanclar la base.
             if follow then
                 if clone.lastRootPos and (root.Position - clone.lastRootPos).Magnitude > 60 then
                     clone.baseRoot = root.CFrame
@@ -413,22 +496,77 @@ local function updateClones()
                 clone.lastRootPos = root.Position
             end
 
-            local base
-            if follow and clone.baseRoot then
-                base = clone.anchorCF * clone.baseRoot:Inverse()
-            else
-                base = clone.anchorCF * root.CFrame:Inverse()
-            end
-
-            for i = 1, #clone.pairs do
-                local pair = clone.pairs[i]
-                local orig = pair.orig
-                if orig.Parent then
-                    pair.clone.CFrame = base * orig.CFrame
+            -- LOD: lejos de la camara se actualiza menos a menudo.
+            local far = camPos and farDistance > 0
+                and (root.Position - camPos).Magnitude > farDistance
+            if not (far and (C._tick % farSkip ~= 0)) then
+                local base
+                if follow and clone.baseRoot then
+                    if clone._baseRootCached ~= clone.baseRoot or not clone._baseRootInv then
+                        clone._baseRootCached = clone.baseRoot
+                        clone._baseRootInv = clone.baseRoot:Inverse()
+                    end
+                    base = clone.anchorCF * clone._baseRootInv
+                else
+                    -- Cacheados por jugador: muchos clones comparten original.
+                    -- Se reutiliza la tabla para no generar basura cada tick.
+                    local key = clone.source
+                    local entry = invCache[key]
+                    if not entry then
+                        entry = {}
+                        invCache[key] = entry
+                    end
+                    local rootCF = root.CFrame
+                    if entry.cf ~= rootCF then
+                        entry.cf = rootCF
+                        entry.inv = rootCF:Inverse()
+                    end
+                    base = clone.anchorCF * entry.inv
                 end
+
+                local baseChanged = (clone._lastBase ~= base)
+                local pairs_ = clone.pairs
+                local writes = 0
+                for i = 1, #pairs_ do
+                    local pair = pairs_[i]
+                    local orig = pair.orig
+                    if orig.Parent then
+                        local origCF = orig.CFrame
+                        if baseChanged or pair._lastOrig ~= origCF then
+                            local target = base * origCF
+                            if useBulk then
+                                bulkParts[#bulkParts + 1] = pair.clone
+                                bulkCFrames[#bulkCFrames + 1] = target
+                            else
+                                pair.clone.CFrame = target
+                            end
+                            pair._lastOrig = origCF
+                            writes = writes + 1
+                        end
+                    end
+                end
+                clone._lastBase = base
+                C._lastWrites = (C._lastWrites or 0) + writes
             end
         end
     end
+
+    if useBulk and #bulkParts > 0 then
+        local ok = pcall(function()
+            workspace:BulkMoveTo(bulkParts, bulkCFrames, Enum.BulkMoveMode.DontFireCFrameChanged)
+        end)
+        if not ok then
+            -- Fallback defensivo: escribir una a una y no volver a intentarlo.
+            C._bulkSupported = false
+            for i = 1, #bulkParts do
+                pcall(function() bulkParts[i].CFrame = bulkCFrames[i] end)
+            end
+        end
+    end
+
+    -- Media suavizada para el diagnostico (evita valores de 0 en un tick
+    -- en el que todo estaba quieto).
+    C._avgWrites = (C._avgWrites or 0) * 0.9 + (C._lastWrites or 0) * 0.1
 end
 
 local function ensureRenderLoop()
@@ -648,6 +786,72 @@ function UCam.setCloneLabels(enabled)
         applyLabel(clone)
     end
     return true
+end
+
+-- ============================================================
+-- v12.6: AJUSTES DE RENDIMIENTO
+-- ============================================================
+
+--- Cambia la frecuencia del espejo (10-60 Hz).
+function UCam.setCloneUpdateRate(hz)
+    C.UpdateHz = math.clamp(tonumber(hz) or 30, 10, 60)
+    C._accum = 0
+    return true
+end
+
+--- Activa/desactiva las sombras de todos los clones.
+function UCam.setCloneShadows(enabled)
+    C.CastShadows = enabled ~= false
+    for _, clone in ipairs(C.Items) do
+        if clone.model then
+            for _, desc in ipairs(clone.model:GetDescendants()) do
+                if desc:IsA("BasePart") then desc.CastShadow = C.CastShadows end
+            end
+        end
+    end
+    return true
+end
+
+--- Apaga o reactiva el Humanoid de los clones ya creados.
+function UCam.setCloneHumanoid(enabled)
+    C.DisableHumanoid = enabled ~= false
+    for _, clone in ipairs(C.Items) do
+        if clone.model then
+            local hum = clone.model:FindFirstChildOfClass("Humanoid")
+            if hum then
+                if C.DisableHumanoid then
+                    pcall(function()
+                        hum.Enabled = false
+                        hum:ChangeState(Enum.HumanoidStateType.Physics)
+                    end)
+                else
+                    pcall(function() hum.Enabled = true end)
+                end
+            end
+        end
+    end
+    return true
+end
+
+--- Datos para mostrar el coste actual (clones activos y partes espejadas).
+function UCam.getCloneStats()
+    local active, parts = 0, 0
+    for _, clone in ipairs(C.Items) do
+        if clone.model and clone.model.Parent then
+            active = active + 1
+            parts = parts + #clone.pairs
+        end
+    end
+    local hz = C.UpdateHz or 30
+    local writesPerTick = C._avgWrites or C._lastWrites or 0
+    return {
+        clones = active,
+        parts = parts,
+        averageParts = active > 0 and math.floor(parts / active + 0.5) or 0,
+        hz = hz,
+        writesPerSecond = math.floor(writesPerTick * hz + 0.5),
+        bulk = C._bulkSupported == true,
+    }
 end
 
 function UCam.placeSelectedCloneAtCursor()
