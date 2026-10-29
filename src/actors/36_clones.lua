@@ -21,6 +21,13 @@
 --   placeSelectedCloneAtCursor, placeSelectedCloneWhereLooking,
 --   snapSelectedCloneToGround, rotateSelectedClone,
 --   rebuildClonesFor, refreshClones, stopClones
+--
+-- v12.7: diseño capturado. Cada clon guarda el modelo con el que se creó
+-- (KeepDesign). Si el jugador cambia de personaje con el panel del juego,
+-- el clon mantiene ese diseño y sigue copiando el movimiento del personaje
+-- nuevo emparejando partes por rol de rig (R6/R15). Expone además
+-- setClonesKeepDesign, recaptureCloneDesign, getCloneTargets y
+-- getCloneByLabel (este último para pintar clones desde "Cuerpo").
 -- ============================================================
 local UCam = _G.UCam
 local C = UCam.Clones
@@ -98,6 +105,163 @@ local function buildPartPairs(char, clone)
         end
     end
     return pairs_
+end
+
+-- ============================================================
+-- v12.7: DISEÑO CAPTURADO Y CAMBIO DE PERSONAJE
+-- Un clon se crea a partir del modelo del jugador en ese momento. Si el
+-- juego permite cambiar de personaje (paneles de selección, private servers),
+-- el clon puede seguir usando el diseño viejo y aun así copiar el movimiento
+-- del personaje nuevo: las partes se emparejan por rol de rig (R6/R15) en
+-- vez de por ruta exacta.
+-- ============================================================
+
+local function normalizeName(name)
+    return (name:lower():gsub("[%s_%-]", ""))
+end
+
+--- Rol de rig de una parte. Los rigs R6 y R15 usan nombres distintos para
+-- el mismo hueso, así que se agrupan por rol equivalente.
+local RIG_ROLE = {
+    humanoidrootpart = "root",
+    head             = "head",
+    torso            = "torso",
+    uppertorso       = "torso",
+    lowertorso       = "torso",
+    leftarm          = "larm",
+    leftupperarm     = "larm",
+    leftlowerarm     = "larm_low",
+    lefthand         = "larm_hand",
+    rightarm         = "rarm",
+    rightupperarm    = "rarm",
+    rightlowerarm    = "rarm_low",
+    righthand        = "rarm_hand",
+    leftleg          = "lleg",
+    leftupperleg     = "lleg",
+    leftlowerleg     = "lleg_low",
+    leftfoot         = "lleg_foot",
+    rightleg         = "rleg",
+    rightupperleg    = "rleg",
+    rightlowerleg    = "rleg_low",
+    rightfoot        = "rleg_foot",
+}
+
+--- Roles que se prueban, en orden, cuando el rol exacto no existe en el
+-- personaje nuevo (por ejemplo clon R6 y original R15).
+local ROLE_FALLBACK = {
+    torso     = { "torso" },
+    larm      = { "larm", "larm_low" },
+    larm_low  = { "larm_low", "larm" },
+    larm_hand = { "larm_hand", "larm_low", "larm" },
+    rarm      = { "rarm", "rarm_low" },
+    rarm_low  = { "rarm_low", "rarm" },
+    rarm_hand = { "rarm_hand", "rarm_low", "rarm" },
+    lleg      = { "lleg", "lleg_low" },
+    lleg_low  = { "lleg_low", "lleg" },
+    lleg_foot = { "lleg_foot", "lleg_low", "lleg" },
+    rleg      = { "rleg", "rleg_low" },
+    rleg_low  = { "rleg_low", "rleg" },
+    rleg_foot = { "rleg_foot", "rleg_low", "rleg" },
+}
+
+--- Parte que sirve de apoyo rígido cuando no hay equivalente directo.
+local ROLE_ANCHOR = {
+    larm_low = "larm", larm_hand = "larm",
+    rarm_low = "rarm", rarm_hand = "rarm",
+    lleg_low = "lleg", lleg_foot = "lleg",
+    rleg_low = "rleg", rleg_foot = "rleg",
+}
+
+--- Empareja las partes del MODELO DEL CLON (diseño que se conserva) con las
+-- partes del personaje actual del jugador. Primero por ruta exacta, luego
+-- por rol de rig y, si no hay equivalente, la parte se mueve rígida junto a
+-- su parte de apoyo (así un antebrazo no se queda flotando).
+local function buildDesignPairs(model, char)
+    local byPath, byRole = {}, {}
+    for _, desc in ipairs(char:GetDescendants()) do
+        if desc:IsA("BasePart") then
+            local path = relativePath(char, desc)
+            if byPath[path] == nil then byPath[path] = desc end
+            local role = RIG_ROLE[normalizeName(desc.Name)]
+            if role then
+                local list = byRole[role]
+                if list then
+                    list[#list + 1] = desc
+                else
+                    byRole[role] = { desc }
+                end
+            end
+        end
+    end
+
+    local pairs_ = {}
+    local anchorOf = {}
+    local unmatched = {}
+    for _, desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("BasePart") then
+            local role = RIG_ROLE[normalizeName(desc.Name)]
+            local orig = byPath[relativePath(model, desc)]
+            if not orig and role then
+                local candidates = ROLE_FALLBACK[role] or { role }
+                for _, candidate in ipairs(candidates) do
+                    local list = byRole[candidate]
+                    if list and #list > 0 then
+                        orig = table.remove(list, 1)
+                        break
+                    end
+                end
+            end
+            if orig then
+                pairs_[#pairs_ + 1] = { orig = orig, clone = desc }
+                if role and not anchorOf[role] then anchorOf[role] = pairs_[#pairs_] end
+            else
+                unmatched[#unmatched + 1] = { clone = desc, role = role }
+            end
+        end
+    end
+
+    for _, entry in ipairs(unmatched) do
+        -- Solo se anclan partes de rig. Los accesorios y herramientas sin
+        -- equivalente se dejan como están: sus soldaduras los siguen solas.
+        -- El apoyo es la parte emparejada más cercana (antebrazo → brazo,
+        -- pie → pierna) o la raíz.
+        local anchor = nil
+        if entry.role then
+            anchor = anchorOf[ROLE_ANCHOR[entry.role] or "root"] or anchorOf.root
+        end
+        if anchor and anchor.clone and anchor.orig then
+            local anchorPart = anchor.clone
+            local ok, rel = pcall(function()
+                return anchorPart.CFrame:ToObjectSpace(entry.clone.CFrame)
+            end)
+            if ok and rel then
+                pairs_[#pairs_ + 1] = {
+                    orig  = anchor.orig,
+                    clone = entry.clone,
+                    rel   = rel,
+                }
+            end
+        end
+    end
+
+    return pairs_
+end
+
+--- Reengancha un clon al personaje actual de su jugador SIN tocar su modelo.
+local function rebindDesign(clone, char, root)
+    if not (clone and clone.model and clone.model.Parent and char and root) then return false end
+    clone._lastRebind = char
+    local newPairs = buildDesignPairs(clone.model, char)
+    if #newPairs == 0 then return false end
+    clone.pairs         = newPairs
+    clone.sourceChar    = char
+    clone.sourceRoot    = root
+    clone.baseRoot      = (C.Mode == MODE_FOLLOW) and root.CFrame or nil
+    clone._baseRootInv  = nil
+    clone._baseRootCached = nil
+    clone.lastRootPos   = root.Position
+    clone._lastBase     = nil
+    return true
 end
 
 --- Altura de la raíz sobre los pies, para apoyar el clon en el suelo.
@@ -373,6 +537,11 @@ local function rebuildOne(clone, char, root)
     clone.sourceRoot = root
     clone.footOffset = computeFootOffset(char, root)
     clone.baseRoot = (C.Mode == MODE_FOLLOW) and root.CFrame or nil
+    -- v12.7: el modelo cambió, así que el espejo debe reescribir todo.
+    clone._lastBase = nil
+    clone._lastRebind = char
+    clone._baseRootCached = nil
+    clone._baseRootInv = nil
 
     local base
     if C.Mode == MODE_FOLLOW and clone.baseRoot then
@@ -482,8 +651,33 @@ local function updateClones(dt)
 
     for _, clone in ipairs(C.Items) do
         local model = clone.model
+        local player = clone.source
         local char = clone.sourceChar
-        local root = clone.sourceRoot or (char and char:FindFirstChild("HumanoidRootPart"))
+
+        -- v12.7: el jugador cambió de personaje (panel de selección del juego).
+        -- Si se conserva el diseño, el clon mantiene su modelo y solo cambia
+        -- la fuente de movimiento. Si no, CharacterAdded lo reconstruye.
+        if C.KeepDesign and player and char and player.Character ~= char
+                and clone._lastRebind ~= player.Character then
+            local newChar, _, newRoot = sourceCharacter(player)
+            if newChar and newRoot then
+                rebindDesign(clone, newChar, newRoot)
+                char = clone.sourceChar
+            else
+                clone._lastRebind = player.Character
+            end
+        end
+
+        local root = clone.sourceRoot
+        if root and not root.Parent then root = nil end
+        if not (char and char.Parent and root) then
+            local c, _, r = sourceCharacter(player)
+            if c and r then
+                char, root = c, r
+                clone.sourceChar = c
+                clone.sourceRoot = r
+            end
+        end
 
         if model and model.Parent and char and char.Parent and root then
             clone.sourceRoot = root
@@ -538,7 +732,14 @@ local function updateClones(dt)
                     if orig.Parent then
                         local origCF = orig.CFrame
                         if baseChanged or pair._lastOrig ~= origCF then
-                            local target = base * origCF
+                            -- pair.rel: parte sin equivalente exacto en el modelo
+                            -- nuevo; se mueve rígida junto a su parte de apoyo.
+                            local target
+                            if pair.rel then
+                                target = base * origCF * pair.rel
+                            else
+                                target = base * origCF
+                            end
                             if useBulk then
                                 bulkParts[#bulkParts + 1] = pair.clone
                                 bulkCFrames[#bulkCFrames + 1] = target
@@ -922,15 +1123,22 @@ function UCam.rotateSelectedClone(degrees)
 end
 
 --- Reconstruye todos los clones de un jugador (respawn/apariencia).
-function UCam.rebuildClonesFor(player)
+-- v12.7: con KeepDesign activo no se toca el modelo: el clon conserva el
+-- diseño con el que se creó y solo se reengancha al personaje actual.
+-- @param force true = recapturar siempre la apariencia (botón de la UI)
+function UCam.rebuildClonesFor(player, force)
     local char, _, root = sourceCharacter(player)
     if not char then return 0 end
     local rebuilt = 0
     for _, clone in ipairs(C.Items) do
         if clone.source == player then
-            if rebuildOne(clone, char, root) then
-                rebuilt = rebuilt + 1
+            local ok
+            if C.KeepDesign and not force then
+                ok = rebindDesign(clone, char, root)
+            else
+                ok = rebuildOne(clone, char, root)
             end
+            if ok then rebuilt = rebuilt + 1 end
         end
     end
     return rebuilt
@@ -944,14 +1152,72 @@ function UCam.refreshClones()
     end
     local rebuilt = 0
     for player in pairs(sources) do
-        rebuilt = rebuilt + UCam.rebuildClonesFor(player)
+        rebuilt = rebuilt + UCam.rebuildClonesFor(player, true)
     end
     if rebuilt == 0 then
         UCam.notify("Clones", "No se pudo actualizar ningún clon.", 4)
     else
-        UCam.notify("Clones", ("%d clones actualizados con la apariencia actual."):format(rebuilt), 4)
+        UCam.notify("Clones", ("%d clones ahora usan la apariencia actual."):format(rebuilt), 4)
     end
     return rebuilt
+end
+
+-- ============================================================
+-- v12.7: DISEÑO Y OBJETIVOS DE "CUERPO"
+-- ============================================================
+
+--- Activa/desactiva conservar el diseño capturado al cambiar de personaje.
+function UCam.setClonesKeepDesign(enabled)
+    C.KeepDesign = enabled ~= false
+    if C.KeepDesign then
+        for _, clone in ipairs(C.Items) do
+            local char, _, root = sourceCharacter(clone.source)
+            if char and char ~= clone.sourceChar then
+                rebindDesign(clone, char, root)
+            end
+        end
+    end
+    return true
+end
+
+--- Recaptura la apariencia actual del original para el clon seleccionado.
+function UCam.recaptureCloneDesign(index)
+    index = math.floor(tonumber(index) or C.Selected)
+    local clone = C.Items[index]
+    if not clone then
+        UCam.notify("Clones", "Selecciona un clon primero.", 4)
+        return false
+    end
+    local char, _, root = sourceCharacter(clone.source)
+    if not char then
+        UCam.notify("Clones", "Ese jugador no tiene personaje ahora mismo.", 4)
+        return false
+    end
+    local ok = rebuildOne(clone, char, root)
+    if ok then
+        UCam.notify("Clones", ("Clon %02d actualizado al diseño actual."):format(index), 4)
+    end
+    return ok
+end
+
+--- Lista de clones como objetivos de la pestaña Cuerpo.
+function UCam.getCloneTargets()
+    local list = {}
+    for i, clone in ipairs(C.Items) do
+        list[i] = {
+            label = ("Clon %02d · %s"):format(i, clone.source and clone.source.Name or "?"),
+            clone = clone,
+        }
+    end
+    return list
+end
+
+function UCam.getCloneByLabel(label)
+    if not label then return nil end
+    for _, entry in ipairs(UCam.getCloneTargets()) do
+        if entry.label == label then return entry.clone end
+    end
+    return nil
 end
 
 --- Apagado limpio: usado por Unload().

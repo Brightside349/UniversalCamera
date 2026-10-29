@@ -590,16 +590,30 @@ UCam.UIRefs = {
     TargetPlayerDropdowns = {},
 }
 
-function UCam.setTargetPlayer(player)
-    if not player or player == UCam.player then return false end
-    UCam.BodyColor.TargetPlayer = player
-    if UCam.emit then UCam.emit("targetChanged", player) end
+--- v12.7: el objetivo de "Cuerpo" puede ser un jugador o un clon local.
+-- Los clones no son Players, asi que se distinguen por ser tablas con model.
+function UCam.setBodyTarget(target)
+    if not target then return false end
+    local isClone = (type(target) == "table")
+    if isClone then
+        if not (target.model and target.model.Parent) then return false end
+    else
+        if not target:IsA("Player") or target == UCam.player then return false end
+    end
+    UCam.BodyColor.TargetPlayer = target
+    if UCam.emit then UCam.emit("targetChanged", target) end
+    local label = (UCam.bodyTargetName and UCam.bodyTargetName(target)) or target.Name
     for _, dropdown in ipairs(UCam.UIRefs.TargetPlayerDropdowns or {}) do
         pcall(function()
-            if dropdown and dropdown.Set then dropdown:Set({ player.Name }) end
+            if dropdown and dropdown.Set then dropdown:Set({ label }) end
         end)
     end
     return true
+end
+
+function UCam.setTargetPlayer(player)
+    if not player or player == UCam.player then return false end
+    return UCam.setBodyTarget(player)
 end
 
 function UCam.registerTargetPlayerDropdown(dropdown)
@@ -983,6 +997,10 @@ UCam.Clones = {
     FarSkip         = 2,      -- 1 de cada N actualizaciones para clones lejanos
     CastShadows     = true,   -- proyectar sombras (desactivar sube FPS)
     DisableHumanoid = true,   -- apagar el Humanoid de los clones (mejor FPS)
+    -- v12.7: el clon conserva el diseno con el que se creo. Si el jugador
+    -- cambia de personaje (paneles de seleccion del juego), el clon mantiene
+    -- su modelo viejo y sigue copiando el movimiento del nuevo por rol de rig.
+    KeepDesign      = true,
     _renderConn     = nil,
     _charConns      = {},     -- { [Player] = RBXScriptConnection }
     _accum          = 0,      -- acumulador del limitador de tasa

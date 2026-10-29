@@ -127,6 +127,8 @@ function UCam.build_clones(Window)
                 clonesDropdown:Set({ items[selected + 1] })
             end
         end)
+        -- v12.7: los clones también se editan desde la pestaña Cuerpo.
+        if UCam.refreshBodyTargets then UCam.refreshBodyTargets() end
     end
 
     ClonesTab:CreateButton({
@@ -164,6 +166,27 @@ function UCam.build_clones(Window)
         Name         = "Mostrar números sobre los clones",
         CurrentValue = C.ShowLabels,
         Callback     = function(v) UCam.setCloneLabels(v) end,
+    })
+
+    -- ============================================================
+    -- v12.7: DISEÑO CAPTURADO
+    -- ============================================================
+    ClonesTab:CreateSection("Diseño capturado (personajes intercambiables)")
+    ClonesTab:CreateParagraph({
+        Title   = "Clonar un diseño viejo",
+        Content = "El clon guarda el modelo que tenía el jugador en el momento de crearlo. Si el juego te deja cambiar de personaje con su propio panel (por ejemplo 10 diseños y 7 cupos), el clon sigue mostrando el diseño viejo y aun así copia el movimiento del personaje nuevo: las partes se emparejan por rol (cabeza, torso, brazos, piernas) aunque el rig haya cambiado entre R6 y R15.\n\nLas piezas sin equivalente, como accesorios distintos, se quedan quietas junto al cuerpo. Con 'Conservar diseño' desactivado, el clon se reconstruye con la apariencia actual cuando el jugador respawnea o cambia de personaje.",
+    })
+    ClonesTab:CreateToggle({
+        Name         = "🧬 Conservar diseño capturado",
+        CurrentValue = C.KeepDesign,
+        Callback     = function(v) UCam.setClonesKeepDesign(v) end,
+    })
+    ClonesTab:CreateButton({
+        Name     = "🖼 Recapturar diseño del clon seleccionado",
+        Callback = function()
+            UCam.recaptureCloneDesign(C.Selected)
+            refreshCloneDropdown()
+        end,
     })
 
     -- ============================================================
@@ -220,7 +243,7 @@ function UCam.build_clones(Window)
 
     ClonesTab:CreateSection("Mantenimiento")
     ClonesTab:CreateButton({
-        Name     = "🔄 Actualizar apariencia de los clones",
+        Name     = "🔄 Recapturar diseño de TODOS los clones",
         Callback = function() UCam.refreshClones() end,
     })
     ClonesTab:CreateButton({
@@ -244,7 +267,7 @@ function UCam.build_clones(Window)
 
     ClonesTab:CreateParagraph({
         Title   = "Consejos para la toma",
-        Content = "• Los clones no bloquean la cámara ni tus raycasts: puedes colocar a uno encima de otro sin que estorben.\n• Para muchos clones usa 'Rendimiento (20/s)' y baja la distancia de detalle.\n• 'Fijar en el sitio' evita el desplazamiento, pero sigue copiando la pose.\n• Al respawnear el jugador original, sus clones se reconstruyen solos en la misma posición.\n• Todo se borra al recargar el script o al pulsar 'Eliminar TODOS'.",
+        Content = "• Los clones no bloquean la cámara ni tus raycasts: puedes colocar a uno encima de otro sin que estorben.\n• Para muchos clones usa 'Rendimiento (20/s)' y baja la distancia de detalle.\n• 'Fijar en el sitio' evita el desplazamiento, pero sigue copiando la pose.\n• Con 'Conservar diseño' activo, los clones sobreviven a los cambios de personaje del juego.\n• Los clones se pueden pintar desde la pestaña Cuerpo: aparecen en la lista como 'Clon 03 · Nombre'.\n• Todo se borra al recargar el script o al pulsar 'Eliminar TODOS'.",
     })
 
     -- Mantener la lista de jugadores al día.

@@ -64,6 +64,37 @@ local PRESETS = {
 -- ============================================================
 -- HELPERS
 -- ============================================================
+
+--- v12.7: un objetivo de "Cuerpo" puede ser un Player (su personaje) o un
+-- clon local (una tabla con .model). Devuelve el modelo sobre el que pintar.
+local function targetCharacter(target)
+    if not target then return nil end
+    if type(target) == "table" then
+        local model = target.model
+        if model and model.Parent then return model end
+        return nil
+    end
+    return target.Character
+end
+
+--- Nombre legible del objetivo (jugador o "Clon 03 · Nombre").
+function UCam.bodyTargetName(target)
+    if not target then return "?" end
+    if type(target) == "table" then
+        local index = 0
+        local items = (UCam.Clones and UCam.Clones.Items) or {}
+        for i, clone in ipairs(items) do
+            if clone == target then
+                index = i
+                break
+            end
+        end
+        local sourceName = target.source and target.source.Name or "?"
+        return ("Clon %02d · %s"):format(index, sourceName)
+    end
+    return target.Name or "?"
+end
+
 local function snapshotCharacterAppearance(character)
     local snapshot = {}
     for _, part in ipairs(character:GetDescendants()) do
@@ -316,8 +347,8 @@ end
 -- APPLY TO OTHER PLAYER (LOCAL)
 -- ============================================================
 function UCam.applyBodyColorToPlayer(player, partSelection, color, material, transparency)
-    if not player or not player.Character then return end
-    local character = player.Character
+    local character = targetCharacter(player)
+    if not character then return end
     
     -- Snapshot if first time
     if not UCam.BodyColor._playerTargets[player] then
@@ -342,8 +373,8 @@ function UCam.applyBodyColorToPlayer(player, partSelection, color, material, tra
 end
 
 function UCam.applyPresetToPlayer(player, presetName)
-    if not player or not player.Character then return end
-    local character = player.Character
+    local character = targetCharacter(player)
+    if not character then return end
     
     local preset = PRESETS[presetName] or UCam.BodyColor.Presets[presetName]
     if not preset then return end
@@ -459,8 +490,8 @@ function UCam.restorePlayerBodyColor(player)
 end
 
 function UCam.restoreAllPlayerBodyColors()
-    for player, data in pairs(UCam.BodyColor._playerTargets) do
-        if player and player.Character then
+    for target, data in pairs(UCam.BodyColor._playerTargets) do
+        if target and targetCharacter(target) then
             restoreCharacterAppearance(data.originalAppearance)
         end
     end
