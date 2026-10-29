@@ -4,7 +4,7 @@
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v12.3.0"
+local VERSION = "v12.4.0"
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
 local MAX_RETRIES = 3
@@ -32,6 +32,7 @@ local ORDER = {
     "actors/32_bodycolor.lua",
     "actors/33_poses.lua",
     "actors/35_playermod.lua",
+    "actors/36_clones.lua",
     "props/45_props.lua",
     "camera/50_spectate.lua",
     "camera/60_director.lua",
@@ -53,6 +54,7 @@ local ORDER = {
     "ui/tabs/estudio.lua",
     "ui/tabs/gimbal.lua",
     "ui/tabs/props.lua",
+    "ui/tabs/clones.lua",
     "ui/tabs/fun.lua",
     "ui/tabs/bodycolor.lua",
     "ui/tabs/poses.lua",
@@ -141,7 +143,7 @@ end
 table.clear(sources)
 
 if #failedList == 0 then
-    print(("[UCam] Universal Camera Pro v12.1 cargado OK (%d partes). Local: props, guias, Replay Pro."):format(loaded))
+    print(("[UCam] Universal Camera Pro v12.4 cargado OK (%d partes). Local: clones, props, guias, Replay Pro."):format(loaded))
 else
     warn(("[UCam] Carga completada con %d errores. Fallaron: %s"):format(
         #failedList,

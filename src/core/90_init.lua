@@ -28,6 +28,7 @@ function UCam.Unload()
         if UCam.stopAdvPoses then UCam.stopAdvPoses() end
         if UCam.stopBodyColor then UCam.stopBodyColor() end
         if UCam.stopPlayerMod then UCam.stopPlayerMod() end
+        if UCam.stopClones then UCam.stopClones() end
         if UCam.restoreAllPlayers then UCam.restoreAllPlayers() end
         if UCam.stopReplay then UCam.stopReplay() end
         if UCam.destroyGreenScreen then UCam.destroyGreenScreen() end
