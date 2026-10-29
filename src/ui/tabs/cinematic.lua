@@ -5,6 +5,8 @@
 -- v12.5: se unificaron los one-shots de shake en un solo botón, se
 -- retiraron el editor por-waypoint, la exportación/importación de rutas
 -- y los slots duplicados. Todo lo esencial del Director queda junto.
+-- v12.8: vuelve el salto individual a waypoints (lista + anterior/siguiente)
+-- usando UCam.directorGoToWaypoint, sin reproducir la ruta.
 -- ============================================================
 local UCam = _G.UCam
 
@@ -187,6 +189,82 @@ function UCam.build_cinematic(Window)
                 pcall(UCam.clearPathVisualizer)
             end
         end,
+    })
+
+    -- ============================================================
+    -- IR A UN WAYPOINT
+    -- La API (UCam.directorGoToWaypoint) sobrevivió a la limpieza de la UI,
+    -- pero no tenía ningún control. Aquí vuelve el salto individual: elegir
+    -- un waypoint de la lista, ir directo a él o recorrerlos con anterior /
+    -- siguiente sin reproducir la ruta.
+    -- ============================================================
+    CinematicTab:CreateSection("Director: ir a un waypoint")
+    local selectedWaypoint = UCam.directorGetWaypointOptions()[1]
+
+    local function waypointIndexFromSelection()
+        return tonumber(tostring(selectedWaypoint or ""):match("^(%d+)"))
+    end
+
+    local function setSelectedWaypoint(index)
+        local options = UCam.directorGetWaypointOptions()
+        if not options[index] then return end
+        selectedWaypoint = options[index]
+        if UCam.UIRefs.WaypointDropdown then
+            pcall(function() UCam.UIRefs.WaypointDropdown:Set({ selectedWaypoint }) end)
+        end
+    end
+
+    UCam.UIRefs.WaypointDropdown = CinematicTab:CreateDropdown({
+        Name = "Waypoint",
+        Options = UCam.directorGetWaypointOptions(),
+        CurrentOption = { selectedWaypoint },
+        MultipleOptions = false,
+        Callback = function(o)
+            local v = UCam.resolveDropdownValue(o)
+            if v then selectedWaypoint = v end
+        end,
+    })
+
+    CinematicTab:CreateButton({
+        Name = "🎯 Ir al waypoint seleccionado",
+        Callback = function()
+            local total = #UCam.Waypoint.List
+            if total == 0 then
+                UCam.notify("Waypoints", "Guarda un waypoint primero.", 3)
+                return
+            end
+            -- Sin selección válida (o lista cambiada) cae al primero.
+            local index = math.clamp(waypointIndexFromSelection() or 1, 1, total)
+            setSelectedWaypoint(index)
+            UCam.directorGoToWaypoint(index)
+        end,
+    })
+
+    local function stepWaypoint(delta)
+        local total = #UCam.Waypoint.List
+        if total == 0 then
+            UCam.notify("Waypoints", "Guarda un waypoint primero.", 3)
+            return
+        end
+        local index = waypointIndexFromSelection()
+        if index then
+            index = index + delta
+            -- Ciclo: del último salta al primero y viceversa.
+            if index < 1 then index = total elseif index > total then index = 1 end
+        else
+            index = (delta > 0) and 1 or total
+        end
+        setSelectedWaypoint(index)
+        UCam.directorGoToWaypoint(index)
+    end
+
+    CinematicTab:CreateButton({
+        Name = "◀ Waypoint anterior",
+        Callback = function() stepWaypoint(-1) end,
+    })
+    CinematicTab:CreateButton({
+        Name = "Siguiente waypoint ▶",
+        Callback = function() stepWaypoint(1) end,
     })
 
     CinematicTab:CreateSection("Director: plantillas de toma")
