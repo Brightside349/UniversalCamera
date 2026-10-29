@@ -560,3 +560,71 @@ UCam.trackConnection(
     UCam.RunService.RenderStepped:Connect(updatePropsDrag),
     "Props:Drag"
 )
+
+-- ============================================================
+-- v12.5: API DE TRANSFORMACION (usada por el Animador y la UI)
+-- ============================================================
+
+--- Devuelve la CFrame actual de un prop (pivot del modelo o CFrame de la parte).
+function UCam.getPropCFrame(index)
+    local item = UCam.Props.Items[math.floor(tonumber(index) or 0)]
+    if not (item and item.model and item.model.Parent) then return nil end
+    local cf
+    pcall(function()
+        if item.model:IsA("Model") then
+            cf = item.model:GetPivot()
+        elseif item.model:IsA("BasePart") then
+            cf = item.model.CFrame
+        end
+    end)
+    return cf
+end
+
+--- Coloca un prop en una CFrame (sin guardar por defecto, para animar).
+function UCam.setPropCFrame(index, cf, save)
+    local item = UCam.Props.Items[math.floor(tonumber(index) or 0)]
+    if not (item and item.model and item.model.Parent) then return false end
+    if typeof(cf) ~= "CFrame" then return false end
+    local ok = pcall(function()
+        if item.model:IsA("Model") then
+            item.model:PivotTo(cf)
+        elseif item.model:IsA("BasePart") then
+            item.model.CFrame = cf
+        end
+        item.cf = cf
+    end)
+    if ok and save then notifyPropsSaved() end
+    return ok
+end
+
+--- Mueve el prop seleccionado un offset en studs.
+function UCam.nudgeSelectedProp(offset)
+    local P = UCam.Props
+    local cf = UCam.getPropCFrame(P.Selected)
+    if not cf then return false end
+    return UCam.setPropCFrame(P.Selected, cf + (offset or Vector3.new()), true)
+end
+
+--- Duplica el prop indicado (o el seleccionado) junto a su original.
+function UCam.duplicateProp(index)
+    local P = UCam.Props
+    index = math.floor(tonumber(index) or P.Selected)
+    local item = P.Items[index]
+    if not (item and item.assetId) then
+        UCam.notify("Props", "Selecciona un prop para duplicarlo.", 4)
+        return false
+    end
+    local cf = UCam.getPropCFrame(index)
+    local newCF = cf and (cf + Vector3.new(4, 0, 0)) or nil
+    local ok = UCam.spawnProp(item.assetId, {
+        cf        = newCF,
+        scale     = item.scale,
+        canCollide = item.canCollide,
+        name      = item.name,
+        silent    = true,
+    })
+    if ok then
+        UCam.notify("Props", ("Prop duplicado: %s."):format(item.name or "?"))
+    end
+    return ok
+end

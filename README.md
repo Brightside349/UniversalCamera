@@ -1,10 +1,10 @@
-# Universal Camera Pro v12.4 · Runtime estable + herramientas cinematográficas
+# Universal Camera Pro v12.5 · Cámaras por modo + animador de props
 
 Camara libre cinematografica para Roblox con modos de camara, espectador,
-Director, Replay Pro local, filtros, guias de composicion, Clean Shot,
-escenas, herramientas locales para creadores, **Props**: decoraciones que
-traes por ID de asset y solo tu ves, y **Clones**: copias locales de
-cualquier jugador para grabar tomas con mucha gente.
+Director, filtros, iluminacion, guias de composicion, Clean Shot, escenas,
+**Props** locales por ID de asset, **Animador** con timeline de keyframes y
+**Clones**: copias locales de cualquier jugador para grabar tomas con mucha
+gente.
 
 ### v12.1
 
@@ -33,7 +33,26 @@ cualquier jugador para grabar tomas con mucha gente.
 - Colocación con clic en el mapa, snap al suelo, rotación y formaciones
   (cuadricula, fila, circulo) al clonar.
 
-> Version estable: `v12.4.0`.
+### v12.5
+
+- **Inicio** sin "Recuperacion V10" ni "Acciones rapidas". El HUD tiene un solo
+  comportamiento: se oculta al activar la camara libre y vuelve al salir, con un
+  toggle manual para ocultarlo sin cámara libre.
+- **Cámaras** muestra solo los controles del modo elegido y añade el modo
+  **Personalizada** (distancia, altura, giro, inclinacion, sway, roll y FOV).
+- **Espectador** y **Cinematografico** unificados: encuadre condicional, un solo
+  boton de shake y Director condensado.
+- **Filtros** sin la parrilla de 30 botones; **Iluminacion** con presets en
+  selectores.
+- **Estudio** mejorado: croma unificado, rotacion y ajuste automatico al encuadre.
+- **Props** con empuje por ejes y duplicado. Nueva pestaña **Animador**:
+  timeline de keyframes para animar props en conjunto o por separado, con
+  duracion, easing, loop, reproduccion y tecla rapida.
+- **Diversion** y **Cuerpo** unificados.
+- Eliminadas las pestañas **Poses**, **Mod Jugadores**, **Replay**, **Perfiles**
+  y **Demo** (y su estado, persistencia y referencias).
+
+> Version estable: `v12.5.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -43,7 +62,7 @@ cualquier jugador para grabar tomas con mucha gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.4.0`.
+La version publicada apunta al tag `v12.5.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -54,7 +73,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.4.0"
+local VERSION = "v12.5.0"
 ```
 
 ## Props locales (v11)
@@ -63,9 +82,22 @@ local VERSION = "v12.4.0"
 2. Todo se crea en tu cliente: **nadie mas lo ve** y no se envia al servidor.
 3. Muevelo con **Mover con camara** (rueda = acercar/alejar), **Colocar donde
    miro** (raycast) o **Apoyar en el suelo**.
-4. Rota ±15° por eje, escala 0.1x–20x y activa colision si lo necesitas.
+4. Empuja por ejes, rota en yaw/pitch/roll, escala 0.1x–20x, duplica y activa
+   colision si lo necesitas.
 5. Los props se guardan en tu config por juego y **reaparecen solos** la
    proxima sesion. `Eliminar TODOS` los borra y tambien limpia el guardado.
+
+## Animador de props (v12.5)
+
+1. Coloca y posiciona los props que quieras animar.
+2. Abre **🎬 Animador** y elige el alcance: `Todos` (conjunto) o
+   `Prop seleccionado` (cada uno con su propio ritmo).
+3. Mueve el slider de tiempo, mueve los props a la pose deseada y pulsa
+   **Guardar keyframe**. Repite para cada momento.
+4. Ajusta duracion, easing y loop, y pulsa **Reproducir** (o la tecla `P`).
+   `Volver al inicio` devuelve los props a la primera pose.
+
+La animacion vive en la sesion actual; los props en si siguen guardandose.
 
 ## Clones locales (v12.4)
 
@@ -100,21 +132,17 @@ Universal Camera/
     ├── actors/
     │   ├── 30_fun.lua           # diversion, escala y efectos locales
     │   ├── 32_bodycolor.lua     # colores y materiales
-    │   ├── 33_poses.lua         # poses y morphs
-    │   ├── 35_playermod.lua     # modificaciones locales a jugadores
     │   └── 36_clones.lua        # clones locales de jugadores (v12.4)
     ├── camera/
     │   ├── 50_spectate.lua      # espectador
-    │   ├── 55_replay.lua         # grabacion y reproduccion
-    │   ├── 60_director.lua       # waypoints y director
-    │   └── 70_camcore.lua        # nucleo de camara y render loop
+    │   ├── 60_director.lua      # waypoints y director
+    │   └── 70_camcore.lua       # nucleo de camara y render loop
     ├── props/
-    │   └── 45_props.lua          # props locales por ID de asset (v11)
-    ├── presets/
-    │   └── 57_profiles.lua      # perfiles completos
+    │   ├── 45_props.lua         # props locales por ID de asset (v11)
+    │   └── 46_propsanim.lua     # timeline de keyframes (v12.5)
     ├── runtime/
     │   ├── 85_performance.lua  # diagnostico de frame budget
-    │   ├── 88_v9extras.lua      # eventos, gamepad, escenas y timelapse
+    │   ├── 88_v9extras.lua      # eventos, gamepad y escenas
     │   └── 89_v10extras.lua     # captura, guias y recovery
     ├── extensions/
     │   └── 85_plugins.lua       # API y carga de plugins
@@ -130,7 +158,7 @@ El orden canonico esta en `Loader.lua`. Las carpetas organizan la propiedad
 de cada dominio, pero no sustituyen el orden de dependencias de Luau:
 
 ```text
-core → visuals → actors → camera → props → presets → runtime/extensions
+core → visuals → actors → props → camera → runtime/extensions
      → ui/00_registry → ui/tabs → ui/90_builder → core/90_init
 ```
 

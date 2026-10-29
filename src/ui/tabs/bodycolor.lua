@@ -1,539 +1,381 @@
 -- ============================================================
--- Universal Camera Pro v7 · ui/bodycolor
--- UI para el módulo de Coloreo de Cuerpo Avanzado
+-- Universal Camera Pro v12.5 · ui/bodycolor
+-- Pestaña Cuerpo: color, material y transparencia por partes, presets,
+-- arcoíris y aplicación local a otros jugadores.
+--
+-- v12.5: se unificaron las acciones (un solo botón de aplicar por
+-- bloque), los presets pasaron a un selector y se retiró la duplicación
+-- de controles del módulo Mod Jugadores.
 -- ============================================================
 local UCam = _G.UCam
+local B = UCam.BodyColor
 
 function UCam.build_bodycolor(Window)
     local Tab = Window:CreateTab("🎨 Cuerpo", 4483362458)
-    
+
     -- ============================================================
-    -- SECCIÓN: COLOREO POR PARTES
+    -- MI PERSONAJE
     -- ============================================================
-    local SectionParts = Tab:CreateSection("Coloreo por Partes")
-    
+    Tab:CreateSection("Mi personaje")
     Tab:CreateParagraph({
-        Title = "Sistema Avanzado de Coloreo",
-        Content = "Controla color, material y transparencia de cada parte del cuerpo individualmente."
+        Title = "Control por partes",
+        Content = "Elige una parte (o Todo), ajusta color, material y transparencia, y aplica. Los cambios son locales.",
     })
-    
-    local partDropdown = Tab:CreateDropdown({
-        Name = "Seleccionar Parte",
-        Options = UCam.BodyColor.PartOptions,
-        CurrentOption = {UCam.BodyColor.SelectedPart},
+    Tab:CreateDropdown({
+        Name = "Parte",
+        Options = B.PartOptions,
+        CurrentOption = { B.SelectedPart },
+        MultipleOptions = false,
         Flag = "BodyPartSelection",
         Callback = function(opt)
             local part = UCam.resolveDropdownValue(opt)
-            if part then
-                UCam.BodyColor.SelectedPart = part
-            end
+            if part then B.SelectedPart = part end
         end,
     })
-    
     local colorPicker = Tab:CreateColorPicker({
-        Name = "Color de Parte",
+        Name = "Color",
         Color = Color3.fromRGB(255, 255, 255),
         Flag = "BodyPartColor",
-        Callback = function(color)
-            -- v8.1: No notificar aquí, solo guardar el color seleccionado.
-            -- El usuario aplicará con el botón "Aplicar a Todo el Cuerpo"
+        Callback = function() end,
+    })
+    local materialDropdown = Tab:CreateDropdown({
+        Name = "Material",
+        Options = { "Plastic", "Neon", "Metal", "Glass", "Wood", "Slate", "Marble", "Granite", "Ice", "ForceField" },
+        CurrentOption = { "Plastic" },
+        MultipleOptions = false,
+        Flag = "BodyPartMaterial",
+        Callback = function() end,
+    })
+    local transparencySlider = Tab:CreateSlider({
+        Name = "Transparencia", Range = { 0, 1 }, Increment = 0.05,
+        CurrentValue = 0,
+        Flag = "BodyPartTransparency",
+        Callback = function() end,
+    })
+
+    local function selectedMaterial()
+        return UCam.resolveDropdownValue(materialDropdown.CurrentOption) or "Plastic"
+    end
+
+    Tab:CreateButton({
+        Name = "✅ Aplicar a la parte seleccionada",
+        Callback = function()
+            if not B.SelectedPart then
+                UCam.notify("Cuerpo", "Selecciona una parte primero.", 3)
+                return
+            end
+            UCam.applyBodyColorToPart(B.SelectedPart, colorPicker.Color, selectedMaterial(), transparencySlider.CurrentValue)
+            UCam.notify("Cuerpo", "Aplicado a " .. B.SelectedPart)
+        end,
+    })
+    Tab:CreateButton({
+        Name = "✅ Aplicar a TODO el cuerpo",
+        Callback = function()
+            UCam.applyBodyColorToPart("Todo", colorPicker.Color, selectedMaterial(), transparencySlider.CurrentValue)
+            UCam.notify("Cuerpo", "Aplicado a todo el cuerpo")
+        end,
+    })
+    Tab:CreateButton({
+        Name = "↩ Restaurar colores originales",
+        Callback = function()
+            UCam.restoreBodyColor()
+            UCam.notify("Cuerpo", "Colores restaurados")
         end,
     })
 
-    -- v7: Campo de código HEX para uno mismo.
-    -- El callback se dispara al perder foco/Enter: aplica a la parte seleccionada.
-    -- Guardamos el último texto en lastBodyHex para que el botón "TODO el cuerpo" lo reutilice.
-    local lastBodyHex = nil
+    Tab:CreateSection("Color por código HEX")
+    local lastHex = nil
     Tab:CreateInput({
-        Name = "Color por código HEX (#RRGGBB)",
-        PlaceholderText = "Ej: #FF5500 → aplica a la parte",
+        Name = "HEX (#RRGGBB)",
+        PlaceholderText = "Ej: #FF5500",
         RemoveTextAfterFocusLost = false,
         Flag = "BodyPartHexColor",
         Callback = function(text)
-            if not text or text == "" then return end
-            lastBodyHex = text
-            local color = UCam.hexToColor(text)
-            if not color then
-                UCam.notify("Coloreo", "Código inválido. Usa #RRGGBB (ej. #3366FF)", 4)
-                return
-            end
-            local part = UCam.BodyColor.SelectedPart
-            if not part then return end
-            UCam.applyBodyColorToPart(part, color, nil, nil)
-            UCam.notify("Coloreo", string.format("HEX %s → %s", text, part))
+            if text and text ~= "" then lastHex = text end
         end,
     })
-
-    Tab:CreateButton({
-        Name = "Aplicar HEX a TODO el cuerpo",
-        Callback = function()
-            if not lastBodyHex or lastBodyHex == "" then
-                UCam.notify("Coloreo", "Primero escribe un código HEX arriba", 3)
-                return
-            end
-            local color = UCam.hexToColor(lastBodyHex)
-            if not color then
-                UCam.notify("Coloreo", "Código inválido: " .. lastBodyHex, 4)
-                return
-            end
-            UCam.applyBodyColorToPart("Todo", color, nil, nil)
-            UCam.notify("Coloreo", string.format("HEX %s → todo el cuerpo", lastBodyHex))
-        end,
-    })
-
-    local materialDropdown = Tab:CreateDropdown({
-        Name = "Material de Parte",
-        Options = {"Plastic", "Neon", "Metal", "Glass", "Wood", "Slate", "Marble", "Granite", "Ice", "ForceField"},
-        CurrentOption = {"Plastic"},
-        Flag = "BodyPartMaterial",
-        Callback = function(opt)
-            -- v8.1: No notificar aquí, solo guardar la selección.
-            -- El usuario aplicará con el botón "Aplicar a Todo el Cuerpo"
-        end,
-    })
-    
-    local transparencySlider = Tab:CreateSlider({
-        Name = "Transparencia",
-        Range = {0, 1},
-        Increment = 0.05,
-        CurrentValue = 0,
-        Flag = "BodyPartTransparency",
-        Callback = function(value)
-            -- v8.1: No aplicar automáticamente para evitar spam.
-            -- El usuario aplicará con el botón "Aplicar a Todo el Cuerpo"
-        end,
-    })
-    
-    Tab:CreateButton({
-        Name = "Aplicar a Parte Seleccionada",
-        Callback = function()
-            local part = UCam.BodyColor.SelectedPart
-            if not part then
-                UCam.notify("Coloreo", "Selecciona una parte primero", 3)
-                return
-            end
-            local color = colorPicker.Color
-            local material = UCam.resolveDropdownValue(materialDropdown.CurrentOption)
-            local transparency = transparencySlider.CurrentValue
-            
-            UCam.applyBodyColorToPart(part, color, material, transparency)
-            UCam.notify("Coloreo", "Configuración aplicada a " .. part)
-        end,
-    })
-    
-    Tab:CreateButton({
-        Name = "Aplicar a Todo el Cuerpo",
-        Callback = function()
-            local color = colorPicker.Color
-            local material = UCam.resolveDropdownValue(materialDropdown.CurrentOption)
-            local transparency = transparencySlider.CurrentValue
-            
-            UCam.applyBodyColorToPart("Todo", color, material, transparency)
-            UCam.notify("Coloreo", "Configuración aplicada a todo el cuerpo")
-        end,
-    })
-    
-    Tab:CreateButton({
-        Name = "Restaurar Colores Originales",
-        Callback = function()
-            UCam.restoreBodyColor()
-            UCam.notify("Coloreo", "Colores restaurados")
-        end,
-    })
-    
-    -- ============================================================
-    -- SECCIÓN: PRESETS
-    -- ============================================================
-    local SectionPresets = Tab:CreateSection("Presets de Aspecto")
-    
-    Tab:CreateParagraph({
-        Title = "Presets Predefinidos",
-        Content = "Transformaciones completas del aspecto de tu personaje."
-    })
-    
-    -- v9 FIX (bug UI): antes se iteraba un hash con pairs() → los botones salían
-    -- en orden aleatorio en cada carga. Ahora es un array ordenado con ipairs().
-    local presetButtons = {
-        { name = "Robot",     label = "🤖 Robot (Metal plateado)" },
-        { name = "Fantasma",  label = "👻 Fantasma (Transparente)" },
-        { name = "Demonio",   label = "😈 Demonio (Neon rojo)" },
-        { name = "Dorado",    label = "⭐ Dorado (Mármol dorado)" },
-        { name = "Invisible", label = "👁️ Invisible Total" },
-        { name = "Glitch",    label = "⚡ Glitch (Colores aleatorios)" },
-    }
-
-    for _, preset in ipairs(presetButtons) do
-        Tab:CreateButton({
-            Name = preset.label,
-            Callback = function()
-                UCam.applyPreset(preset.name)
-                UCam.notify("Coloreo", "Preset aplicado: " .. preset.name)
-            end,
-        })
+    local function applyHex(targetAll)
+        if not lastHex then
+            UCam.notify("Cuerpo", "Escribe un HEX primero.", 3)
+            return
+        end
+        local color = UCam.hexToColor(lastHex)
+        if not color then
+            UCam.notify("Cuerpo", "HEX inválido: " .. lastHex, 4)
+            return
+        end
+        UCam.applyBodyColorToPart(targetAll and "Todo" or B.SelectedPart, color, nil, nil)
+        UCam.notify("Cuerpo", string.format("HEX %s aplicado", lastHex))
     end
-    
-    -- ============================================================
-    -- SECCIÓN: RAINBOW (ARCOÍRIS ANIMADO)
-    -- ============================================================
-    local SectionRainbow = Tab:CreateSection("Arcoíris Animado")
-    
-    local rainbowToggle = Tab:CreateToggle({
-        Name = "Activar Arcoíris",
-        CurrentValue = false,
-        Flag = "BodyRainbowEnabled",
-        Callback = function(enabled)
-            UCam.BodyColor.RainbowEnabled = enabled
-            if enabled then
-                UCam.initBodyColor()
-                UCam.notify("Coloreo", "Arcoíris activado")
-            else
-                UCam.notify("Coloreo", "Arcoíris desactivado")
-            end
-        end,
+    Tab:CreateButton({
+        Name = "Aplicar HEX a la parte",
+        Callback = function() applyHex(false) end,
     })
-    
-    Tab:CreateSlider({
-        Name = "Velocidad Arcoíris",
-        Range = {0.1, 5.0},
-        Increment = 0.1,
-        CurrentValue = 1.0,
-        Flag = "BodyRainbowSpeed",
-        Callback = function(value)
-            UCam.BodyColor.RainbowSpeed = value
-        end,
+    Tab:CreateButton({
+        Name = "Aplicar HEX a todo el cuerpo",
+        Callback = function() applyHex(true) end,
     })
-    
+
+    Tab:CreateSection("Presets de aspecto")
     Tab:CreateDropdown({
-        Name = "Parte con Arcoíris",
-        Options = UCam.BodyColor.PartOptions,
-        CurrentOption = {"Todo"},
-        Flag = "BodyRainbowPart",
-        Callback = function(opt)
-            local part = UCam.resolveDropdownValue(opt)
-            if part then
-                UCam.BodyColor.RainbowPart = part
+        Name = "Elegir y aplicar",
+        Options = B.PresetOptions,
+        CurrentOption = { B.PresetOptions[1] },
+        MultipleOptions = false,
+        Callback = function(o)
+            local v = UCam.resolveDropdownValue(o)
+            if v then
+                UCam.applyPreset(v)
+                UCam.notify("Cuerpo", "Preset aplicado: " .. v)
             end
         end,
     })
-    
-    -- ============================================================
-    -- SECCIÓN: APLICAR A OTROS JUGADORES
-    -- ============================================================
-    local SectionPlayers = Tab:CreateSection("Aplicar a Otros Jugadores (Local)")
-    
-    Tab:CreateParagraph({
-        Title = "Modificar Jugadores",
-        Content = "Aplica colores, materiales y presets a otros jugadores. Solo visible para ti."
+
+    Tab:CreateSection("Arcoíris animado")
+    Tab:CreateToggle({
+        Name = "Activar arcoíris",
+        CurrentValue = B.RainbowEnabled,
+        Flag = "BodyRainbowEnabled",
+        Callback = function(v)
+            B.RainbowEnabled = v
+            if v then UCam.initBodyColor() end
+        end,
     })
-    
+    Tab:CreateSlider({
+        Name = "Velocidad", Range = { 0.1, 5 }, Increment = 0.1,
+        CurrentValue = B.RainbowSpeed,
+        Flag = "BodyRainbowSpeed",
+        Callback = function(v) B.RainbowSpeed = v end,
+    })
+    Tab:CreateDropdown({
+        Name = "Parte con arcoíris",
+        Options = B.PartOptions,
+        CurrentOption = { B.RainbowPart },
+        MultipleOptions = false,
+        Flag = "BodyRainbowPart",
+        Callback = function(o)
+            local part = UCam.resolveDropdownValue(o)
+            if part then B.RainbowPart = part end
+        end,
+    })
+
+    -- ============================================================
+    -- OTROS JUGADORES
+    -- ============================================================
+    Tab:CreateSection("Otros jugadores (solo local)")
     local function getPlayerNames()
         local names = {}
         for _, p in ipairs(UCam.Players:GetPlayers()) do
-            if p ~= UCam.player then
-                table.insert(names, p.Name)
-            end
+            if p ~= UCam.player then table.insert(names, p.Name) end
         end
+        if #names == 0 then names[1] = "(Sin otros jugadores)" end
         return names
     end
-    
-    local targetPlayerDropdown = UCam.registerTargetPlayerDropdown(Tab:CreateDropdown({
-        Name = "Jugador Objetivo",
+
+    local targetDropdown = UCam.registerTargetPlayerDropdown(Tab:CreateDropdown({
+        Name = "Jugador objetivo",
         Options = getPlayerNames(),
-        CurrentOption = {""},
+        CurrentOption = { "(Sin otros jugadores)" },
+        MultipleOptions = false,
         Flag = "TargetPlayerBodyColor",
         Callback = function(opt)
-            local playerName = UCam.resolveDropdownValue(opt)
-            if playerName then
-                local targetPlayer = UCam.Players:FindFirstChild(playerName)
-                if targetPlayer then
-                    UCam.setTargetPlayer(targetPlayer)
-                end
-            end
+            local name = UCam.resolveDropdownValue(opt)
+            if not name or name == "(Sin otros jugadores)" then return end
+            local target = UCam.Players:FindFirstChild(name)
+            if target then UCam.setTargetPlayer(target) end
         end,
     }))
-    
     Tab:CreateButton({
-        Name = "🔄 Actualizar Lista de Jugadores",
+        Name = "🔄 Actualizar lista de jugadores",
         Callback = function()
-            targetPlayerDropdown:Refresh(getPlayerNames())
-            UCam.notify("Coloreo", "Lista actualizada")
+            pcall(function() targetDropdown:Refresh(getPlayerNames()) end)
         end,
     })
 
-    -- v7: COLOREO POR PARTES A OTRO JUGADOR (incluye HEX)
-    local targetPartDropdown = Tab:CreateDropdown({
-        Name = "Parte a colorear (otro jugador)",
-        Options = UCam.BodyColor.PartOptions,
-        CurrentOption = {"Todo"},
+    Tab:CreateDropdown({
+        Name = "Parte del otro jugador",
+        Options = B.PartOptions,
+        CurrentOption = { B.TargetSelectedPart or "Todo" },
+        MultipleOptions = false,
         Flag = "TargetPlayerBodyPart",
         Callback = function(opt)
             local part = UCam.resolveDropdownValue(opt)
-            if part then
-                UCam.BodyColor.TargetSelectedPart = part
-            end
+            if part then B.TargetSelectedPart = part end
         end,
     })
-    UCam.BodyColor.TargetSelectedPart = UCam.BodyColor.TargetSelectedPart or "Todo"
-
-    local targetColorPicker = Tab:CreateColorPicker({
-        Name = "Color del otro jugador (parte)",
+    local targetColor = Tab:CreateColorPicker({
+        Name = "Color para el jugador",
         Color = Color3.fromRGB(255, 255, 255),
         Flag = "TargetPlayerPartColor",
-        Callback = function(color)
-            -- v8.1: Solo guarda; se aplica con el botón para evitar spam
+        Callback = function() end,
+    })
+    local targetMaterial = Tab:CreateDropdown({
+        Name = "Material para el jugador",
+        Options = { "Plastic", "Neon", "Metal", "Glass", "Wood", "Slate", "Marble", "Granite", "Ice", "ForceField" },
+        CurrentOption = { "Plastic" },
+        MultipleOptions = false,
+        Flag = "TargetPlayerMaterial",
+        Callback = function() end,
+    })
+    Tab:CreateButton({
+        Name = "🎨 Aplicar color y material al jugador",
+        Callback = function()
+            local target = B.TargetPlayer
+            if not target then
+                UCam.notify("Cuerpo", "Selecciona un jugador objetivo.", 3)
+                return
+            end
+            local part = B.TargetSelectedPart or "Todo"
+            local mat = UCam.resolveDropdownValue(targetMaterial.CurrentOption) or "Plastic"
+            UCam.applyBodyColorToPlayer(target, part, targetColor.Color, mat, nil)
+            UCam.notify("Cuerpo", string.format("%s → %s de %s", mat, part, target.Name))
         end,
     })
 
     local lastTargetHex = nil
     Tab:CreateInput({
-        Name = "HEX para el otro jugador (#RRGGBB)",
+        Name = "HEX para el jugador",
         PlaceholderText = "Ej: #00AAFF",
         RemoveTextAfterFocusLost = false,
         Flag = "TargetPlayerHexColor",
         Callback = function(text)
-            if not text or text == "" then return end
-            lastTargetHex = text
+            if text and text ~= "" then lastTargetHex = text end
         end,
     })
-
     Tab:CreateButton({
-        Name = "🎨 Aplicar Color → Parte del Jugador",
+        Name = "Aplicar HEX al jugador",
         Callback = function()
-            if not UCam.PlayerMod.TargetPlayer then
-                UCam.notify("Coloreo", "Selecciona un jugador objetivo primero", 3)
+            local target = B.TargetPlayer
+            if not target then
+                UCam.notify("Cuerpo", "Selecciona un jugador objetivo.", 3)
                 return
             end
-            local part = UCam.BodyColor.TargetSelectedPart or "Todo"
-            local color = targetColorPicker.Color
-            UCam.applyBodyColorToPlayer(UCam.PlayerMod.TargetPlayer, part, color, nil, nil)
-            UCam.notify("Coloreo", string.format("Color aplicado a %s → %s", part, UCam.PlayerMod.TargetPlayer.Name))
-        end,
-    })
-
-    Tab:CreateButton({
-        Name = "🎨 Aplicar HEX → Parte del Jugador",
-        Callback = function()
-            if not UCam.PlayerMod.TargetPlayer then
-                UCam.notify("Coloreo", "Selecciona un jugador objetivo primero", 3)
-                return
-            end
-            if not lastTargetHex or lastTargetHex == "" then
-                UCam.notify("Coloreo", "Escribe un código HEX arriba primero", 3)
-                return
-            end
-            local color = UCam.hexToColor(lastTargetHex)
+            local color = lastTargetHex and UCam.hexToColor(lastTargetHex)
             if not color then
-                UCam.notify("Coloreo", "Código HEX inválido: " .. lastTargetHex, 4)
+                UCam.notify("Cuerpo", "Escribe un HEX válido.", 3)
                 return
             end
-            local part = UCam.BodyColor.TargetSelectedPart or "Todo"
-            UCam.applyBodyColorToPlayer(UCam.PlayerMod.TargetPlayer, part, color, nil, nil)
-            UCam.notify("Coloreo", string.format("HEX %s → %s de %s", lastTargetHex, part, UCam.PlayerMod.TargetPlayer.Name))
+            UCam.applyBodyColorToPlayer(target, B.TargetSelectedPart or "Todo", color, nil, nil)
+            UCam.notify("Cuerpo", "HEX aplicado a " .. target.Name)
         end,
     })
 
-    local targetMaterialDropdown = Tab:CreateDropdown({
-        Name = "Material del otro jugador",
-        Options = {"Plastic", "Neon", "Metal", "Glass", "Wood", "Slate", "Marble", "Granite", "Ice", "ForceField"},
-        CurrentOption = {"Plastic"},
-        Flag = "TargetPlayerMaterial",
-        Callback = function(opt)
-            -- solo guarda
-        end,
+    local targetPreset = Tab:CreateDropdown({
+        Name = "Preset para el jugador",
+        Options = B.PresetOptions,
+        CurrentOption = { B.PresetOptions[1] },
+        MultipleOptions = false,
+        Flag = "TargetPreset",
+        Callback = function() end,
     })
-
     Tab:CreateButton({
-        Name = "Aplicar Material → Parte del Jugador",
+        Name = "Aplicar preset al jugador",
         Callback = function()
-            if not UCam.PlayerMod.TargetPlayer then
-                UCam.notify("Coloreo", "Selecciona un jugador objetivo primero", 3)
+            local target = B.TargetPlayer
+            if not target then
+                UCam.notify("Cuerpo", "Selecciona un jugador objetivo.", 3)
                 return
             end
-            local part = UCam.BodyColor.TargetSelectedPart or "Todo"
-            local material = UCam.resolveDropdownValue(targetMaterialDropdown.CurrentOption) or "Plastic"
-            UCam.applyBodyColorToPlayer(UCam.PlayerMod.TargetPlayer, part, nil, material, nil)
-            UCam.notify("Coloreo", string.format("Material %s → %s de %s", material, part, UCam.PlayerMod.TargetPlayer.Name))
-        end,
-    })
-
-    Tab:CreateButton({
-        Name = "Restaurar Jugador Seleccionado (colores)",
-        Callback = function()
-            if UCam.PlayerMod.TargetPlayer then
-                UCam.restorePlayerBodyColor(UCam.PlayerMod.TargetPlayer)
-                UCam.notify("Coloreo", "Colores restaurados de " .. UCam.PlayerMod.TargetPlayer.Name)
-            else
-                UCam.notify("Coloreo", "Selecciona un jugador primero", 3)
+            local preset = UCam.resolveDropdownValue(targetPreset.CurrentOption)
+            if preset then
+                UCam.applyPresetToPlayer(target, preset)
+                UCam.notify("Cuerpo", "Preset '" .. preset .. "' → " .. target.Name)
             end
         end,
     })
-
     Tab:CreateButton({
-        Name = "Copiar Mi Aspecto → Jugador",
+        Name = "Copiar mi aspecto al jugador",
         Callback = function()
-            if not UCam.PlayerMod.TargetPlayer then
-                UCam.notify("Coloreo", "Selecciona un jugador objetivo", 3)
+            local target = B.TargetPlayer
+            if not target then
+                UCam.notify("Cuerpo", "Selecciona un jugador objetivo.", 3)
                 return
             end
-            
-            -- Copy current body color configuration to target player
-            for partName, data in pairs(UCam.BodyColor.Parts) do
-                if data.Color or data.Material or data.Transparency ~= 0 then
-                    local displayName = partName
-                    -- Map internal name to display name
-                    local nameMap = {
-                        Head = "Cabeza",
-                        Torso = "Torso",
-                        LeftArm = "Brazo Izq.",
-                        RightArm = "Brazo Der.",
-                        LeftLeg = "Pierna Izq.",
-                        RightLeg = "Pierna Der.",
-                    }
-                    displayName = nameMap[partName] or partName
-                    
-                    UCam.applyBodyColorToPlayer(
-                        UCam.PlayerMod.TargetPlayer,
-                        displayName,
-                        data.Color,
-                        data.Material,
-                        data.Transparency
-                    )
+            local nameMap = {
+                Head = "Cabeza", Torso = "Torso",
+                LeftArm = "Brazo Izq.", RightArm = "Brazo Der.",
+                LeftLeg = "Pierna Izq.", RightLeg = "Pierna Der.",
+            }
+            for partName, data in pairs(B.Parts) do
+                if data.Color or data.Material or (data.Transparency or 0) ~= 0 then
+                    UCam.applyBodyColorToPlayer(target, nameMap[partName] or partName,
+                        data.Color, data.Material, data.Transparency)
                 end
             end
-            
-            UCam.notify("Coloreo", "Aspecto copiado a " .. UCam.PlayerMod.TargetPlayer.Name)
+            UCam.notify("Cuerpo", "Aspecto copiado a " .. target.Name)
         end,
     })
-    
-    local targetPresetDropdown = Tab:CreateDropdown({
-        Name = "Preset a Aplicar",
-        Options = {"Robot", "Fantasma", "Demonio", "Dorado", "Invisible", "Glitch"},
-        CurrentOption = {"Robot"},
-        Flag = "TargetPreset",
-        Callback = function(opt)
-            -- Just store selection
-        end,
-    })
-    
     Tab:CreateButton({
-        Name = "Aplicar Preset a Jugador",
+        Name = "↩ Restaurar jugador seleccionado",
         Callback = function()
-            if not UCam.PlayerMod.TargetPlayer then
-                UCam.notify("Coloreo", "Selecciona un jugador objetivo", 3)
-                return
-            end
-            
-            local preset = UCam.resolveDropdownValue(targetPresetDropdown.CurrentOption)
-            if preset then
-                UCam.applyPresetToPlayer(UCam.PlayerMod.TargetPlayer, preset)
-                UCam.notify("Coloreo", "Preset '" .. preset .. "' aplicado a " .. UCam.PlayerMod.TargetPlayer.Name)
+            if B.TargetPlayer then
+                UCam.restorePlayerBodyColor(B.TargetPlayer)
+                UCam.notify("Cuerpo", "Restaurado: " .. B.TargetPlayer.Name)
             end
         end,
     })
-    
     Tab:CreateButton({
-        Name = "Restaurar TODOS los Jugadores",
+        Name = "🧹 Restaurar TODOS los jugadores",
         Callback = function()
             UCam.restoreAllPlayerBodyColors()
-            UCam.notify("Coloreo", "Todos los jugadores restaurados")
+            UCam.notify("Cuerpo", "Todos restaurados.")
         end,
     })
-    
+
     -- ============================================================
-    -- SECCIÓN: PRESETS PERSONALIZADOS
+    -- PRESETS PERSONALIZADOS
     -- ============================================================
-    local SectionCustomPresets = Tab:CreateSection("Presets Personalizados")
-    
-    Tab:CreateParagraph({
-        Title = "Guardar Configuraciones",
-        Content = "Guarda tu configuración actual de colores y materiales como preset reutilizable."
-    })
-    
-    local customPresetName = Tab:CreateInput({
-        Name = "Nombre del Preset",
-        PlaceholderText = "Mi Estilo Único",
+    Tab:CreateSection("Presets personalizados")
+    Tab:CreateInput({
+        Name = "Nombre del preset",
+        PlaceholderText = "Mi estilo",
         RemoveTextAfterFocusLost = false,
         Flag = "CustomPresetName",
-        Callback = function(text)
-            -- Store name
-        end,
+        Callback = function() end,
     })
-    
     Tab:CreateButton({
-        Name = "💾 Guardar Preset Actual",
+        Name = "💾 Guardar aspecto actual",
         Callback = function()
-            -- v9 FIX (bug UI): leer el valor vía UCam.Rayfield.Flags. El objeto
-            -- del Input no expone .CurrentValue → antes siempre "Escribe un nombre".
             local flag = UCam.Rayfield.Flags and UCam.Rayfield.Flags["CustomPresetName"]
             local name = flag and (flag.CurrentValue or flag.Value) or ""
             if not name or name == "" then
-                UCam.notify("Coloreo", "Escribe un nombre para el preset", 3)
+                UCam.notify("Cuerpo", "Escribe un nombre.", 3)
                 return
             end
-            
             if UCam.saveBodyColorPreset(name) then
-                UCam.notify("Coloreo", "Preset guardado: " .. name)
+                UCam.notify("Cuerpo", "Preset guardado: " .. name)
             else
-                UCam.notify("Coloreo", "Error al guardar preset", 3)
+                UCam.notify("Cuerpo", "No se pudo guardar.", 3)
             end
         end,
     })
-    
-    -- List saved presets
-    if next(UCam.BodyColor.Presets) then
-        Tab:CreateLabel("Presets Guardados:")
-        for presetName, _ in pairs(UCam.BodyColor.Presets) do
-            Tab:CreateButton({
-                Name = "📌 " .. presetName,
-                Callback = function()
-                    if UCam.loadBodyColorPreset(presetName) then
-                        -- Reapply loaded configuration
-                        for partName, data in pairs(UCam.BodyColor.Parts) do
-                            local displayName = partName
-                            local nameMap = {
-                                Head = "Cabeza",
-                                Torso = "Torso",
-                                LeftArm = "Brazo Izq.",
-                                RightArm = "Brazo Der.",
-                                LeftLeg = "Pierna Izq.",
-                                RightLeg = "Pierna Der.",
-                            }
-                            displayName = nameMap[partName] or partName
-                            
-                            if data.Color or data.Material or data.Transparency ~= 0 then
-                                UCam.applyBodyColorToPart(
-                                    displayName,
-                                    data.Color,
-                                    data.Material,
-                                    data.Transparency
-                                )
-                            end
-                        end
-                        UCam.notify("Coloreo", "Preset cargado: " .. presetName)
+
+    local savedNames = {}
+    for presetName in pairs(B.Presets or {}) do table.insert(savedNames, presetName) end
+    if #savedNames == 0 then savedNames[1] = "(Sin presets guardados)" end
+    Tab:CreateDropdown({
+        Name = "Preset guardado",
+        Options = savedNames,
+        CurrentOption = { savedNames[1] },
+        MultipleOptions = false,
+        Callback = function(o)
+            local name = UCam.resolveDropdownValue(o)
+            if not name or name == "(Sin presets guardados)" then return end
+            if UCam.loadBodyColorPreset(name) then
+                local nameMap = {
+                    Head = "Cabeza", Torso = "Torso",
+                    LeftArm = "Brazo Izq.", RightArm = "Brazo Der.",
+                    LeftLeg = "Pierna Izq.", RightLeg = "Pierna Der.",
+                }
+                for partName, data in pairs(B.Parts) do
+                    if data.Color or data.Material or (data.Transparency or 0) ~= 0 then
+                        UCam.applyBodyColorToPart(nameMap[partName] or partName,
+                            data.Color, data.Material, data.Transparency)
                     end
-                end,
-            })
-        end
-    end
-    
-    -- ============================================================
-    -- SECCIÓN: INFO
-    -- ============================================================
-    local SectionInfo = Tab:CreateSection("Información")
-    
-    Tab:CreateParagraph({
-        Title = "Características",
-        Content = [[
-• Coloreo independiente por parte del cuerpo
-• Control de transparencia por parte (0-100%)
-• Materiales por parte (10 opciones)
-• Color por código HEX (#RRGGBB) además del selector
-• 6 presets predefinidos de transformación
-• Efecto arcoíris animado configurable
-• Coloreo por PARTES a otros jugadores (cabeza azul, etc.)
-• Color HEX directo a otros jugadores
-• Aplicación local a otros jugadores
-• Guardar/cargar presets personalizados
-        ]]
+                end
+                UCam.notify("Cuerpo", "Preset cargado: " .. name)
+            end
+        end,
     })
+
 end

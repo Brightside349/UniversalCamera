@@ -1173,8 +1173,18 @@ function UCam.FunV7.updateTrail(dt)
             else
                 local k = 1 - (age / math.max(UCam.Fun.Trail.Duration, 0.05))
                 local s = math.max(UCam.Fun.Trail.Width * k, 0.05)
+                -- v12.5 FIX visual: el desvanecido por tamaño solo se aplicaba
+                -- a las bolas; las lineas, cuadrados y estrellas conservaban
+                -- su tamano original hasta desaparecer.
                 if UCam.Fun.Trail.Type == "Ball" then
                     entry.part.Size = Vector3.new(s, s, s)
+                elseif UCam.Fun.Trail.Type == "Line" then
+                    entry.part.Size = Vector3.new(0.2, 0.2, s)
+                elseif UCam.Fun.Trail.Type == "Square" then
+                    entry.part.Size = Vector3.new(s, s, s)
+                elseif UCam.Fun.Trail.Type == "Star" then
+                    local mesh = entry.part:FindFirstChildOfClass("SpecialMesh")
+                    if mesh then mesh.Scale = Vector3.new(s, s, s) end
                 end
                 
                 -- Actualizar color si es rainbow

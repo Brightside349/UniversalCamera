@@ -1,53 +1,100 @@
 -- ============================================================
--- Universal Camera Pro v11 · ui/info
--- Pestaña Info / Ayuda: documentacion de controles, modos y modulos.
+-- Universal Camera Pro v12.5 · ui/info
+-- Pestaña Info / Ayuda: controles y mapa de la interfaz actual.
 -- ============================================================
 local UCam = _G.UCam
 
 function UCam.build_info(Window)
     local InfoTab = Window:CreateTab("ℹ️ Info", "info")
+
     InfoTab:CreateParagraph({
-        Title   = "Controles basicos",
+        Title = "Controles básicos",
         Content =
-        "Clic derecho + mouse -> rotar camara\nRueda del mouse -> zoom (FOV)\nShift -> sprint (modo Libre / Handheld)\nWASD + Espacio / Ctrl -> movimiento\nDelete -> mostrar/ocultar UI\nF -> activar camara libre\nX -> dejar de espectar\nZ -> disparar Camera Shake\nE / Q -> Siguiente / Anterior jugador (Espectar)",
+        "Clic derecho + mouse → rotar cámara\n" ..
+        "Rueda del mouse → zoom (FOV)\n" ..
+        "Shift → sprint\n" ..
+        "WASD + Espacio / Ctrl → movimiento\n" ..
+        "Delete → mostrar/ocultar UI\n" ..
+        "F → activar cámara libre\n" ..
+        "X → dejar de espectar\n" ..
+        "Z → disparar Camera Shake\n" ..
+        "E / Q → siguiente / anterior jugador\n" ..
+        "P → reproducir animación de props",
     })
+
     InfoTab:CreateParagraph({
-        Title   = "Modos de camara (18 modos)",
+        Title = "Modos de cámara (19)",
         Content =
-        "Libre: WASD + rotacion con clic derecho.\nOrbita: gira alrededor del personaje.\nTripode: fijo, solo rotacion.\nCenital: vista de pajaro (top-down).\nLateral: side-scroller cinematico.\nDron: orbitas suaves (circulo o figura 8).\nFollow: chase cam estilo hombro.\nCrashZoom: dolly-in dramatico.\nDirector: ruta de waypoints para intros/outros.\nCrane: plano de grua (sube/baja con Space/Ctrl + giro opcional).\nDolly Glide: carril cinematico (lateral / forward / diagonal).\nHandheld: camara en mano con sacudida procedural.\nRoll Axis: rotacion continua sobre el eje forward (barrel roll).\nVertigo: dolly zoom Hitchcock - el FOV se compensa mientras la camara se acerca/aleja y el fondo se deforma.\nFPV Dron: drone acrobatico con inercia y roll extremo.\nSnorricam: camara atada al personaje mirando hacia su cara.\nCable Cam: camara restringida a una linea entre dos puntos.\nSecurity Cam: camara estatica con paneo automatico lento.",
+        "Libre, Orbita, Tripode, Cenital, Lateral, Dron, Follow, CrashZoom,\n" ..
+        "Director, Crane, Dolly Glide, Handheld, Roll Axis, Vertigo, FPV Dron,\n" ..
+        "Snorricam, Cable Cam, Security Cam y Personalizada.\n\n" ..
+        "En Cámaras solo ves los controles del modo elegido. Personalizada te deja\n" ..
+        "definir distancia, altura, giro, inclinación, sway, roll y FOV propios.",
     })
+
     InfoTab:CreateParagraph({
-        Title   = "Como esta organizada la UI (v11)",
+        Title = "Mapa de la interfaz",
         Content =
-        "Inicio: camara libre, ocultar HUD/personaje, auto-HUD y acciones rapidas (captura, teletransporte, restablecer todo).\nCamaras: los 18 modos y todos sus parametros agrupados por modo.\nEspectador: jugadores, auto-ciclo, estilos y FOV.\nReplay: graba el recorrido con camara libre y lo reproduce suavemente (alternativa al Director sin waypoints).\nCinematografico: letterbox, vignette, shake, FOV pulse, director y post-procesado (bloom, DOF, sun rays).\nFiltros: 30 built-in + editor custom + tus presets.\nIluminacion / Estudio / Gimbal: modulos de ambiente y bloqueo.\nProps: coloca decoraciones locales (solo tu las ves) con ID de asset; mueve, rota y escala.\nDiversion: montar, fisicas, tamano, poses, aspecto y efectos visuales.\nCuerpo / Poses / Jugadores: modifica aspecto de tu personaje y otros.\nPerfiles: guarda/carga setups completos.\nAjustes: teclas y notificaciones.\nPlugins: extensiones cargadas de la carpeta UniversalCamera/plugins.",
+        "Inicio: cámara libre, HUD automático/manual y ocultar personaje.\n" ..
+        "Cámaras: modo + opciones del modo + lente + posiciones guardadas.\n" ..
+        "Espectador: jugadores, auto-ciclo, estilos y encuadre.\n" ..
+        "Cinematográfico: encuadre, shake, Director y post-procesado.\n" ..
+        "Filtros: selector, editor custom, mezcla y filtro temporal.\n" ..
+        "Iluminación: hora, exposición, niebla, ambiente, sombras y skybox.\n" ..
+        "Estudio: pantalla de croma con encuadre automático y rotación.\n" ..
+        "Gimbal: bloqueo de objetivo (LookAt).\n" ..
+        "Props: objetos locales por ID de asset.\n" ..
+        "Animador: timeline de keyframes para props.\n" ..
+        "Clones: copias locales de cualquier jugador.\n" ..
+        "Diversión: montar, física, tamaño, giro y efectos.\n" ..
+        "Cuerpo: color, material y presets por partes.\n" ..
+        "Creator: toma limpia, biblioteca de tomas, guías y escenas.\n" ..
+        "Ajustes: teclas, notificaciones, gamepad, rendimiento y plugins.",
     })
+
     InfoTab:CreateParagraph({
-        Title = "V10.5 Reorganizacion de estructura",
-        Content = "Creator incluye Clean Shot reversible, guías Thirds/Center/Safe/Vertical, escenas con metadata, marcadores y edición básica de Replay. El Director permite pausar cada waypoint y conserva rutas antiguas al importar. Recuperar sesión devuelve cámara, HUD, personaje, efectos y módulos locales a un estado seguro.",
-    })
-    InfoTab:CreateParagraph({
-        Title   = "Pestana Filtros",
+        Title = "Props y Animador",
         Content =
-        "Hay 30 filtros built-in. Ademas incluye un editor custom en vivo: ajusta Brillo, Contraste, Saturacion y el tinte RGB con sliders; presiona 'Guardar filtro custom' y asignale un nombre para anadirlo a tu coleccion. Puedes guardar hasta 12 filtros custom. En 'Mis filtros custom guardados' eliges uno para aplicarlo o eliminarlo.",
+        "Los props se crean en tu cliente: nadie más los ve. Puedes moverlos con\n" ..
+        "la cámara, empujarlos por ejes, rotarlos, escalarlos, duplicarlos y\n" ..
+        "apoyarlos en el suelo.\n\n" ..
+        "En Animador guarda un keyframe por tiempo (alcance «Todos» o «Prop\n" ..
+        "seleccionado»), ajusta duración, easing y loop, y reproduce. Así puedes\n" ..
+        "animar una multitud en conjunto o dar a cada prop su propio ritmo.",
     })
+
     InfoTab:CreateParagraph({
-        Title   = "Cinematografico (post-procesado + efectos)",
+        Title = "Clones locales",
         Content =
-        "Letterbox: barras 21:9.\nDutch angle: inclina la camara (en Camaras).\nBloom: brillo intenso.\nDOF: desenfoque.\nAuto-Focus DOF: enfoca automaticamente al personaje/jugador espectado o realiza raycast en camara libre.\nSun Rays: rayos volumetricos.\nVignette: oscurece los bordes para enmarcar la toma.\nCamera Shake: sutil / terremoto / explosion / pulso / impacto (toggle, one-shots y tecla Z).\nFOV Pulse: respiracion del FOV, util para horror / suspenso.\nDirector: graba waypoints y reproduce (con visualizador de ruta 3D).",
+        "Copia a cualquier jugador las veces que quieras aunque la partida tenga\n" ..
+        "límite de jugadores. «Seguir movimiento» reproduce caminar, saltar y\n" ..
+        "emotes; «Fijar en el sitio» deja al clon quieto con la pose copiada.",
     })
+
     InfoTab:CreateParagraph({
-        Title   = "Espectador Mejorado (9 modos)",
+        Title = "Espectador (9 estilos)",
         Content =
-        "Primera persona = ojos del jugador.\nTercera persona = detras del jugador (clic derecho para orbitar).\nCinematico = orbita automatica.\nSobre hombro = estilo shooter.\nDron aereo: vista de drone con bobbing.\nContrapicado: angulo bajo dramatico.\nDolly lateral: camara en riel lateral con sway.\nOrbita dinamica: orbita auto con cambios de distancia/altura.\nSteadicam: seguimiento suave detras del personaje.\n\nAuto-ciclo: cambia de jugador automaticamente cada N segundos.\nNavegacion rapida: teclas Q/E cambian de jugador instantaneamente.\nRotacion con Mouse: activado en todos los modos (excepto 1ra persona).",
+        "Primera persona, Tercera persona, Cinematográfico, Sobre hombro,\n" ..
+        "Dron aéreo, Contrapicado, Dolly lateral, Órbita dinámica y Steadicam.\n\n" ..
+        "El encuadre solo aparece cuando el estilo se aleja del jugador.\n" ..
+        "Q/E cambian de jugador; el auto-ciclo lo hace cada N segundos.",
     })
+
     InfoTab:CreateParagraph({
-        Title   = "Diversion - Efectos visuales (v8)",
+        Title = "Cinematográfico",
         Content =
-        "Invisibilidad: vuelve transparente a tu personaje (solo local).\nTrail: deja una estela de esferas neon con ancho, duracion y color RGB configurables.\nDisco floor: panel neon bajo tus pies que TE SIGUE a todas partes, con tamano y color RGB.\nMaterial: convierte tu cuerpo en Neon, Metal, Glass, ForceField, etc.",
+        "Letterbox 21:9, viñeta, Camera Shake con patrones, FOV Pulse,\n" ..
+        "Director con waypoints, curvas y plantillas de toma,\n" ..
+        "y post-procesado: Bloom, DOF con auto-focus y Sun Rays.",
     })
+
     InfoTab:CreateParagraph({
-        Title   = "Para creadores de contenido",
+        Title = "Para creadores de contenido",
         Content =
-        "Stack recomendado para intros epicas:\n  Crane (grua) + Handheld (sacudida sutil) + transiciones suaves + auto-focus DOF + filtro Teal & Orange + Letterbox + Bloom.\n\nVertigo: perfecto para revelar al personaje con tension dramatica.\n\nCaptura de pantalla limpia:\n  Usa el boton en Inicio para ocultar la UI del script por 3s y tomar la foto sin destruir el script. Activa 'Auto-ocultar HUD' para que la UI del juego desaparezca sola al entrar en camara libre.",
+        "Stack para intros: Crane o Personalizada + Handheld + auto-focus DOF +\n" ..
+        "filtro Teal & Orange + Letterbox + Bloom.\n\n" ..
+        "Para multitudes: Clones + Props + Animador.\n\n" ..
+        "Para una toma limpia usa Creator → Preparar toma; el HUD se oculta solo\n" ..
+        "al entrar en cámara libre y vuelve al salir.",
     })
 end

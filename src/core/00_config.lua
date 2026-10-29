@@ -87,9 +87,8 @@ function UCam.notify(title, content, duration, opts)
     if type(duration) == "table" and opts == nil then opts, duration = duration, nil end
     opts = opts or {}
     local ncfg = UCam.Config.Notifications
-    -- Silencio automático durante tomas (grabación/reproducción de Replay)
-    if ncfg.MuteOnCapture and not opts.critical and UCam.Replay
-        and (UCam.Replay.Recording or UCam.Replay.Playing) then
+    -- Silencio automático durante tomas preparadas (Clean Shot)
+    if ncfg.MuteOnCapture and not opts.critical and UCam.CleanShot and UCam.CleanShot.Enabled then
         return
     end
     local mode = ncfg.Mode or "all"
@@ -228,6 +227,7 @@ UCam.Saved = {
 
 UCam.Hud = {
     Hidden = false,
+    ManualHidden = false,  -- v12.5: el usuario oculto el HUD a mano
     CharacterHidden = false,
     Transparencies = {},
     CustomStates = {},
@@ -255,6 +255,23 @@ UCam.CamModes = {
     "Snorricam",    -- v7 (cámara atada al personaje mirando hacia su cara)
     "Cable Cam",    -- v7 (cámara que se mueve solo en una línea entre dos puntos)
     "Security Cam", -- v7 (cámara estática con paneo automático lento)
+    "Personalizada", -- v12.5 (modo armado por el usuario con sus propios valores)
+}
+
+-- v12.5: modo Personalizada. Es una orbita armada por el usuario:
+-- distancia, altura, giro, balanceo, roll y FOV propios.
+UCam.CustomCam = {
+    Distance   = 12,
+    Height     = 3,
+    OrbitSpeed = 0.35,   -- vueltas de orbita por segundo (0 = fija)
+    Tilt       = 10,     -- grados sobre el objetivo (negativo = contrapicado)
+    Sway       = 0,      -- balanceo suave en studs
+    SwaySpeed  = 0.6,
+    Roll       = 0,      -- grados de inclinacion fija
+    FOV        = 70,
+    UseFOV     = true,
+    Manual     = false,  -- clic derecho para orbitar a mano
+    Angle      = 0,
 }
 
 -- v7: Nuevos modos de cámara (se implementarán en 70_camcore.lua)
@@ -575,7 +592,7 @@ UCam.UIRefs = {
 
 function UCam.setTargetPlayer(player)
     if not player or player == UCam.player then return false end
-    UCam.PlayerMod.TargetPlayer = player
+    UCam.BodyColor.TargetPlayer = player
     if UCam.emit then UCam.emit("targetChanged", player) end
     for _, dropdown in ipairs(UCam.UIRefs.TargetPlayerDropdowns or {}) do
         pcall(function()
@@ -590,9 +607,11 @@ function UCam.registerTargetPlayerDropdown(dropdown)
     return dropdown
 end
 
--- v6: Auto-ocultar HUD al entrar en camara libre
+-- v12.5: el HUD se oculta solo al entrar en camara libre (comportamiento
+-- unico, sin toggle). El toggle de Inicio queda para ocultarlo a mano
+-- sin activar la camara libre.
 UCam.AutoHUD = {
-    Enabled = false,
+    Enabled = true,
 }
 
 -- Forward declaration de triggerTransition (lo asigna 70_camcore)
@@ -612,13 +631,15 @@ UCam.GreenScreen = {
     Enabled         = false,
     Color           = Color3.fromRGB(0, 255, 0),
     Transparency    = 0,
-    Size            = Vector3.new(60, 40, 60),
+    Size            = Vector3.new(60, 40, 1),   -- v12.5: panel fino (antes era un bloque de 60st)
     Part            = nil,
     Position        = nil,
     Vertical        = "Detras",
     VerticalModes   = { "Detras", "Arriba", "Abajo", "Enfrente" },
     Distance        = 15,
     VerticalOffset  = 12,
+    Rotation        = 0,      -- v12.5: giro de la pantalla sobre su eje Y
+    AutoFit         = false,  -- v12.5: ajustar tamaño al encuadre de la camara
     AvoidSpawns     = true,
     _spawnCache     = nil,
     _spawnCacheAt   = 0,
@@ -869,29 +890,6 @@ UCam.FilterTemporal = {
 }
 
 -- ============================================================
--- MÓDULO POSES AVANZADAS (v7) — 33_poses.lua
--- ============================================================
-UCam.Poses = {
-    Current = "Normal",
-    PosesList = {
-        "Normal", "T-Pose", "A-Pose", "Sentado", "Flotando",
-        "Dab", "Superhero Landing", "Victoria", "Manos Arriba",
-        "Meditando", "Acostado", "Recostado", "Durmiendo",
-        "Zombie Walk", "Robot", "Bailando",
-        "Caída Dramática", "Pose de Acción", "Caminando",
-        -- v7: poses creativas nuevas para videos
-        "Superman", "Kamehameha", "Saludo Militar", "Yoga Árbol",
-        "Spiderman", "Crucifixión", "Beso", "Cargando Poder",
-        "Plancha", "Bailarina", "Agachado Listo", "James Bond"
-    },
-    TransitionSpeed = 0.15,
-    CustomPoses = {},           -- poses guardadas por el usuario
-    _originals = {},            -- snapshot original de Motor6Ds
-    _playerTargets = {},        -- para aplicar poses a otros jugadores
-    _connHeartbeat = nil,
-}
-
--- ============================================================
 -- MÓDULO COLOREAR CUERPO AVANZADO (v7) — 32_bodycolor.lua
 -- ============================================================
 UCam.BodyColor = {
@@ -905,6 +903,7 @@ UCam.BodyColor = {
     },
     Accessories = { Color = nil, Material = nil, Transparency = 0 },
     SelectedPart = "Todo",
+    TargetPlayer = nil,            -- v12.5: jugador al que se aplica (local)
     TargetSelectedPart = "Todo",   -- v7: parte seleccionada para colorear a otros jugadores
     PartOptions = { "Cabeza", "Torso", "Brazo Izq.", "Brazo Der.", "Pierna Izq.", "Pierna Der.", "Accesorios", "Todo" },
     Presets = {},               -- presets guardados por el usuario
@@ -915,43 +914,6 @@ UCam.BodyColor = {
     _originals = {},            -- snapshot de estado original
     _playerTargets = {},        -- para aplicar a otros jugadores
     _connHeartbeat = nil,
-}
-
--- ============================================================
--- MÓDULO MOD JUGADORES (v7) — 35_playermod.lua
--- ============================================================
-UCam.PlayerMod = {
-    TargetPlayer = nil,
-    Targets = {},               -- { [Player] = { pose, color, scale, effects... } }
-    SelectedPlayers = {},       -- para selección múltiple
-    _snapshots = {},            -- snapshots originales por jugador
-    _connHeartbeat = nil,
-}
-
--- ============================================================
--- MÓDULO REPLAY / GRABACIÓN (v8.1 REMASTERIZADO) — 55_replay.lua
--- v8.1: Simplificado, solo funciona con cámara libre, sin marcadores/ramps
--- ============================================================
-UCam.Replay = {
-    Recording = false,
-    Playing = false,
-    Paused = false,
-    Frames = {},                -- { CFrame, FOV, timestamp }
-    MaxDuration = 60,
-    CurrentTime = 0,
-    PlaybackSpeed = 1.0,
-    Loop = false,
-    SavedRoutes = {},           -- hasta 3 rutas guardadas
-    Markers     = {},            -- v10: marcas locales { time, label }
-    _recordStartTime = 0,
-}
-
--- v8: Perfiles completos (modo + filtros + lighting + slowmo + fun)
-UCam.Profiles = {
-    Slots      = {},
-    QuickSlots = {},
-    MaxSlots   = 8,
-    MaxQuick   = 3,
 }
 
 -- ============================================================
@@ -968,6 +930,28 @@ UCam.Props = {
     DragOffset     = Vector3.new(), -- offset que arrastras con la rueda
     _attachedIndex = 0,       -- prop adjuntado a la camara ahora mismo
     _renderBound   = false,
+}
+
+-- ============================================================
+-- v12.5: ANIMADOR DE PROPS — timeline de keyframes local.
+-- Cada keyframe guarda las CFrames de los props capturados en un
+-- tiempo dado. "Todos" anima el conjunto; "Prop" anima solo el
+-- seleccionado, así varios props pueden tener ritmos distintos.
+-- ============================================================
+UCam.PropAnim = {
+    Enabled      = false,
+    Scope        = "Todos",          -- "Todos" | "Prop seleccionado"
+    Scopes       = { "Todos", "Prop seleccionado" },
+    Duration     = 6,
+    Loop         = false,
+    Easing       = "Smooth",
+    Easings      = { "Linear", "Smooth", "Sin", "Expo", "Bounce", "Elastic", "Back" },
+    Keyframes    = {},               -- { { t = number, poses = { [index] = CFrame } } }
+    Playing      = false,
+    StartTime    = 0,
+    Playhead     = 0,
+    _conn        = nil,
+    _lastTime    = 0,
 }
 
 -- ============================================================

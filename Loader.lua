@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera PRO v11 · Loader
+-- Universal Camera PRO v12.5 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v12.4.0"
+local VERSION = "v12.5.0"
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
 local MAX_RETRIES = 3
@@ -30,15 +30,12 @@ local ORDER = {
     "visuals/20_filters.lua",
     "actors/30_fun.lua",
     "actors/32_bodycolor.lua",
-    "actors/33_poses.lua",
-    "actors/35_playermod.lua",
     "actors/36_clones.lua",
     "props/45_props.lua",
+    "props/46_propsanim.lua",
     "camera/50_spectate.lua",
     "camera/60_director.lua",
     "camera/70_camcore.lua",
-    "camera/55_replay.lua",
-    "presets/57_profiles.lua",
     "ui/00_registry.lua",
     "runtime/85_performance.lua",
     "extensions/85_plugins.lua",
@@ -54,13 +51,10 @@ local ORDER = {
     "ui/tabs/estudio.lua",
     "ui/tabs/gimbal.lua",
     "ui/tabs/props.lua",
+    "ui/tabs/propsanim.lua",
     "ui/tabs/clones.lua",
     "ui/tabs/fun.lua",
     "ui/tabs/bodycolor.lua",
-    "ui/tabs/poses.lua",
-    "ui/tabs/playermod.lua",
-    "ui/tabs/replay.lua",
-    "ui/tabs/profiles.lua",
     "ui/tabs/config.lua",
     "ui/tabs/creator.lua",
     "ui/tabs/info.lua",
@@ -143,7 +137,7 @@ end
 table.clear(sources)
 
 if #failedList == 0 then
-    print(("[UCam] Universal Camera Pro v12.4 cargado OK (%d partes). Local: clones, props, guias, Replay Pro."):format(loaded))
+    print(("[UCam] Universal Camera Pro v12.5 cargado OK (%d partes). Camara libre, props con animador, clones y estudio."):format(loaded))
 else
     warn(("[UCam] Carga completada con %d errores. Fallaron: %s"):format(
         #failedList,

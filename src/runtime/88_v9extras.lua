@@ -160,24 +160,6 @@ function UCam.applyScene(slot)
     return true
 end
 
--- Exportación de keyframes legible y sin servidor.
-function UCam.exportReplayKeyframes()
-    local route = UCam.serializeRoute and UCam.serializeRoute() or ""
-    if route == "" then return nil, "no hay frames" end
-    return "UCAM_KEYFRAMES_V1\n" .. route
-end
-function UCam.importReplayKeyframes(textValue)
-    if type(textValue) ~= "string" then return false, "texto inválido" end
-    textValue = textValue:gsub("^UCAM_KEYFRAMES_V1\n?", "")
-    local frames = UCam.deserializeRoute(textValue)
-    if not frames then return false, "keyframes inválidos" end
-    table.clear(UCam.Replay.Frames)
-    for i, frame in ipairs(frames) do UCam.Replay.Frames[i] = frame end
-    UCam.Replay.CurrentTime = 0
-    if UCam.Replay.Markers then table.clear(UCam.Replay.Markers) end
-    return true, #frames
-end
-
 UCam.UISettings = { Theme = "Dark", Compact = false }
 function UCam.applyUISettings()
     local rf = UCam.Rayfield
@@ -188,35 +170,6 @@ function UCam.applyUISettings()
     end)
 end
 
--- Timelapse reutiliza el motor de Replay, sin crear otro formato de ruta.
-UCam.Timelapse = { Active = false, Interval = 2, Elapsed = 0 }
-function UCam.startTimelapse()
-    if not UCam.freeCamEnabled then return false, "activa la cámara libre" end
-    table.clear(UCam.Replay.Frames)
-    UCam.Timelapse.Active, UCam.Timelapse.Elapsed = true, 0
-    return true
-end
-function UCam.stopTimelapse()
-    UCam.Timelapse.Active = false
-    return #UCam.Replay.Frames
-end
-function UCam.toggleTimelapse(enabled)
-    if enabled then return UCam.startTimelapse() end
-    return true, UCam.stopTimelapse()
-end
-local function updateTimelapse(dt)
-    if not UCam.Timelapse.Active or not UCam.freeCamEnabled then return end
-    UCam.Timelapse.Elapsed = UCam.Timelapse.Elapsed + dt
-    if UCam.Timelapse.Elapsed < UCam.Timelapse.Interval then return end
-    UCam.Timelapse.Elapsed = 0
-    local previous = UCam.Replay.Frames[#UCam.Replay.Frames]
-    local now = #UCam.Replay.Frames * UCam.Timelapse.Interval
-    if not previous or (UCam.camera.CFrame.Position - previous.cf.Position).Magnitude > 0.001 then
-        table.insert(UCam.Replay.Frames, { cf = UCam.camera.CFrame, fov = UCam.camera.FieldOfView, t = now })
-    end
-end
-
 UCam.trackConnection(UCam.RunService.RenderStepped:Connect(function(dt)
     updateGamepad(dt)
-    updateTimelapse(dt)
 end), "v9.extras")

@@ -169,27 +169,15 @@ local SCHEMA = {
         Fly = { Speed = nil },
     },
 
-    -- Replay (SavedRoutes se serializa aparte — cada frame tiene CFrame)
-    Replay = {
-        MaxDuration = nil, PlaybackSpeed = nil, Loop = nil,
-        Markers = nil,
-    },
-
     -- v9: notificaciones (modo / duración / silencio en tomas)
     Config = {
         Notifications = { Mode = nil, Duration = nil, MuteOnCapture = nil },
     },
 
-    -- Poses / BodyColor / PlayerMod (presets custom del usuario)
-    -- v8.1: CustomPoses y Presets se serializan con funciones especiales
-    -- (contienen CFrames y Color3 que el deepCopy genérico descarta)
-    Poses = {
-        TransitionSpeed = nil,
-    },
+    -- BodyColor: presets custom del usuario (se serializan aparte)
     BodyColor = {
         RainbowSpeed = nil, RainbowPart = nil,
     },
-    PlayerMod = {},  -- vacío; la lista de targets es dinámica y no persiste
 
     -- Waypoint / Director
     Waypoint = {
@@ -337,70 +325,6 @@ local function deserializeCustomFilters(saved)
 end
 
 -- ============================================================
--- Serializador especializado para Replay.SavedRoutes
--- Cada ruta: { frames = { {cf, fov, t}, ... }, savedAt, duration, count }
--- Cada CFrame -> tabla de 12 componentes para JSON.
--- ============================================================
-local function serializeReplayRoutes(routes)
-    if type(routes) ~= "table" then return nil end
-    local out = {}
-    for slot, route in pairs(routes) do
-        if type(route) == "table" and type(route.frames) == "table" then
-            local frames = {}
-            for i, f in ipairs(route.frames) do
-                if f and f.cf then
-                    frames[i] = {
-                        cf  = serCFrame(f.cf),
-                        fov = f.fov,
-                        t   = f.t,
-                        roll = f.roll,
-                    }
-                end
-            end
-            out[tostring(slot)] = {
-                frames   = frames,
-                savedAt  = route.savedAt,
-                duration = route.duration,
-                count    = route.count,
-                markers  = route.markers,
-            }
-        end
-    end
-    if next(out) == nil then return nil end
-    return out
-end
-
-local function deserializeReplayRoutes(saved)
-    if type(saved) ~= "table" then return nil end
-    local out = {}
-    for slot, route in pairs(saved) do
-        local slotNum = tonumber(slot)
-        if slotNum and type(route) == "table" and type(route.frames) == "table" then
-            local frames = {}
-            for i, f in ipairs(route.frames) do
-                if f and f.cf then
-                    frames[i] = {
-                        cf  = desCFrame(f.cf),
-                        fov = f.fov,
-                        t   = f.t,
-                        roll = f.roll,
-                    }
-                end
-            end
-            out[slotNum] = {
-                frames   = frames,
-                savedAt  = route.savedAt,
-                duration = route.duration,
-                count    = route.count,
-                markers  = route.markers,
-            }
-        end
-    end
-    if next(out) == nil then return nil end
-    return out
-end
-
--- ============================================================
 -- Serializador para CamCore.SavedPositions (diccionario slot->CFrame)
 -- ============================================================
 local function serializeCameraPositions(pos)
@@ -423,48 +347,6 @@ local function deserializeCameraPositions(saved)
         if slotNum and type(cfTable) == "table" then
             local ok, cf = pcall(desCFrame, cfTable)
             if ok then out[slotNum] = cf end
-        end
-    end
-    if next(out) == nil then return nil end
-    return out
-end
-
--- ============================================================
--- Serializador para Poses.CustomPoses (v8.1 FIX crítico #1)
--- Cada pose: { [Motor6D.Name] = CFrame } — los CFrames NO son
--- JSON-safe. El deepCopy genérico los descartaba → poses vacías.
--- ============================================================
-local function serializeCustomPoses(poses)
-    if type(poses) ~= "table" then return nil end
-    local out = {}
-    for name, joints in pairs(poses) do
-        if type(joints) == "table" then
-            local jt = {}
-            for jointName, cf in pairs(joints) do
-                if typeof(cf) == "CFrame" then
-                    jt[jointName] = serCFrame(cf)
-                end
-            end
-            out[name] = jt
-        end
-    end
-    if next(out) == nil then return nil end
-    return out
-end
-
-local function deserializeCustomPoses(saved)
-    if type(saved) ~= "table" then return nil end
-    local out = {}
-    for name, joints in pairs(saved) do
-        if type(joints) == "table" then
-            local jt = {}
-            for jointName, cfTable in pairs(joints) do
-                if type(cfTable) == "table" then
-                    local ok, cf = pcall(desCFrame, cfTable)
-                    if ok then jt[jointName] = cf end
-                end
-            end
-            out[name] = jt
         end
     end
     if next(out) == nil then return nil end
@@ -613,14 +495,10 @@ local function buildConfigTable()
             cfg[topKey] = serializeValue(schemaEntry, src)
         end
     end
-    -- Replay routes: serialización especializada (CFrames dentro de frames)
-    cfg._replayRoutes = serializeReplayRoutes(UCam.Replay and UCam.Replay.SavedRoutes)
     -- v8 FIX: filtros custom con TintColor Color3 → {r,g,b}
     cfg._customFilters = serializeCustomFilters(UCam.CustomFilters)
     -- Posiciones de cámara guardadas: serialización especializada (dict slot->CFrame)
     cfg._cameraPositions = serializeCameraPositions(UCam.CamCore and UCam.CamCore.SavedPositions)
-    -- v8.1 FIX (crítico #1): poses custom (CFrames) fuera del deepCopy genérico
-    cfg._customPoses = serializeCustomPoses(UCam.Poses and UCam.Poses.CustomPoses)
     -- v8.1 FIX (crítico #2): presets de BodyColor (Color3/EnumItem)
     cfg._bodyColorPresets = serializeBodyColorPresets(UCam.BodyColor and UCam.BodyColor.Presets)
     -- v8.1 FIX (riesgo #S.Keybinds): keybinds nunca deben contener EnumItem
@@ -671,15 +549,8 @@ function UCam.saveConfig()
 
     local cfg = buildConfigTable()
     -- Campos extra no en SCHEMA pero que queremos persistir
-    cfg._version = "11.0"
+    cfg._version = "12.5"
     cfg._savedAt = os.time()
-    -- v8: perfiles slots + quick (copia directa; NO contienen CFrames anidados)
-    if UCam.Profiles then
-        cfg._profiles = {
-            Slots      = UCam.Profiles.Slots      or {},
-            QuickSlots = UCam.Profiles.QuickSlots or {},
-        }
-    end
     -- v11: props locales (assetId + CFrame + escala + colisión)
     cfg._props = serializeProps(UCam.Props and UCam.Props.Items)
     if UCam.Scenes then cfg._scenes = UCam.Scenes.Slots or {} end
@@ -747,22 +618,10 @@ function UCam.loadConfig()
     if cfg._customFilters then
         UCam.CustomFilters = deserializeCustomFilters(cfg._customFilters)
     end
-    -- v8.1 FIX (crítico #1): poses custom se guardan con CFrames
-    if cfg._customPoses then
-        local poses = deserializeCustomPoses(cfg._customPoses)
-        if poses and UCam.Poses then UCam.Poses.CustomPoses = poses end
-    end
     -- v8.1 FIX (crítico #2): presets de BodyColor con Color3/EnumItem
     if cfg._bodyColorPresets then
         local presets = deserializeBodyColorPresets(cfg._bodyColorPresets)
         if presets and UCam.BodyColor then UCam.BodyColor.Presets = presets end
-    end
-    -- Rutas guardadas (Replay/Director): reemplazo directo, no merge
-    if cfg._replayRoutes then
-        local routes = deserializeReplayRoutes(cfg._replayRoutes)
-        if routes then
-            UCam.Replay.SavedRoutes = routes
-        end
     end
     if cfg.Director and cfg.Director.SavedRoutes then
         UCam.Director.SavedRoutes = cfg.Director.SavedRoutes
@@ -773,16 +632,6 @@ function UCam.loadConfig()
         if pos then
             UCam.CamCore.SavedPositions = pos
         end
-    end
-    -- Poses/presets custom: reemplazo directo
-    -- (Poses.CustomPoses y BodyColor.Presets se restauran vía _customPoses /
-    --  _bodyColorPresets serializados, no por estas ramas del schema)
-
-    -- v8 FIX: perfiles guardados en disco se restauran aquí también
-    -- (antes solo se restauraban en importConfig, así que se perdían al reiniciar)
-    if cfg._profiles and UCam.Profiles then
-        UCam.Profiles.Slots      = cfg._profiles.Slots      or {}
-        UCam.Profiles.QuickSlots = cfg._profiles.QuickSlots or {}
     end
     if cfg._scenes and UCam.Scenes then UCam.Scenes.Slots = cfg._scenes end
     if cfg._uiSettings and UCam.UISettings then
@@ -872,12 +721,8 @@ function UCam.importConfig(base64)
         local restored = deserializeCustomFilters(cfg._customFilters)
         if restored then UCam.CustomFilters = restored end
     end
-    -- v8.1 FIX (crítico #3): importConfig debe restaurar también
-    -- rutas de Replay, posiciones de cámara, poses y presets de BodyColor.
-    if cfg._replayRoutes then
-        local routes = deserializeReplayRoutes(cfg._replayRoutes)
-        if routes and UCam.Replay then UCam.Replay.SavedRoutes = routes end
-    end
+    -- v8.1 FIX (crítico #3): importConfig restaura posiciones de cámara
+    -- y presets de BodyColor.
     if cfg.Director and cfg.Director.SavedRoutes and UCam.Director then
         UCam.Director.SavedRoutes = cfg.Director.SavedRoutes
     end
@@ -885,18 +730,9 @@ function UCam.importConfig(base64)
         local pos = deserializeCameraPositions(cfg._cameraPositions)
         if pos and UCam.CamCore then UCam.CamCore.SavedPositions = pos end
     end
-    if cfg._customPoses then
-        local poses = deserializeCustomPoses(cfg._customPoses)
-        if poses and UCam.Poses then UCam.Poses.CustomPoses = poses end
-    end
     if cfg._bodyColorPresets then
         local presets = deserializeBodyColorPresets(cfg._bodyColorPresets)
         if presets and UCam.BodyColor then UCam.BodyColor.Presets = presets end
-    end
-    -- v8: restaurar perfiles (copia directa; NO contienen CFrames anidados)
-    if cfg._profiles and UCam.Profiles then
-        UCam.Profiles.Slots      = cfg._profiles.Slots      or {}
-        UCam.Profiles.QuickSlots = cfg._profiles.QuickSlots or {}
     end
     -- v11: props de una config importada (solo si el usuario no tiene props aún)
     if cfg._props and UCam.Props and #UCam.Props.Items == 0 then
