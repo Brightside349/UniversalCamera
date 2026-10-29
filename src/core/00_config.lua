@@ -970,6 +970,31 @@ UCam.Props = {
     _renderBound   = false,
 }
 
+-- ============================================================
+-- v12.4: CLONES LOCALES — copias de un jugador que solo existen en
+-- tu cliente. Sirven para grabar tomas con más jugadores del límite
+-- de la partida (8 jugadores) sin enviar nada al servidor.
+-- Cada clon copia las CFrames del personaje original cada frame, así
+-- que reproduce caminar, saltar y cualquier emote.
+-- ============================================================
+UCam.Clones = {
+    Items           = {},     -- registros de clones activos
+    Selected        = 0,      -- índice del clon activo
+    MaxClones       = 40,     -- tope total de la sesión
+    SourcePlayer    = nil,    -- jugador a clonar (nil = yo)
+    Count           = 6,      -- clones por clonación
+    Spacing         = 3.5,    -- separación de la formación inicial
+    Layout          = "Cuadricula",
+    Layouts         = { "Cuadricula", "Fila", "Circulo" },
+    Mode            = "Seguir movimiento",
+    Modes           = { "Seguir movimiento", "Fijar en el sitio" },
+    PlaceWithCursor = false,  -- clic en el mapa coloca el clon seleccionado
+    SnapToGround    = true,   -- al colocar, apoyar sobre el suelo
+    ShowLabels      = false,  -- números sobre cada clon
+    _renderConn     = nil,
+    _charConns      = {},     -- { [Player] = RBXScriptConnection }
+}
+
 -- v8.1 FIX (crítico #4): timeout de 5 s. Si el juego no tiene
 -- PlayerModule, WaitForChild colgaría la carga para siempre dentro
 -- del pcall (que no aborta un WaitForChild).

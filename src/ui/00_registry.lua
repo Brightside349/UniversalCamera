@@ -19,6 +19,7 @@ UCam._uiBuilders = {
     "estudio",
     "gimbal",
     "props",
+    "clones",
     "fun",
     "bodycolor",
     "poses",
