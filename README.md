@@ -1,4 +1,4 @@
-# Universal Camera Pro v12.8 · Director con salto a waypoints
+# Universal Camera Pro v12.9 · FOV y zoom con la rueda en todos los modos
 
 Camara libre cinematografica para Roblox con modos de camara, espectador,
 Director, filtros, iluminacion, guias de composicion, Clean Shot, escenas,
@@ -102,7 +102,20 @@ gente.
 - La lista se refresca al guardar, deshacer o limpiar waypoints, y se
   autocorrige cuando la seleccion ya no existe.
 
-> Version estable: `v12.8.0`.
+### v12.9
+
+- **FOV y zoom con la rueda arreglados en camara libre** y auditados en los 17
+  modos. El valor se aplica al instante (mitad del recorrido en el mismo frame)
+  en vez de depender de que corra el suavizado, y la rueda se atiende antes del
+  filtro de "evento procesado" de Roblox, que era lo que la anulaba.
+- Elegir un modo en el selector **enciende de verdad** ese modo (antes solo
+  cambiaba la etiqueta y `updateCamera` salia sin hacer nada).
+- **Personalizada** y **Vertigo** conservan la rueda: mueve su FOV propio en vez
+  de perderse al frame siguiente.
+- Pestaña **Camaras → Lente**: nuevos controles *Zoom con la rueda* y
+  *Grados por muesca* (1-10).
+
+> Version estable: `v12.9.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -112,7 +125,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.8.0`.
+La version publicada apunta al tag `v12.9.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -123,7 +136,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.8.0"
+local VERSION = "v12.9.0"
 ```
 
 ## Props locales (v11)

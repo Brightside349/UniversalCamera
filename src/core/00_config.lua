@@ -304,6 +304,8 @@ UCam.SecurityCam = {
 UCam.CamCore = {
     SmoothZoom    = true,    -- interpolar FOV al usar la rueda (en vez de salto)
     ZoomSpeed     = 10,      -- velocidad del lerp de FOV
+    WheelZoom     = true,    -- v12.9: la rueda cambia el FOV en cámara libre
+    ZoomStep      = 3,       -- v12.9: grados de FOV por muesca de la rueda
     TargetFOV     = nil,     -- FOV objetivo para smooth zoom
     AutoExposure  = false,  -- ajustar brillo automáticamente según dónde mira la cámara
     ExposureRange = { min = -0.15, max = 0.15 },

@@ -111,6 +111,7 @@ local SCHEMA = {
     -- v11: MotionBlur/MBAmount retirados del schema (feature eliminada).
     CamCore = {
         SmoothZoom = nil, ZoomSpeed = nil,
+        WheelZoom = nil, ZoomStep = nil,
         AutoExposure = nil,
         ExposureRange = { min = nil, max = nil },
         -- SavedPositions NO va aquí: ver serializeCameraPositions
