@@ -114,8 +114,15 @@ function UCam.build_camaras(Window)
             resetModeState(value)
             applyPanels(value)
 
+            -- v12.9: elegir un modo entra en cámara libre. Antes solo cambiaba
+            -- la etiqueta y, con la cámara apagada, el modo (y su FOV/zoom) no
+            -- respondían a nada.
+            if UCam.ensureFreeCam then UCam.ensureFreeCam() end
+
             if value ~= "Personalizada" and UCam.CustomCam.UseFOV and UCam.freeCamEnabled then
-                UCam.camera.FieldOfView = UCam.DEFAULT_FOV
+                -- v12.9: misma vía que la rueda/slider, para que el valor
+                -- quede en el slider y no haya dos FOV compitiendo.
+                UCam.setCameraFOV(UCam.DEFAULT_FOV)
             end
 
             UCam.notify("Modo", "Cambiado a: " .. value)
@@ -535,19 +542,35 @@ function UCam.build_camaras(Window)
         Range = { UCam.MIN_FOV, UCam.MAX_FOV },
         Increment = 1,
         Suffix = " grados",
-        CurrentValue = UCam.DEFAULT_FOV,
+        CurrentValue = math.floor(UCam.camera.FieldOfView + 0.5),
         Callback = function(v)
+            -- v12.9: una sola vía de cambio; el valor se aplica al instante y
+            -- no lo pisa el lerp de zoom suave ni el FOV propio de un modo.
+            UCam.UIRefs.FOVSliderValue = v
             if UCam.freeCamEnabled or UCam.Spectate.Active then
-                UCam.camera.FieldOfView = v
+                UCam.setCameraFOV(v, true)
             end
         end,
     })
+    UCam.UIRefs.FOVSlider = fovSlider
+    UCam.UIRefs.FOVSliderValue = math.floor(UCam.camera.FieldOfView + 0.5)
     CamTab:CreateButton({
         Name = "Restablecer FOV",
         Callback = function()
-            UCam.camera.FieldOfView = UCam.DEFAULT_FOV
+            UCam.setCameraFOV(UCam.DEFAULT_FOV, true)
+            UCam.UIRefs.FOVSliderValue = UCam.DEFAULT_FOV
             pcall(function() fovSlider:Set(UCam.DEFAULT_FOV) end)
         end,
+    })
+    CamTab:CreateToggle({
+        Name = "Zoom con la rueda",
+        CurrentValue = UCam.CamCore.WheelZoom ~= false,
+        Callback = function(v) UCam.CamCore.WheelZoom = v end,
+    })
+    CamTab:CreateSlider({
+        Name = "Grados por muesca", Range = { 1, 10 }, Increment = 1, Suffix = "°",
+        CurrentValue = UCam.CamCore.ZoomStep or 3,
+        Callback = function(v) UCam.CamCore.ZoomStep = v end,
     })
     CamTab:CreateSlider({
         Name = "Sensibilidad del mouse", Range = { 0.05, 1.5 }, Increment = 0.05, Suffix = "x",

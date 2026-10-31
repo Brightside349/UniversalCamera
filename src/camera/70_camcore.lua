@@ -239,6 +239,19 @@ function UCam.toggleFreeCam()
 end
 
 -- ============================================================
+-- v12.9: ENTRAR EN CÁMARA LIBRE SIN ALTERNAR
+-- Elegir un modo en el dropdown solo cambiaba la etiqueta: si la cámara
+-- libre estaba apagada, el modo no hacía nada y el FOV/zoom parecían rotos.
+-- ensureFreeCam() la enciende sin depender del estado previo.
+-- ============================================================
+function UCam.ensureFreeCam()
+    if UCam.freeCamEnabled then return true end
+    if UCam.Spectate.Active then return false end
+    UCam.toggleFreeCam()
+    return UCam.freeCamEnabled
+end
+
+-- ============================================================
 -- CRASH ZOOM
 -- ============================================================
 function UCam.startCrashZoom()
@@ -993,6 +1006,80 @@ function UCam.loadCameraPosition(slot)
 end
 
 -- ============================================================
+-- v12.9: FOV — UNA SOLA VÍA DE CAMBIO
+-- La rueda, el slider de la pestaña Cámaras y "Restablecer FOV" pasan por aquí.
+-- Antes la rueda solo escribía CamCore.TargetFOV y dependía de que el lerp de
+-- "zoom suave" llegara a ejecutarse en updateCamera; además el evento se
+-- descartaba cuando Roblox lo marcaba como procesado. En modos que imponen su
+-- propio FOV (Personalizada con FOV propio, Vertigo) el valor se perdía en el
+-- siguiente frame. Ahora se aplica de inmediato y se enruta al valor propio
+-- del modo cuando ese modo reescribe el FOV cada frame.
+-- ============================================================
+function UCam.setCameraFOV(fov, instant)
+    fov = UCam.clamp(tonumber(fov) or UCam.DEFAULT_FOV, UCam.MIN_FOV, UCam.MAX_FOV)
+    if not UCam.camera then return fov end
+
+    if UCam.camMode == "Personalizada" and UCam.CustomCam then
+        UCam.CustomCam.UseFOV = true
+        UCam.CustomCam.FOV = fov
+    elseif UCam.camMode == "Vertigo" and UCam.Vertigo then
+        UCam.Vertigo.BaseFOV = fov
+    end
+
+    if instant or not UCam.CamCore.SmoothZoom then
+        UCam.camera.FieldOfView = fov
+        UCam.CamCore.TargetFOV = nil
+    else
+        UCam.CamCore.TargetFOV = fov
+        -- Paso inmediato: aunque el lerp no llegue a correr (modos que hacen
+        -- return antes del bloque de suavizado), el zoom se nota al instante.
+        local cur = UCam.camera.FieldOfView
+        local step = (fov - cur) * 0.5
+        if math.abs(step) > 0.05 then
+            UCam.camera.FieldOfView = UCam.clamp(cur + step, UCam.MIN_FOV, UCam.MAX_FOV)
+        end
+    end
+
+    -- Refleja el valor en el slider de la pestaña Cámaras (solo cuando el
+    -- cambio viene de la rueda; si viene del slider no se toca para no
+    -- reentrar en su Callback).
+    local uiRefs = UCam.UIRefs
+    if not instant and uiRefs and uiRefs.FOVSlider then
+        local rounded = math.floor(fov + 0.5)
+        if uiRefs.FOVSliderValue ~= rounded then
+            uiRefs.FOVSliderValue = rounded
+            pcall(function() uiRefs.FOVSlider:Set(rounded) end)
+        end
+    end
+    return fov
+end
+
+--- Suma (o resta) grados al FOV actual, acumulando sobre el objetivo del
+-- suavizado para que varias muescas seguidas no se pierdan.
+function UCam.nudgeCameraFOV(delta)
+    delta = tonumber(delta) or 0
+    if delta == 0 then return UCam.camera.FieldOfView end
+    local base = UCam.CamCore.TargetFOV or UCam.camera.FieldOfView
+    return UCam.setCameraFOV(base + delta)
+end
+
+--- Atiende una muesca de la rueda. Se llama desde InputChanged incluso si
+-- Roblox marcó el evento como procesado: con CameraType Scriptable el zoom
+-- por defecto no la consume, pero algunos juegos/GUIs la marcan igual y el
+-- FOV se quedaba clavado.
+function UCam.handleWheelZoom(input)
+    if UCam.CamCore.WheelZoom == false then return end
+    if UCam.Spectate.Active then return end -- ahí la rueda controla la distancia
+    if UCam.Director.Active then return end -- el FOV lo manda el waypoint
+    if not UCam.freeCamEnabled then return end
+    if UCam.UserInputService:GetFocusedTextBox() then return end
+    local scroll = (input.Position and input.Position.Z) or 0
+    if scroll == 0 and input.Delta then scroll = input.Delta.Z or 0 end
+    if scroll == 0 then return end
+    UCam.nudgeCameraFOV(-scroll * (tonumber(UCam.CamCore.ZoomStep) or 3))
+end
+
+-- ============================================================
 -- INPUT: MouseButton2 (rotacion), MouseWheel (FOV)
 -- v8: conexiones trackeadas en UCam._connections
 -- ============================================================
@@ -1024,8 +1111,14 @@ UCam.trackConnection(
 
 UCam.trackConnection(
     UCam.UserInputService.InputChanged:Connect(function(input, gpe)
-        -- v9 FIX (bug UI): ignorar el input si Rayfield lo procesó (la rueda
-        -- sobre la UI ya no cambia el FOV ni rota la cámara).
+        -- v12.9: la rueda se atiende ANTES del filtro de "procesado" (ver
+        -- handleWheelZoom). Si se descartaba por gpe, el FOV no se movía.
+        if input.UserInputType == Enum.UserInputType.MouseWheel then
+            UCam.handleWheelZoom(input)
+            return
+        end
+        -- v9 FIX (bug UI): el resto del input sí ignora lo que Rayfield ya
+        -- procesó (click derecho sobre la UI ya no rota la cámara).
         if gpe then return end
         if not (UCam.freeCamEnabled or UCam.Spectate.Active) then return end
         if input.UserInputType == Enum.UserInputType.MouseMovement then
@@ -1042,21 +1135,6 @@ UCam.trackConnection(
                 else
                     UCam.applyCameraRotation(input.Delta)
                 end
-            end
-        elseif input.UserInputType == Enum.UserInputType.MouseWheel then
-            -- v9 FIX (conflicto de rueda): mientras se especta, la rueda
-            -- controla la distancia (50_spectate); el FOV queda fuera para
-            -- que no cambien las dos cosas a la vez.
-            if UCam.Spectate.Active then return end
-            local current = UCam.CamCore.TargetFOV or UCam.camera.FieldOfView
-            local newFov = current - (input.Position.Z * 3)
-            newFov = UCam.clamp(newFov, UCam.MIN_FOV, UCam.MAX_FOV)
-            if UCam.CamCore.SmoothZoom then
-                -- Smooth zoom: solo actualiza el target; el lerp ocurre en updateCamera
-                UCam.CamCore.TargetFOV = newFov
-            else
-                UCam.camera.FieldOfView = newFov
-                UCam.CamCore.TargetFOV = nil
             end
         end
     end),
