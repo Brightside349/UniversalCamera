@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera PRO v12.9 · Loader
+-- Universal Camera PRO v13.0 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v12.9.0"
+local VERSION = "v13.0.0"
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
 local MAX_RETRIES = 3
@@ -21,10 +21,18 @@ end
 local UCam = {}
 _G.UCam = UCam
 
+-- v13: las partes necesitan saber de donde descargar recursos propios
+-- (la UI vendorizada vive en src/lib/windui.lua).
+UCam.VERSION = VERSION
+UCam.BASE = BASE
+UCam.FALLBACK_BASE = FALLBACK_BASE
+
 -- El orden es explicito: las carpetas organizan el dominio, pero no
 -- sustituyen las dependencias de ejecucion de Luau.
 local ORDER = {
     "core/00_config.lua",
+    "lib/00_windui.lua",
+    "ui/05_adapter.lua",
     "core/05_persistence.lua",
     "core/10_utils.lua",
     "visuals/20_filters.lua",

@@ -1,4 +1,4 @@
-# Universal Camera Pro v12.9 · FOV y zoom con la rueda en todos los modos
+# Universal Camera Pro v13 · Interfaz WindUI
 
 Camara libre cinematografica para Roblox con modos de camara, espectador,
 Director, filtros, iluminacion, guias de composicion, Clean Shot, escenas,
@@ -115,7 +115,27 @@ gente.
 - Pestaña **Camaras → Lente**: nuevos controles *Zoom con la rueda* y
   *Grados por muesca* (1-10).
 
-> Version estable: `v12.9.0`.
+### v13
+
+- **Nueva interfaz sobre WindUI** (MIT, `1.6.66` vendorizado en `src/lib/`):
+  tema propio, barra lateral agrupada en 5 secciones (Camara, Escena,
+  Personajes, Creacion, Sistema), **buscador integrado**, iconos Lucide en vez
+  de emojis y **imagen de fondo** configurable (`rbxassetid://8741056068`).
+- Las 16 pestañas y sus 527 controles **no cambiaron de codigo**: un adaptador
+  (`ui/05_adapter.lua`) traduce la API anterior a WindUI.
+- **Ajustes → Tema de UI** con cuatro temas (UCam Pro, Claro, Aqua, Amatista),
+  **Imagen de fondo de la UI** y **Opacidad de la imagen** de 0% a 100%
+  (sustituyen al "Modo compacto", que no aplicaba nada).
+- **Boton flotante solo para moviles** para abrir la UI sin teclado.
+- Los paneles por modo de **Camaras** y **Espectador** ahora se ocultan por
+  `ElementFrame` en vez de escarbar el arbol de la GUI: ya no dependen de
+  nombres internos de la libreria.
+- La libreria se carga con version fija y copia local, asi que una actualizacion
+  de la UI no puede romper el script a mitad de partida.
+- Clean Shot oculta la UI por su propia API (`UCam.UI.setVisible`) y `Unload`
+  destruye las cuatro ScreenGui de WindUI antes de recargar.
+
+> Version estable: `v13.0.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -125,7 +145,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v12.9.0`.
+La version publicada apunta al tag `v13.0.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -136,8 +156,21 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v12.9.0"
+local VERSION = "v13.0.0"
 ```
+
+## Interfaz (v13)
+
+- `Delete` abre/cierra la ventana. En movil aparece un **boton flotante**
+  ("Universal Camera") porque no hay teclado.
+- La barra lateral agrupa las pestañas en **Camara / Escena / Personajes /
+  Creacion / Sistema** y el **buscador** filtra controles de todas ellas.
+- **Ajustes → Tema de UI**: UCam Pro, Claro, Aqua y Amatista.
+- **Ajustes → Imagen de fondo de la UI** (on/off) y **Opacidad de la imagen**
+  (0%-100%) controlan el fondo `rbxassetid://8741056068`.
+- Los controles conservan los nombres y valores de v12: la configuracion
+  guardada se sigue cargando igual, y los plugins que usan
+  `Window:CreateTab` siguen funcionando.
 
 ## Props locales (v11)
 
@@ -193,6 +226,9 @@ Universal Camera/
 ├── README.md
 ├── LICENSE.md
 └── src/
+    ├── lib/
+    │   ├── 00_windui.lua        # carga de WindUI (copia local + fallbacks)
+    │   └── windui.lua           # libreria vendorizada 1.6.66 (MIT)
     ├── core/
     │   ├── 00_config.lua       # namespace, servicios y estado base
     │   ├── 05_persistence.lua  # guardado, carga, export e import
@@ -218,6 +254,7 @@ Universal Camera/
     ├── extensions/
     │   └── 85_plugins.lua       # API y carga de plugins
     └── ui/
+        ├── 05_adapter.lua        # adaptador a WindUI (API estilo Rayfield)
         ├── 00_registry.lua      # registro de builders y tabs de plugins
         ├── 90_builder.lua        # ventana, tabs y autosave
         └── tabs/                 # un builder por pestaña
@@ -229,7 +266,8 @@ El orden canonico esta en `Loader.lua`. Las carpetas organizan la propiedad
 de cada dominio, pero no sustituyen el orden de dependencias de Luau:
 
 ```text
-core → visuals → actors → props → camera → runtime/extensions
+core/00_config → lib (WindUI) → ui/05_adapter → core (resto)
+     → visuals → actors → props → camera → runtime/extensions
      → ui/00_registry → ui/tabs → ui/90_builder → core/90_init
 ```
 
@@ -278,4 +316,5 @@ Los tags historicos permanecen disponibles en Git:
 ## Licencia y creditos
 
 - Script original: Cocoa Feliz.
-- UI: [Rayfield](https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua).
+- UI: [WindUI](https://github.com/Footagesus/WindUI) 1.6.66 de Footagesus,
+  licencia MIT. Copia vendorizada en `src/lib/windui.lua`; no se modifica.

@@ -50,23 +50,14 @@ UCam.Lighting         = game:GetService("Lighting")
 UCam.TweenService     = game:GetService("TweenService")
 
 -- ============================================================
--- RAYFIELD (con fallback a dos mirrors)
+-- UI LIBRARY
+-- v13: la UI es WindUI (ver lib/00_windui.lua y ui/05_adapter.lua).
+-- Aqui no se descarga nada: el adaptador expone UCam.UI y UCam.Rayfield
+-- (alias de compatibilidad) despues de que cargue la libreria.
 -- ============================================================
-local Rayfield
-for _, url in ipairs({
-    "https://sirius.menu/rayfield",
-    "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
-}) do
-    local ok, lib = pcall(function() return loadstring(game:HttpGet(url))() end)
-    if ok and lib then
-        Rayfield = lib; break
-    end
-end
-if not Rayfield then error("[Universal Camera] No se pudo cargar Rayfield.") end
-UCam.Rayfield = Rayfield
 
 -- ============================================================
--- NOTIFY (wrapper de Rayfield:Notify) — v9: modos de notificación
+-- NOTIFY (wrapper de la UI) — v9: modos de notificación
 -- ============================================================
 -- UCam.Config.Notifications:
 --   .Mode       "all" | "important" | "silent"
@@ -95,11 +86,11 @@ function UCam.notify(title, content, duration, opts)
     if UCam.emit then UCam.emit("notification", { title = title, content = content, opts = opts }) end
     if mode == "silent" and not opts.critical then return end
     if mode == "important" and not (opts.important or opts.critical) then return end
-    Rayfield:Notify({
+    if not (UCam.UI and UCam.UI.notify) then return end
+    UCam.UI.notify({
         Title    = title,
         Content  = content,
         Duration = duration or ncfg.Duration or 3,
-        Image    = 4483362458,
     })
 end
 

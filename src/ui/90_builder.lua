@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v12.5 · UI builder
+-- Universal Camera Pro v13 · UI builder
 -- Construye la ventana, tabs estáticos/dinámicos y autosave.
 --
 -- Dependencias: core/00_config.lua, core/05_persistence.lua,
@@ -8,16 +8,18 @@
 local UCam = _G.UCam
 
 function UCam.buildUI()
-    local Window = UCam.Rayfield:CreateWindow({
-        Name = "Universal Camera Pro v12.5 By Cocoa Feliz",
-        LoadingTitle = "Universal Camera Pro v12.5",
-        LoadingSubtitle = "Cargando cámaras, props y animador...",
-        Icon = 4483362458,
-        ToggleUIKeybind = Enum.KeyCode.Delete,
-        DisableRayfieldPrompts = true,
-        ConfigurationSaving = { Enabled = false },
-    })
+    -- v13: la ventana, el tema y el fondo los arma ui/05_adapter.lua.
+    local Window = UCam.UI and UCam.UI.createWindow and UCam.UI.createWindow()
+    if not Window then
+        warn("[UCam] UI no disponible: se cargan los modulos sin panel.")
+        return
+    end
     UCam._window = Window
+
+    -- Refleja tema/fondo guardados en cuanto existe la ventana.
+    if UCam.applyUISettings then
+        pcall(UCam.applyUISettings)
+    end
 
     for _, name in ipairs(UCam._uiBuilders) do
         local fn = UCam["build_" .. name]

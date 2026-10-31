@@ -86,6 +86,11 @@ function UCam.Unload()
             pcall(UCam.applyLightingTweaks)
         end
     end)
+    -- v13: destruir la UI de WindUI (y restos de Rayfield de versiones
+    -- anteriores) para que una recarga no deje ventanas duplicadas.
+    if UCam.UI and UCam.UI.destroy then
+        pcall(UCam.UI.destroy)
+    end
     UCam.Initialized = false
 end
 
@@ -118,10 +123,10 @@ if ok then
     end
 
     UCam.notify(
-        "Universal Camera Pro v12.5 By Cocoa Feliz",
-        "V12.5: HUD unificado, cámaras por modo, modo Personalizada y animador de props. Presiona Delete para la UI."
+        "Universal Camera Pro v13 · WindUI",
+        "Nueva interfaz con fondo, secciones y buscador. Presiona Delete para abrirla."
     )
-    print("[UCam] Universal Camera Pro v12.5 cargado OK. Cámaras por modo + animador de props.")
+    print("[UCam] Universal Camera Pro v13 cargado OK. UI WindUI activa.")
 else
     warn("[UCam] Error al construir la UI: " .. tostring(err))
 end
