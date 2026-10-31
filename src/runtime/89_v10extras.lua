@@ -31,6 +31,12 @@ end
 
 local function hideRayfieldGuis(capture)
     capture._hiddenGuis = capture._hiddenGuis or {}
+    -- v13: la UI es WindUI; ocultarla por su propia API es mas fiable que
+    -- buscar ScreenGuis por nombre.
+    if UCam.UI and UCam.UI.setVisible then
+        pcall(UCam.UI.setVisible, false)
+        capture._uiHidden = true
+    end
     local parents = {}
     local ok, coreGui = pcall(function() return game:GetService("CoreGui") end)
     if ok and coreGui then table.insert(parents, coreGui) end
@@ -51,6 +57,10 @@ local function hideRayfieldGuis(capture)
 end
 
 local function restoreRayfieldGuis(capture)
+    if capture._uiHidden and UCam.UI and UCam.UI.setVisible then
+        pcall(UCam.UI.setVisible, true)
+        capture._uiHidden = false
+    end
     for _, entry in ipairs(capture._hiddenGuis or {}) do
         local gui = entry.gui or entry
         local enabled = entry.enabled

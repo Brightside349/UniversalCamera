@@ -160,14 +160,21 @@ function UCam.applyScene(slot)
     return true
 end
 
-UCam.UISettings = { Theme = "Dark", Compact = false }
+-- v13: preferencias de la UI WindUI (tema, fondo y tamaño de iconos).
+UCam.UISettings = { Theme = "UCam Pro", Background = true, BackgroundOpacity = 50, Compact = false }
+
 function UCam.applyUISettings()
-    local rf = UCam.Rayfield
-    if not rf then return end
-    pcall(function()
-        if rf.SetTheme then rf:SetTheme(UCam.UISettings.Theme) end
-        if rf.ChangeTheme then rf:ChangeTheme(UCam.UISettings.Theme) end
-    end)
+    local ui = UCam.UI
+    if not ui then return end
+    if ui.setTheme then
+        pcall(ui.setTheme, UCam.UISettings.Theme or "UCam Pro")
+    end
+    if ui.setBackground then
+        pcall(ui.setBackground, UCam.UISettings.Background ~= false, UCam.UISettings.BackgroundOpacity or 50)
+    end
+    if ui.setCompact then
+        pcall(ui.setCompact, UCam.UISettings.Compact == true)
+    end
 end
 
 UCam.trackConnection(UCam.RunService.RenderStepped:Connect(function(dt)

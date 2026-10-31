@@ -254,7 +254,7 @@ function UCam.build_config(Window)
     })
     ConfigTab:CreateDropdown({
         Name = "Tema de UI",
-        Options = { "Dark", "Light", "Aqua", "Amethyst" },
+        Options = { "UCam Pro", "Claro", "Aqua", "Amatista" },
         CurrentOption = { UCam.UISettings.Theme },
         MultipleOptions = false,
         Callback = function(o)
@@ -262,10 +262,19 @@ function UCam.build_config(Window)
             if v then UCam.UISettings.Theme = v; UCam.applyUISettings() end
         end,
     })
+    -- v13: la personalizacion real de la ventana (antes "Modo compacto"
+    -- guardaba una preferencia que ninguna parte de la UI aplicaba).
     ConfigTab:CreateToggle({
-        Name = "Modo compacto (preferencia de UI)",
-        CurrentValue = UCam.UISettings.Compact,
-        Callback = function(v) UCam.UISettings.Compact = v; UCam.applyUISettings() end,
+        Name = "Imagen de fondo de la UI",
+        CurrentValue = UCam.UISettings.Background ~= false,
+        Callback = function(v) UCam.UISettings.Background = v; UCam.applyUISettings() end,
+    })
+    ConfigTab:CreateSlider({
+        -- WindUI redondea la transparencia a decimas: de 10 en 10 es exacto.
+        Name = "Opacidad de la imagen de fondo",
+        Range = { 0, 100 }, Increment = 10, Suffix = "%",
+        CurrentValue = UCam.UISettings.BackgroundOpacity or 50,
+        Callback = function(v) UCam.UISettings.BackgroundOpacity = v; UCam.applyUISettings() end,
     })
     -- v11: la gestión de Escenas vive solo en la pestaña Creator (tenía
     -- renombrar/metadata; aquí estaba duplicada sin esas funciones).
