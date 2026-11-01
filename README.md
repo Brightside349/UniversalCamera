@@ -193,7 +193,17 @@ gente.
   frame. Ahora el tamaño se aplica de golpe y solo quedan los fundidos.
 - El arranque avisa en consola si el fondo no cargó como imagen directa.
 
-> Version estable: `v13.3.0`.
+### v13.3.1
+
+- **Fondo con decals, resuelto**: ni la imagen directa ni `rbxthumb` cargaban en
+  juego. Ahora, si la imagen no carga, se pide su miniatura a la API de Roblox,
+  se descarga el PNG y se registra con `getcustomasset` (la misma vía que usa la
+  librería para fondos por URL). Si el executor no expone esas funciones, se
+  intenta `rbxthumb` como último recurso.
+- El campo de ID de fondo espera a que termines de escribir antes de aplicar la
+  imagen (antes lanzaba una descarga por tecla).
+
+> Version estable: `v13.3.1`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -203,7 +213,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.3.0`.
+La version publicada apunta al tag `v13.3.1`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -214,7 +224,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.3.0"
+local VERSION = "v13.3.1"
 ```
 
 ## Interfaz (v13)
