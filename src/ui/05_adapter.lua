@@ -584,13 +584,23 @@ local THEME_ALIASES = {
 local function installThemes(lib)
     if UI._themesInstalled then return end
 
-    local gradient = lib.Gradient
+    -- OJO: Gradient es un METODO (self primero). Llamarlo con punto desplaza
+    -- los argumentos, la tabla de keypoints queda vacia y la libreria revienta
+    -- en "attempt to index nil with 'Value'". Y si el gradiente falla por
+    -- cualquier motivo, la UI no debe caerse: se usa un color plano.
     local glow
-    if type(gradient) == "function" then
-        glow = gradient({
-            ["0"]   = { Color = Color3.fromHex("#00E6C3"), Transparency = 0 },
-            ["100"] = { Color = Color3.fromHex("#00B4FF"), Transparency = 0 },
-        }, { Rotation = 0 })
+    if type(lib.Gradient) == "function" then
+        local okGrad, built = pcall(function()
+            return lib:Gradient({
+                ["0"]   = { Color = Color3.fromHex("#00E6C3"), Transparency = 0 },
+                ["100"] = { Color = Color3.fromHex("#00B4FF"), Transparency = 0 },
+            }, { Rotation = 0 })
+        end)
+        if okGrad then
+            glow = built
+        else
+            warn("[UCam] Gradiente de acento no disponible: " .. tostring(built))
+        end
     end
 
     local themes = lib:GetThemes() or {}
@@ -666,17 +676,28 @@ local function installThemes(lib)
     UI._themesInstalled = true
 end
 
+local function themeExists(lib, name)
+    local themes
+    pcall(function() themes = lib:GetThemes() end)
+    return type(themes) == "table" and themes[name] ~= nil
+end
+
 function UI.setTheme(name)
     local lib = UCam.WindUI
     if not lib then return end
     local theme = THEME_ALIASES[name] or name or "UCam Pro"
+    -- Un tema inexistente se ignora en silencio dentro de la libreria, y luego
+    -- CreateWindow recibe Theme=nil: mejor caer a Dark y decirlo.
+    if not themeExists(lib, theme) then
+        warn(("[UCam] Tema '%s' no disponible; se usa Dark."):format(tostring(theme)))
+        theme = "Dark"
+    end
     local ok = pcall(function()
         lib:SetTheme(theme)
     end)
     if not ok then
         pcall(function() lib:SetTheme("Dark") end)
-        UI.themeName = "Dark"
-        return
+        theme = "Dark"
     end
     UI.themeName = theme
 end
@@ -721,7 +742,17 @@ function UI.createWindow()
         return nil
     end
 
-    installThemes(lib)
+    -- Un fallo al instalar temas (color, gradiente) nunca debe impedir que se
+    -- abra la ventana: si algo falla, se sigue con los temas por defecto.
+    local okThemes, themeErr = pcall(installThemes, lib)
+    if not okThemes then
+        warn("[UCam] No se pudieron instalar los temas propios: " .. tostring(themeErr))
+    end
+    -- Sea cual sea el resultado, la ventana solo puede pedir un tema que exista.
+    if not themeExists(lib, UI.themeName) then
+        UI.themeName = "Dark"
+        pcall(function() lib:SetTheme("Dark") end)
+    end
 
     local ok, window = pcall(function()
         return lib:CreateWindow({
