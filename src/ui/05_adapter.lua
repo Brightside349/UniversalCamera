@@ -731,6 +731,58 @@ function UI.thumbnailFor(id)
     return ("rbxthumb://type=Asset&id=%s&w=720&h=720"):format(number)
 end
 
+-- Los decals no siempre cargan en ImageLabel y rbxthumb tampoco siempre esta
+-- permitido en juego. Esta via si funciona: se pide la miniatura a la API de
+-- Roblox, se descarga el PNG y se registra como asset local (getcustomasset),
+-- que es lo mismo que hace la propia libreria con los fondos por URL.
+function UI.resolveWebThumbnail(id, done)
+    local numeric = tostring(id or ""):match("(%d+)")
+    if not numeric or type(done) ~= "function" then
+        return false
+    end
+    if not writefile or not getcustomasset then
+        return false
+    end
+
+    task.spawn(function()
+        local API = "https://thumbnails.roblox.com/v1/assets?assetIds=%s&size=720x720&format=Png"
+        local ok, body = pcall(function()
+            return game:HttpGet(API:format(numeric))
+        end)
+        if not ok or type(body) ~= "string" then
+            return
+        end
+
+        local url = body:match('"imageUrl":"([^"]+)"')
+        if not url then
+            return
+        end
+
+        local folder = "UniversalCameraPro"
+        if isfolder and not isfolder(folder) then
+            pcall(makefolder, folder)
+        end
+
+        local path = folder .. "/background_" .. numeric .. ".png"
+        if not isfile or not isfile(path) then
+            local ok2, image = pcall(function()
+                return game:HttpGet(url)
+            end)
+            if not ok2 or type(image) ~= "string" or #image < 512 then
+                return
+            end
+            pcall(writefile, path, image)
+        end
+
+        local ok3, asset = pcall(getcustomasset, path)
+        if ok3 and type(asset) == "string" and asset ~= "" then
+            done(asset)
+        end
+    end)
+
+    return true
+end
+
 -- Acepta "123456", "rbxassetid://123456" o una URL http(s) de imagen.
 function UI.normalizeBackgroundId(value)
     local text = tostring(value or "")
@@ -802,13 +854,32 @@ function UI.setBackground(enabled, opacityPercent, assetId)
             if token ~= UI._bgToken or not overlay.Parent then
                 return
             end
-            if overlay.IsLoaded == false or overlay.IsLoaded == nil then
-                local thumb = UI.thumbnailFor(id)
-                if thumb then
-                    overlay.Image = thumb
-                    print(("[UCam] Fondo %s no carga como imagen; se usa su miniatura."):format(id))
+            if overlay.IsLoaded ~= false then
+                return
+            end
+
+            local settled = false
+            local function use(asset)
+                if settled or token ~= UI._bgToken or not asset then
+                    return
+                end
+                settled = true
+                overlay.Image = asset
+                if UI._loggedFallback ~= id then
+                    UI._loggedFallback = id
+                    print(("[UCam] Fondo %s no carga directo; se usa su miniatura."):format(id))
                 end
             end
+
+            -- 1) miniatura real descargada del CDN (sirve para decals)
+            UI.resolveWebThumbnail(id, use)
+
+            -- 2) si en 4 s no llego, rbxthumb (funciona si el executor lo permite)
+            task.delay(4, function()
+                if not settled then
+                    use(UI.thumbnailFor(id))
+                end
+            end)
         end)
     end
 

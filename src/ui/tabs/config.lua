@@ -281,10 +281,17 @@ function UCam.build_config(Window)
         CurrentValue    = UCam.UISettings.BackgroundId or "",
         PlaceholderText = "rbxassetid://123456789",
         RemoveTextAfterFocusLost = false,
+        -- El callback salta en cada tecla: se espera a que termine de escribir
+        -- para no aplicar (ni descargar) una imagen por caracter.
         Callback = function(text)
-            local id = tostring(text or ""):gsub("%s", "")
-            UCam.UISettings.BackgroundId = id ~= "" and id or nil
-            UCam.applyUISettings()
+            local clean = tostring(text or ""):gsub("%s", "")
+            UCam._bgInputToken = (UCam._bgInputToken or 0) + 1
+            local token = UCam._bgInputToken
+            task.delay(0.8, function()
+                if token ~= UCam._bgInputToken then return end
+                UCam.UISettings.BackgroundId = clean ~= "" and clean or nil
+                UCam.applyUISettings()
+            end)
         end,
     })
     -- v11: la gestión de Escenas vive solo en la pestaña Creator (tenía
