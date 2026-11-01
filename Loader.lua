@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera PRO v13.0.1 · Loader
+-- Universal Camera PRO v13.1 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v13.0.1"
+local VERSION = "v13.1.0"
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
 local MAX_RETRIES = 3

@@ -33,7 +33,7 @@ UCam.Rayfield = UI
 -- WindUI redondea la transparencia a decimas, asi que el valor por
 -- defecto es 0.5 (50% de opacidad) para que slider y render coincidan.
 local BACKGROUND_ID = "rbxassetid://8741056068"
-local BACKGROUND_TRANSPARENCY = 0.5
+local BACKGROUND_TRANSPARENCY = 0.35
 
 UI.background = {
     id           = BACKGROUND_ID,
@@ -639,6 +639,8 @@ local function installThemes(lib)
     clear.Primary = Color3.fromHex("#0d8bff")
     clear.ElementBackground = Color3.fromHex("#ffffff")
     clear.ElementBackgroundTransparency = 0
+    clear.PanelBackground = Color3.fromHex("#ffffff")
+    clear.PanelBackgroundTransparency = 0.25
     lib:AddTheme(clear)
 
     local aqua = themeCopy(dark)
@@ -655,6 +657,8 @@ local function installThemes(lib)
     aqua.Primary = glow or Color3.fromHex("#00E6C3")
     aqua.ElementBackground = Color3.fromHex("#0a2630")
     aqua.ElementBackgroundTransparency = 0.15
+    aqua.PanelBackground = Color3.fromHex("#041f28")
+    aqua.PanelBackgroundTransparency = 0.4
     lib:AddTheme(aqua)
 
     local amethyst = themeCopy(dark)
@@ -671,9 +675,23 @@ local function installThemes(lib)
     amethyst.Primary = Color3.fromHex("#a855f7")
     amethyst.ElementBackground = Color3.fromHex("#181228")
     amethyst.ElementBackgroundTransparency = 0.15
+    amethyst.PanelBackground = Color3.fromHex("#0f0b1c")
+    amethyst.PanelBackgroundTransparency = 0.4
     lib:AddTheme(amethyst)
 
     UI._themesInstalled = true
+end
+
+-- Instala los temas en cuanto se necesitan. La configuracion se aplica antes
+-- de que exista la ventana (persistencia), asi que sin esto el primer
+-- applyUISettings buscaba "UCam Pro" antes de que existiera y avisaba de un
+-- tema fantasma que luego si se aplicaba.
+local function ensureThemes(lib)
+    if UI._themesInstalled or not lib then return end
+    local ok, err = pcall(installThemes, lib)
+    if not ok then
+        warn("[UCam] No se pudieron instalar los temas propios: " .. tostring(err))
+    end
 end
 
 local function themeExists(lib, name)
@@ -685,6 +703,7 @@ end
 function UI.setTheme(name)
     local lib = UCam.WindUI
     if not lib then return end
+    ensureThemes(lib)
     local theme = THEME_ALIASES[name] or name or "UCam Pro"
     -- Un tema inexistente se ignora en silencio dentro de la libreria, y luego
     -- CreateWindow recibe Theme=nil: mejor caer a Dark y decirlo.
@@ -744,10 +763,7 @@ function UI.createWindow()
 
     -- Un fallo al instalar temas (color, gradiente) nunca debe impedir que se
     -- abra la ventana: si algo falla, se sigue con los temas por defecto.
-    local okThemes, themeErr = pcall(installThemes, lib)
-    if not okThemes then
-        warn("[UCam] No se pudieron instalar los temas propios: " .. tostring(themeErr))
-    end
+    ensureThemes(lib)
     -- Sea cual sea el resultado, la ventana solo puede pedir un tema que exista.
     if not themeExists(lib, UI.themeName) then
         UI.themeName = "Dark"
@@ -790,6 +806,10 @@ function UI.createWindow()
 
     UI.window = window
     UI._sectionName = nil
+
+    -- El fondo se aplica aqui, no solo desde Ajustes: sin esto el panel se
+    -- quedaba pintado sobre una imagen que nunca se ponia.
+    pcall(UI.setBackground, true, (UCam.UISettings and UCam.UISettings.BackgroundOpacity) or 65)
 
     function window:CreateTab(title, icon)
         return UI.makeTab(self, title, icon)

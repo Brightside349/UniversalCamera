@@ -161,7 +161,7 @@ function UCam.applyScene(slot)
 end
 
 -- v13: preferencias de la UI WindUI (tema, fondo y tamaño de iconos).
-UCam.UISettings = { Theme = "UCam Pro", Background = true, BackgroundOpacity = 50, Compact = false }
+UCam.UISettings = { Theme = "UCam Pro", Background = true, BackgroundOpacity = 65, Compact = false }
 
 function UCam.applyUISettings()
     local ui = UCam.UI

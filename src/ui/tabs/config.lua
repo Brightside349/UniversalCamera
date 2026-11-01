@@ -273,7 +273,7 @@ function UCam.build_config(Window)
         -- WindUI redondea la transparencia a decimas: de 10 en 10 es exacto.
         Name = "Opacidad de la imagen de fondo",
         Range = { 0, 100 }, Increment = 10, Suffix = "%",
-        CurrentValue = UCam.UISettings.BackgroundOpacity or 50,
+        CurrentValue = UCam.UISettings.BackgroundOpacity or 65,
         Callback = function(v) UCam.UISettings.BackgroundOpacity = v; UCam.applyUISettings() end,
     })
     -- v11: la gestión de Escenas vive solo en la pestaña Creator (tenía

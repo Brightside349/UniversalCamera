@@ -12,6 +12,11 @@ local UCam = _G.UCam
 function UCam.build_inicio(Window)
     local InicioTab = Window:CreateTab("🎬 Inicio", "home")
 
+    InicioTab:CreateParagraph({
+        Title   = "Universal Camera Pro · v13",
+        Content = "Pulsa Delete (o el botón flotante en móvil) para abrir o cerrar esta ventana. La barra lateral agrupa Cámara, Escena, Personajes, Creación y Sistema, y el buscador salta a cualquier control. En Ajustes cambias el tema y la imagen de fondo.",
+    })
+
     InicioTab:CreateSection("Cámara Libre")
     InicioTab:CreateButton({
         Name     = "Activar / Desactivar Cámara",
