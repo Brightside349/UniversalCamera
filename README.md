@@ -158,7 +158,19 @@ gente.
 - **Inicio** abre con un bloque de bienvenida: version, tecla `Delete`, como
   funciona la barra lateral y donde estan el tema y el fondo.
 
-> Version estable: `v13.1.0`.
+### v13.2
+
+- **Arranque sin tirones**: las 16 pestañas ya no se rellenan de golpe. Se crean
+  vacías y el contenido se construye la primera vez que abres cada una, así que
+  el pico de ~7 s del arranque desaparece. El buscador integrado, en cambio, solo
+  encuentra controles de pestañas que ya hayas abierto.
+- **Fondo más presente**: opacidad por defecto al 85 % (las configuraciones
+  guardadas con el 50 % se migran una sola vez) y panel al 50 % de transparencia
+  en los cuatro temas, para que la imagen se vea detrás de los controles.
+- El log de arranque imprime `UI lista en N ms` y el aspecto real aplicado
+  (tema, transparencia del panel e imagen con su transparencia).
+
+> Version estable: `v13.2.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -168,7 +180,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.1.0`.
+La version publicada apunta al tag `v13.2.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -179,7 +191,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.1.0"
+local VERSION = "v13.2.0"
 ```
 
 ## Interfaz (v13)
