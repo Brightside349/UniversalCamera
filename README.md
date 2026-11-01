@@ -147,7 +147,18 @@ gente.
   usa `Dark` y se avisa en la consola.
 - El mensaje final del Loader muestra la versión real que se cargó.
 
-> Version estable: `v13.0.1`.
+### v13.1
+
+- **Imagen de fondo arreglada**: el tema propio se instala en cuanto se pide
+  (la configuracion se aplica antes de que exista la ventana, asi que antes se
+  quedaba en `Dark`, con el panel opaco tapando la foto) y el fondo se aplica
+  al abrir la ventana, no solo al tocar Ajustes. Opacidad por defecto 65 %.
+- **Buscador sin tirones**: agrupa la busqueda mientras escribes en vez de
+  reconstruir la lista de resultados en cada tecla (causa de los bajones de FPS).
+- **Inicio** abre con un bloque de bienvenida: version, tecla `Delete`, como
+  funciona la barra lateral y donde estan el tema y el fondo.
+
+> Version estable: `v13.1.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -157,7 +168,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.0.1`.
+La version publicada apunta al tag `v13.1.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -168,7 +179,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.0.1"
+local VERSION = "v13.1.0"
 ```
 
 ## Interfaz (v13)

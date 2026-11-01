@@ -12973,8 +12973,18 @@ at.Frame.Results.Frame.Visible=false
 end
 end
 
+-- v13.1 (parche local): la busqueda rehacia la lista de resultados en cada
+-- tecla, creando y destruyendo filas con tween. Se agrupa en una sola busqueda
+-- cuando el usuario deja de escribir, que es lo que causaba los tirones.
+local ucamSearchToken=0
 ai.AddSignal(aq:GetPropertyChangedSignal"Text",function()
+ucamSearchToken=ucamSearchToken+1
+local ucamMine=ucamSearchToken
+task.delay(0.18,function()
+if ucamMine==ucamSearchToken then
 ap:Search(aq.Text)
+end
+end)
 end)
 
 return ap
