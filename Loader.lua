@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera PRO v13.0 · Loader
+-- Universal Camera PRO v13.0.1 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v13.0.0"
+local VERSION = "v13.0.1"
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
 local MAX_RETRIES = 3
@@ -145,7 +145,7 @@ end
 table.clear(sources)
 
 if #failedList == 0 then
-    print(("[UCam] Universal Camera Pro v12.5 cargado OK (%d partes). Camara libre, props con animador, clones y estudio."):format(loaded))
+    print(("[UCam] Universal Camera Pro %s cargado OK (%d partes). Camara libre, props con animador, clones y estudio."):format(VERSION, loaded))
 else
     warn(("[UCam] Carga completada con %d errores. Fallaron: %s"):format(
         #failedList,

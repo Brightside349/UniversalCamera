@@ -135,7 +135,19 @@ gente.
 - Clean Shot oculta la UI por su propia API (`UCam.UI.setVisible`) y `Unload`
   destruye las cuatro ScreenGui de WindUI antes de recargar.
 
-> Version estable: `v13.0.0`.
+### v13.0.1
+
+- Corregido el fallo que dejaba el script **sin interfaz** al arrancar
+  (`[string "windui"]:15482: attempt to index nil with 'Value'`): el gradiente
+  del tema propio se llamaba con punto en vez de dos puntos, así que la librería
+  recibía los argumentos desplazados y no encontraba ni un punto de color.
+- Instalar los temas ya no puede tumbar la ventana: un fallo de color o de
+  gradiente se registra en el log y el tema cae a un color plano.
+- Elegir un tema que no exista ya no viaja hasta `CreateWindow` como `nil`: se
+  usa `Dark` y se avisa en la consola.
+- El mensaje final del Loader muestra la versión real que se cargó.
+
+> Version estable: `v13.0.1`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -145,7 +157,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.0.0`.
+La version publicada apunta al tag `v13.0.1`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -156,7 +168,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.0.0"
+local VERSION = "v13.0.1"
 ```
 
 ## Interfaz (v13)
