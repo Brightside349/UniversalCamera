@@ -721,6 +721,16 @@ function UI.setTheme(name)
     UI.themeName = theme
 end
 
+-- Miniatura del asset: sirve para IDs que no cargan como imagen directa
+-- (tipicamente decals, que en ImageLabel se quedan en blanco).
+function UI.thumbnailFor(id)
+    local number = tostring(id or ""):match("(%d+)")
+    if not number then
+        return nil
+    end
+    return ("rbxthumb://type=Asset&id=%s&w=720&h=720"):format(number)
+end
+
 -- Acepta "123456", "rbxassetid://123456" o una URL http(s) de imagen.
 function UI.normalizeBackgroundId(value)
     local text = tostring(value or "")
@@ -746,6 +756,7 @@ function UI.setBackground(enabled, opacityPercent, assetId)
         or BACKGROUND_ID
 
     UI.background.id = id
+    UI.background.transparency = 1 - (opacity / 100)
 
     pcall(function()
         if type(window.SetBackgroundImage) == "function" then
@@ -755,6 +766,67 @@ function UI.setBackground(enabled, opacityPercent, assetId)
             window:SetBackgroundImageTransparency(1 - (opacity / 100))
         end
     end)
+
+    -- Capa propia: la ruta interna de la libreria colocaba la imagen detras del
+    -- panel opaco de la ventana y no se veia. Esta vive dentro del mismo marco
+    -- redondeado, por encima del fondo de la ventana y por debajo del panel.
+    local overlay
+    pcall(function()
+        local background = window.UIElements.Main.Background
+        overlay = background:FindFirstChild("UCamBackground")
+        if not overlay then
+            overlay = Instance.new("ImageLabel")
+            overlay.Name = "UCamBackground"
+            overlay.BackgroundTransparency = 1
+            overlay.Size = UDim2.fromScale(1, 1)
+            overlay.ScaleType = Enum.ScaleType.Crop
+            overlay.ZIndex = 1
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 18)
+            corner.Parent = overlay
+            overlay.Parent = background
+        end
+        overlay.Image = enabled and id or ""
+        overlay.ImageTransparency = 1 - (opacity / 100)
+        overlay.Visible = enabled == true
+    end)
+
+    UI._overlay = overlay
+
+    -- Si el asset no carga como imagen directa (los decals suelen quedarse en
+    -- blanco), se cambia a su miniatura, que si resuelve el ID.
+    UI._bgToken = (UI._bgToken or 0) + 1
+    local token = UI._bgToken
+    if enabled and overlay and id:match("^rbxassetid://") then
+        task.delay(2, function()
+            if token ~= UI._bgToken or not overlay.Parent then
+                return
+            end
+            if overlay.IsLoaded == false or overlay.IsLoaded == nil then
+                local thumb = UI.thumbnailFor(id)
+                if thumb then
+                    overlay.Image = thumb
+                    print(("[UCam] Fondo %s no carga como imagen; se usa su miniatura."):format(id))
+                end
+            end
+        end)
+    end
+
+    -- Avisa si el asset no se puede ni descargar: es la diferencia entre "no se
+    -- ve" y "no carga".
+    if enabled and overlay and UI._preloadedId ~= id then
+        UI._preloadedId = id
+        task.spawn(function()
+            pcall(function()
+                game:GetService("ContentProvider"):PreloadAsync({ overlay })
+            end)
+            local loaded = overlay.IsLoaded
+            print(("[UCam] Imagen de fondo %s: %s"):format(
+                id,
+                loaded == true and "cargada" or "no cargó como imagen directa (se probará la miniatura)"
+            ))
+        end)
+    end
 end
 
 function UI.setCompact(enabled)
@@ -800,7 +872,8 @@ function UI.describeAppearance()
     end)
     local image, transparency = "?", "?"
     pcall(function()
-        local label = window.UIElements.Main.Background.ImageLabel
+        local background = window.UIElements.Main.Background
+        local label = background:FindFirstChild("UCamBackground") or background.ImageLabel
         image = tostring(label.Image)
         transparency = tostring(string.format("%.2f", label.ImageTransparency))
     end)

@@ -181,7 +181,19 @@ gente.
 - Nuevo campo **Ajustes → ID de la imagen de fondo**: acepta `123456`,
   `rbxassetid://123456` o una URL, para probar otra imagen sin editar código.
 
-> Version estable: `v13.2.1`.
+### v13.3
+
+- **Fondo de la UI, por fin visible**: se pinta en una capa propia dentro del
+  marco redondeado, por encima del fondo de la ventana y por debajo del panel.
+  Los IDs de asset que se copian del catálogo suelen ser **Decals**, que en
+  `ImageLabel` se quedan en blanco: si a los 2 s la imagen no ha cargado se
+  cambia automáticamente a su miniatura (`rbxthumb://`), que sí resuelve el ID.
+- **Sin tirón al abrir/cerrar con `Delete`**: la librería animaba el tamaño de
+  toda la ventana (0,8–0,9 s), lo que recalculaba el layout completo en cada
+  frame. Ahora el tamaño se aplica de golpe y solo quedan los fundidos.
+- El arranque avisa en consola si el fondo no cargó como imagen directa.
+
+> Version estable: `v13.3.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -191,7 +203,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.2.1`.
+La version publicada apunta al tag `v13.3.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -202,7 +214,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.2.1"
+local VERSION = "v13.3.0"
 ```
 
 ## Interfaz (v13)
