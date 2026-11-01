@@ -273,8 +273,18 @@ function UCam.build_config(Window)
         -- WindUI redondea la transparencia a decimas: de 10 en 10 es exacto.
         Name = "Opacidad de la imagen de fondo",
         Range = { 0, 100 }, Increment = 10, Suffix = "%",
-        CurrentValue = UCam.UISettings.BackgroundOpacity or 85,
+        CurrentValue = UCam.UISettings.BackgroundOpacity or 100,
         Callback = function(v) UCam.UISettings.BackgroundOpacity = v; UCam.applyUISettings() end,
+    })
+    ConfigTab:CreateButton({
+        Name = "Probar posición del fondo (3 s)",
+        Callback = function()
+            if UCam.UI and UCam.UI.flashBackground and UCam.UI.flashBackground() then
+                UCam.notify("Fondo", "Magenta durante 3 s: si no lo ves, la capa de fondo no se está dibujando.")
+            else
+                UCam.notify("Fondo", "La capa de fondo todavía no existe.")
+            end
+        end,
     })
     ConfigTab:CreateInput({
         Name            = "ID de la imagen de fondo",

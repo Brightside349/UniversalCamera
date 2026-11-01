@@ -33,7 +33,7 @@ UCam.Rayfield = UI
 -- WindUI redondea la transparencia a decimas, asi que el valor por
 -- defecto es 0.5 (50% de opacidad) para que slider y render coincidan.
 local BACKGROUND_ID = "rbxassetid://8741056068"
-local BACKGROUND_TRANSPARENCY = 0.15
+local BACKGROUND_TRANSPARENCY = 0
 
 UI.background = {
     id           = BACKGROUND_ID,
@@ -624,7 +624,7 @@ local function installThemes(lib)
     pro.ElementBackground = Color3.fromHex("#161a22")
     pro.ElementBackgroundTransparency = 0.15
     pro.PanelBackground = Color3.fromHex("#0f1218")
-    pro.PanelBackgroundTransparency = 0.5
+    pro.PanelBackgroundTransparency = 0.6
     lib:AddTheme(pro)
 
     local clear = themeCopy(light)
@@ -640,7 +640,7 @@ local function installThemes(lib)
     clear.ElementBackground = Color3.fromHex("#ffffff")
     clear.ElementBackgroundTransparency = 0
     clear.PanelBackground = Color3.fromHex("#ffffff")
-    clear.PanelBackgroundTransparency = 0.4
+    clear.PanelBackgroundTransparency = 0.5
     lib:AddTheme(clear)
 
     local aqua = themeCopy(dark)
@@ -658,7 +658,7 @@ local function installThemes(lib)
     aqua.ElementBackground = Color3.fromHex("#0a2630")
     aqua.ElementBackgroundTransparency = 0.15
     aqua.PanelBackground = Color3.fromHex("#041f28")
-    aqua.PanelBackgroundTransparency = 0.5
+    aqua.PanelBackgroundTransparency = 0.6
     lib:AddTheme(aqua)
 
     local amethyst = themeCopy(dark)
@@ -676,7 +676,7 @@ local function installThemes(lib)
     amethyst.ElementBackground = Color3.fromHex("#181228")
     amethyst.ElementBackgroundTransparency = 0.15
     amethyst.PanelBackground = Color3.fromHex("#0f0b1c")
-    amethyst.PanelBackgroundTransparency = 0.5
+    amethyst.PanelBackgroundTransparency = 0.6
     lib:AddTheme(amethyst)
 
     UI._themesInstalled = true
@@ -719,6 +719,31 @@ function UI.setTheme(name)
         theme = "Dark"
     end
     UI.themeName = theme
+    -- Si llego un alias ("Dark"), se guarda el nombre real para que el selector
+    -- de Ajustes no muestre un tema distinto del que se esta usando.
+    if UCam.UISettings and name ~= theme and UCam.UISettings.Theme ~= theme then
+        UCam.UISettings.Theme = theme
+    end
+end
+
+--- Pinta la capa de fondo en magenta durante 3 s para comprobar que se ve.
+--- Sirve para distinguir "la imagen es oscura" de "la capa no se dibuja".
+function UI.flashBackground()
+    local overlay = UI._overlay
+    if not overlay then
+        return false
+    end
+    local previousImage = overlay.Image
+    local previousTransparency = overlay.ImageTransparency
+    overlay.Image = ""
+    overlay.BackgroundColor3 = Color3.fromRGB(255, 0, 200)
+    overlay.BackgroundTransparency = 0
+    task.delay(3, function()
+        overlay.BackgroundTransparency = 1
+        overlay.Image = previousImage
+        overlay.ImageTransparency = previousTransparency
+    end)
+    return true
 end
 
 -- Miniatura del asset: sirve para IDs que no cargan como imagen directa
@@ -1010,7 +1035,7 @@ function UI.createWindow()
 
     -- El fondo se aplica aqui, no solo desde Ajustes: sin esto el panel se
     -- quedaba pintado sobre una imagen que nunca se ponia.
-    pcall(UI.setBackground, true, (UCam.UISettings and UCam.UISettings.BackgroundOpacity) or 85)
+    pcall(UI.setBackground, true, (UCam.UISettings and UCam.UISettings.BackgroundOpacity) or 100)
 
     function window:CreateTab(title, icon)
         return UI.makeTab(self, title, icon)

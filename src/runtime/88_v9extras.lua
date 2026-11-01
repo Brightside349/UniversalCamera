@@ -161,16 +161,16 @@ function UCam.applyScene(slot)
 end
 
 -- v13: preferencias de la UI WindUI (tema, fondo y tamaño de iconos).
-UCam.UISettings = { Theme = "UCam Pro", Background = true, BackgroundOpacity = 85, Compact = false, AppearanceVersion = 3 }
+UCam.UISettings = { Theme = "UCam Pro", Background = true, BackgroundOpacity = 100, Compact = false, AppearanceVersion = 4 }
 
 function UCam.applyUISettings()
     local ui = UCam.UI
     if not ui then return end
     -- v13.2: las configuraciones guardadas traian el fondo al 50 %, que con el
     -- panel translucido se veia casi negro. Se sube una sola vez.
-    if (tonumber(UCam.UISettings.AppearanceVersion) or 1) < 3 then
-        UCam.UISettings.BackgroundOpacity = 85
-        UCam.UISettings.AppearanceVersion = 3
+    if (tonumber(UCam.UISettings.AppearanceVersion) or 1) < 4 then
+        UCam.UISettings.BackgroundOpacity = 100
+        UCam.UISettings.AppearanceVersion = 4
     end
     if ui.setTheme then
         pcall(ui.setTheme, UCam.UISettings.Theme or "UCam Pro")
