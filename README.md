@@ -203,7 +203,18 @@ gente.
 - El campo de ID de fondo espera a que termines de escribir antes de aplicar la
   imagen (antes lanzaba una descarga por tecla).
 
-> Version estable: `v13.3.1`.
+### v13.4
+
+- **Fondo más visible**: la imagen va al 100 % de opacidad y el panel al 60 % de
+  transparencia (40 % opaco) en los cuatro temas. Con una imagen oscura no hay
+  nada que ver: eso pasaba con los decals de prueba, que son arte casi negro.
+- Nuevo botón **Ajustes → Probar posición del fondo (3 s)**: pinta la capa de
+  fondo en magenta. Si aparece, la capa está bien colocada y lo que falla es la
+  imagen; si no aparece, el problema es de dibujado.
+- El selector de tema ya no muestra `Dark` cuando en realidad se está aplicando
+  `UCam Pro` (se guarda el nombre real del tema).
+
+> Version estable: `v13.4.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -213,7 +224,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.3.1`.
+La version publicada apunta al tag `v13.4.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -224,7 +235,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.3.1"
+local VERSION = "v13.4.0"
 ```
 
 ## Interfaz (v13)
