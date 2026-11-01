@@ -276,6 +276,17 @@ function UCam.build_config(Window)
         CurrentValue = UCam.UISettings.BackgroundOpacity or 85,
         Callback = function(v) UCam.UISettings.BackgroundOpacity = v; UCam.applyUISettings() end,
     })
+    ConfigTab:CreateInput({
+        Name            = "ID de la imagen de fondo",
+        CurrentValue    = UCam.UISettings.BackgroundId or "",
+        PlaceholderText = "rbxassetid://123456789",
+        RemoveTextAfterFocusLost = false,
+        Callback = function(text)
+            local id = tostring(text or ""):gsub("%s", "")
+            UCam.UISettings.BackgroundId = id ~= "" and id or nil
+            UCam.applyUISettings()
+        end,
+    })
     -- v11: la gestión de Escenas vive solo en la pestaña Creator (tenía
     -- renombrar/metadata; aquí estaba duplicada sin esas funciones).
 

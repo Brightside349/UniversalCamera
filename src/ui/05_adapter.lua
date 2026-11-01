@@ -721,16 +721,35 @@ function UI.setTheme(name)
     UI.themeName = theme
 end
 
-function UI.setBackground(enabled, opacityPercent)
+-- Acepta "123456", "rbxassetid://123456" o una URL http(s) de imagen.
+function UI.normalizeBackgroundId(value)
+    local text = tostring(value or "")
+    text = text:gsub("%s", "")
+    if text == "" then
+        return nil
+    end
+    if text:match("^%d+$") then
+        return "rbxassetid://" .. text
+    end
+    return text
+end
+
+function UI.setBackground(enabled, opacityPercent, assetId)
     local window = UI.window
     if not window then return end
 
-    local opacity = tonumber(opacityPercent) or 50
+    local opacity = tonumber(opacityPercent) or 85
     opacity = math.clamp(opacity, 0, 100)
+
+    local id = UI.normalizeBackgroundId(assetId)
+        or UI.normalizeBackgroundId(UCam.UISettings and UCam.UISettings.BackgroundId)
+        or BACKGROUND_ID
+
+    UI.background.id = id
 
     pcall(function()
         if type(window.SetBackgroundImage) == "function" then
-            window:SetBackgroundImage(enabled and BACKGROUND_ID or "")
+            window:SetBackgroundImage(enabled and id or "")
         end
         if type(window.SetBackgroundImageTransparency) == "function" then
             window:SetBackgroundImageTransparency(1 - (opacity / 100))
@@ -822,7 +841,7 @@ function UI.createWindow()
             Theme                       = UI.themeName,
             Resizable                   = true,
             SideBarWidth                = 178,
-            Background                  = BACKGROUND_ID,
+            Background                  = (UCam.UISettings and UI.normalizeBackgroundId(UCam.UISettings.BackgroundId)) or BACKGROUND_ID,
             BackgroundImageTransparency = BACKGROUND_TRANSPARENCY,
             HideSearchBar               = false,
             ScrollBarEnabled            = true,
