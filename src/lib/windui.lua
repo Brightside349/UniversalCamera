@@ -14321,12 +14321,10 @@ end
 task.wait(0.06)
 aw.Closed=false
 
-aw.UIElements.Main.Size=UDim2.new(aw.Size.X.Scale,aw.Size.X.Offset,0,100)
-
-ap(aw.UIElements.Main,0.8,{
-
-Size=aw.Size,
-},Enum.EasingStyle.Quint,Enum.EasingDirection.Out):Play()
+-- v13.3 (parche local): animar el Size de la ventana obliga a recalcular el
+-- layout de TODA la interfaz en cada frame y provoca el tiron de FPS al abrir.
+-- Se aplica el tamano final de una vez y se dejan solo los fundidos.
+aw.UIElements.Main.Size=aw.Size
 
 if aw.UIElements.BackgroundGradient then
 ap(aw.UIElements.BackgroundGradient,0.2,{
@@ -14426,10 +14424,8 @@ end
 aw.CanDropdown=false
 aw.Closed=true
 
-ap(aw.UIElements.Main,0.9,{
-
-Size=UDim2.new(aw.Size.X.Scale,aw.Size.X.Offset,0,0),
-},Enum.EasingStyle.Quint,Enum.EasingDirection.Out):Play()
+-- v13.3 (parche local): el mismo problema al cerrar. Sin tween de Size el
+-- ocultado no recalcula el layout y deja de dar el bajon de FPS.
 if aw.UIElements.BackgroundGradient then
 ap(aw.UIElements.BackgroundGradient,0.2,{
 ImageTransparency=1,
