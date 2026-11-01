@@ -33,7 +33,7 @@ UCam.Rayfield = UI
 -- WindUI redondea la transparencia a decimas, asi que el valor por
 -- defecto es 0.5 (50% de opacidad) para que slider y render coincidan.
 local BACKGROUND_ID = "rbxassetid://8741056068"
-local BACKGROUND_TRANSPARENCY = 0.35
+local BACKGROUND_TRANSPARENCY = 0.15
 
 UI.background = {
     id           = BACKGROUND_ID,
@@ -624,7 +624,7 @@ local function installThemes(lib)
     pro.ElementBackground = Color3.fromHex("#161a22")
     pro.ElementBackgroundTransparency = 0.15
     pro.PanelBackground = Color3.fromHex("#0f1218")
-    pro.PanelBackgroundTransparency = 0.4
+    pro.PanelBackgroundTransparency = 0.5
     lib:AddTheme(pro)
 
     local clear = themeCopy(light)
@@ -640,7 +640,7 @@ local function installThemes(lib)
     clear.ElementBackground = Color3.fromHex("#ffffff")
     clear.ElementBackgroundTransparency = 0
     clear.PanelBackground = Color3.fromHex("#ffffff")
-    clear.PanelBackgroundTransparency = 0.25
+    clear.PanelBackgroundTransparency = 0.4
     lib:AddTheme(clear)
 
     local aqua = themeCopy(dark)
@@ -658,7 +658,7 @@ local function installThemes(lib)
     aqua.ElementBackground = Color3.fromHex("#0a2630")
     aqua.ElementBackgroundTransparency = 0.15
     aqua.PanelBackground = Color3.fromHex("#041f28")
-    aqua.PanelBackgroundTransparency = 0.4
+    aqua.PanelBackgroundTransparency = 0.5
     lib:AddTheme(aqua)
 
     local amethyst = themeCopy(dark)
@@ -676,7 +676,7 @@ local function installThemes(lib)
     amethyst.ElementBackground = Color3.fromHex("#181228")
     amethyst.ElementBackgroundTransparency = 0.15
     amethyst.PanelBackground = Color3.fromHex("#0f0b1c")
-    amethyst.PanelBackgroundTransparency = 0.4
+    amethyst.PanelBackgroundTransparency = 0.5
     lib:AddTheme(amethyst)
 
     UI._themesInstalled = true
@@ -754,6 +754,44 @@ function UI.isReady()
     return UCam.WindUI ~= nil
 end
 
+--- Pestaña inerte. Sirve para ejecutar un builder sin crear instancias: así el
+-- arranque descubre el título y el icono de cada pestaña y solo la construye de
+-- verdad cuando el usuario la abre.
+function UI.noopTab()
+    local tab = { _noop = true }
+    local methods = {
+        "CreateSection", "CreateParagraph", "CreateToggle", "CreateSlider",
+        "CreateDropdown", "CreateButton", "CreateInput", "CreateKeybind",
+        "CreateColorPicker", "CreateDivider", "CreateLabel", "CreateImage",
+        "Set", "SetValue", "SetText", "SetVisible", "Refresh", "Hide", "Show",
+        "Destroy",
+    }
+    for _, name in ipairs(methods) do
+        tab[name] = function() return tab end
+    end
+    return tab
+end
+
+--- Resumen legible del aspecto real de la ventana (para el log de arranque).
+function UI.describeAppearance()
+    local window = UI.window
+    local theme
+    pcall(function()
+        theme = UCam.WindUI:GetThemes()[UI.themeName]
+    end)
+    local image, transparency = "?", "?"
+    pcall(function()
+        local label = window.UIElements.Main.Background.ImageLabel
+        image = tostring(label.Image)
+        transparency = tostring(string.format("%.2f", label.ImageTransparency))
+    end)
+    return ("tema=%s, panel=%s, imagen=%s (transparencia %s)"):format(
+        tostring(UI.themeName),
+        theme and tostring(theme.PanelBackgroundTransparency) or "?",
+        image, transparency
+    )
+end
+
 function UI.createWindow()
     local lib = UCam.WindUI
     if not lib then
@@ -809,7 +847,7 @@ function UI.createWindow()
 
     -- El fondo se aplica aqui, no solo desde Ajustes: sin esto el panel se
     -- quedaba pintado sobre una imagen que nunca se ponia.
-    pcall(UI.setBackground, true, (UCam.UISettings and UCam.UISettings.BackgroundOpacity) or 65)
+    pcall(UI.setBackground, true, (UCam.UISettings and UCam.UISettings.BackgroundOpacity) or 85)
 
     function window:CreateTab(title, icon)
         return UI.makeTab(self, title, icon)
