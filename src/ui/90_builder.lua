@@ -101,29 +101,46 @@ function UCam.buildUI()
     end
 
     if #order > 1 then
+        -- WindUI avisa del cambio con el ÍNDICE de la pestaña (no con el
+        -- título). Se resuelve por indice y, por si una version futura cambia
+        -- la convencion, tambien por titulo.
+        local byIndex, byTitle = {}, {}
+        for index, name in ipairs(order) do
+            byIndex[index] = name
+            byTitle[UI.cleanTitle(meta[name][1])] = name
+        end
+
+        local function resolve(current)
+            if type(current) == "number" then
+                return byIndex[current]
+            end
+            if type(current) == "table" then
+                current = current.Title
+            end
+            if type(current) == "string" then
+                return byTitle[UI.cleanTitle(current)]
+            end
+            return nil
+        end
+
         task.spawn(function()
             while true do
-                local current = Window.CurrentTab
-                if type(current) == "table" then
-                    current = current.Title
+                local target = resolve(Window.CurrentTab)
+                if target then
+                    buildTab(target)
                 end
-                local wanted = current and UI.cleanTitle(current)
 
                 local remaining = 0
                 for _, name in ipairs(order) do
                     if not built[name] then
-                        if wanted and UI.cleanTitle(meta[name][1]) == wanted then
-                            buildTab(name)
-                        else
-                            remaining = remaining + 1
-                        end
+                        remaining = remaining + 1
                     end
                 end
 
                 if remaining == 0 then
                     break
                 end
-                task.wait(0.1)
+                task.wait(0.05)
             end
         end)
     end

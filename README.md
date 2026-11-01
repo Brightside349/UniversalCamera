@@ -170,7 +170,18 @@ gente.
 - El log de arranque imprime `UI lista en N ms` y el aspecto real aplicado
   (tema, transparencia del panel e imagen con su transparencia).
 
-> Version estable: `v13.2.0`.
+### v13.2.1
+
+- **Pestañas vacías arregladas**: WindUI avisa del cambio de pestaña con su
+  índice, no con el título, así que el constructor diferido nunca encontraba la
+  pestaña abierta y todas salían con "This tab is Empty". Ahora se resuelve por
+  índice (y por título como respaldo) y cada pestaña se rellena al abrirla.
+- **Fondo al 85 %**: la migración anterior no se aplicaba a las configuraciones
+  ya guardadas con la marca v2, así que seguían al 50 %.
+- Nuevo campo **Ajustes → ID de la imagen de fondo**: acepta `123456`,
+  `rbxassetid://123456` o una URL, para probar otra imagen sin editar código.
+
+> Version estable: `v13.2.1`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -180,7 +191,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.2.0`.
+La version publicada apunta al tag `v13.2.1`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -191,7 +202,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.2.0"
+local VERSION = "v13.2.1"
 ```
 
 ## Interfaz (v13)
