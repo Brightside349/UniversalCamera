@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera PRO v13.4 · Loader
+-- Universal Camera PRO v13.5 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v13.4.0"
+local VERSION = "v13.5.0"
 local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
 local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
 local MAX_RETRIES = 3
@@ -44,6 +44,7 @@ local ORDER = {
     "camera/50_spectate.lua",
     "camera/60_director.lua",
     "camera/70_camcore.lua",
+    "camera/72_compat.lua",
     "ui/00_registry.lua",
     "runtime/85_performance.lua",
     "extensions/85_plugins.lua",

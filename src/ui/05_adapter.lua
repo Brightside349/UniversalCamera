@@ -193,6 +193,22 @@ local function suppressFor(proxy)
     end)
 end
 
+-- WindUI ejecuta el Callback con el valor inicial al crear un control (los
+-- Dropdowns siempre, dentro de un task.spawn). Rayfield no lo hacia, asi que
+-- con la migracion a WindUI abrir una pestana "activaba" sola todas sus
+-- opciones: el preset de iluminacion, el modo de camara, el filtro inicial...
+-- Esta compuerta descarta esos callbacks sinteticos. Se arma recien en el
+-- siguiente Heartbeat: para entonces la creacion ya termino y el task.spawn
+-- interno de la libreria ya consumio el callback inicial.
+local function initialGate()
+    local gate = { armed = false }
+    task.spawn(function()
+        UCam.RunService.Heartbeat:Wait()
+        gate.armed = true
+    end)
+    return gate
+end
+
 -- ============================================================
 -- KEYBINDS
 -- WindUI solo captura la tecla; la ejecucion corre por nuestra cuenta.
@@ -262,6 +278,7 @@ function TabProxy:CreateToggle(spec)
     spec = spec or {}
     local proxy
     local initial = spec.CurrentValue == true
+    local gate = initialGate()
 
     local native = createNative(self, "Toggle", {
         Title    = spec.Name,
@@ -270,6 +287,7 @@ function TabProxy:CreateToggle(spec)
         Value    = initial,
         Flag     = spec.Flag,
         Callback = function(state)
+            if not gate.armed then return end
             if proxy then proxy._value = state end
             if proxy and proxy._suppress then return end
             if type(spec.Callback) == "function" then spec.Callback(state == true) end
@@ -304,6 +322,7 @@ function TabProxy:CreateSlider(spec)
     initial = math.clamp(initial, minValue, maxValue)
 
     local proxy
+    local gate = initialGate()
 
     local native = createNative(self, "Slider", {
         Title = spec.Name,
@@ -313,6 +332,7 @@ function TabProxy:CreateSlider(spec)
         Value = { Min = minValue, Max = maxValue, Default = initial },
         Flag  = spec.Flag,
         Callback = function(value)
+            if not gate.armed then return end
             if proxy then proxy._value = value end
             if proxy and proxy._suppress then return end
             if type(spec.Callback) == "function" then spec.Callback(value) end
@@ -361,6 +381,7 @@ function TabProxy:CreateDropdown(spec)
     end
 
     local proxy
+    local gate = initialGate()
 
     local native = createNative(self, "Dropdown", {
         Title            = spec.Name,
@@ -372,6 +393,7 @@ function TabProxy:CreateDropdown(spec)
         SearchBarEnabled = #values > 8,
         Flag             = spec.Flag,
         Callback         = function(option)
+            if not gate.armed then return end
             if proxy then proxy._value = option end
             if proxy and proxy._suppress then return end
             if type(spec.Callback) == "function" then spec.Callback(option) end
@@ -414,6 +436,7 @@ function TabProxy:CreateInput(spec)
     spec = spec or {}
     local proxy
     local initial = tostring(spec.CurrentValue or "")
+    local gate = initialGate()
 
     local native = createNative(self, "Input", {
         Title       = spec.Name,
@@ -423,6 +446,7 @@ function TabProxy:CreateInput(spec)
         Type        = "Input",
         Flag        = spec.Flag,
         Callback    = function(text)
+            if not gate.armed then return end
             if proxy then proxy._value = text end
             if proxy and proxy._suppress then return end
             if type(spec.Callback) == "function" then spec.Callback(tostring(text or "")) end
@@ -508,6 +532,7 @@ function TabProxy:CreateColorPicker(spec)
     spec = spec or {}
     local proxy
     local initial = spec.Color or Color3.fromRGB(255, 255, 255)
+    local gate = initialGate()
 
     local native = createNative(self, "Colorpicker", {
         Title    = spec.Name,
@@ -515,6 +540,7 @@ function TabProxy:CreateColorPicker(spec)
         Default  = initial,
         Flag     = spec.Flag,
         Callback = function(color)
+            if not gate.armed then return end
             if proxy then proxy._value = color end
             if proxy and proxy._suppress then return end
             if type(spec.Callback) == "function" then spec.Callback(color) end
