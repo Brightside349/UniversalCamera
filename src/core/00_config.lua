@@ -306,6 +306,21 @@ UCam.CamCore = {
 }
 
 -- ============================================================
+-- v13.6: CAMARA LENTA LOCAL
+-- Solo cambia la velocidad de las animaciones que ves en este
+-- cliente. No toca el servidor, ni WalkSpeed, ni la fisica.
+-- ============================================================
+UCam.SlowMotion = {
+    Enabled = false,
+    Scale   = 0.5,
+    Scope   = "Todos",
+    Scopes  = { "Todos", "Solo mi personaje" },
+    _baseSpeed = setmetatable({}, { __mode = "k" }),
+    _applied   = 0,
+    _timer     = 0,
+}
+
+-- ============================================================
 -- v7: TECLAS PERSONALIZABLES (movement keybinds)
 -- getKeyboardDirection() y el fly de Fun leen de aquí, en vez de hardcodear.
 -- Los valores son strings de nombres de Enum.KeyCode.
