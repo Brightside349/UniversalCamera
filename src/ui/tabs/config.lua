@@ -308,6 +308,46 @@ function UCam.build_config(Window)
     -- renombrar/metadata; aquí estaba duplicada sin esas funciones).
 
     -- ========================================================
+    -- v13.5: COMPATIBILIDAD CON LA CAMARA DEL JUEGO
+    -- ========================================================
+    ConfigTab:CreateSection("Compatibilidad con el juego")
+    local compat = UCam.Compat
+    if compat then
+        ConfigTab:CreateParagraph({
+            Title   = "El juego ya tiene su propia camara",
+            Content = "Algunos juegos manejan la camara y limpian Lighting al spawnear. UCam reaplica su look y adopta el FOV del juego en vez de forzar el suyo.",
+        })
+        ConfigTab:CreateToggle({
+            Name         = "Reaplicar look tras el respawn",
+            CurrentValue = compat.Enabled,
+            Callback     = function(v)
+                compat.Enabled = v == true
+                if compat.Enabled and compat.reapplyLook then pcall(compat.reapplyLook) end
+            end,
+        })
+        ConfigTab:CreateToggle({
+            Name         = "Ceder el control automaticamente",
+            CurrentValue = compat.AutoYield,
+            Callback     = function(v) compat.AutoYield = v == true end,
+        })
+        ConfigTab:CreateButton({
+            Name     = "Ceder control al juego",
+            Callback = function() compat.handoffToGame(false) end,
+        })
+        ConfigTab:CreateButton({
+            Name     = "Ver estado de compatibilidad",
+            Callback = function()
+                local s = compat.getStatus()
+                UCam.notify("Compatibilidad", string.format(
+                    "FOV del juego: %s · Conflicto: %s · Script del juego: %s",
+                    tostring(s.serverFov or "?"),
+                    s.gameDriving and "si" or "no",
+                    tostring(s.gameCamera or "no detectado")
+                ), 6)
+            end,
+        })
+    end
+
     -- v8: PLUGINS
     -- ========================================================
     ConfigTab:CreateSection("Plugins")

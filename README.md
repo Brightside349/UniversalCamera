@@ -214,7 +214,29 @@ gente.
 - El selector de tema ya no muestra `Dark` cuando en realidad se está aplicando
   `UCam Pro` (se guarda el nombre real del tema).
 
-> Version estable: `v13.4.0`.
+### v13.5
+
+- **Compatibilidad con juegos que controlan la camara**: nuevo modulo
+  `camera/72_compat.lua`, cargado despues de `70_camcore`.
+- **Filtros respawn-safe**: el script de camara del juego destruye los
+  `ColorCorrectionEffect` y apaga el `BlurEffect` en cada spawn. UCam vuelve a
+  crear su efecto y reaplica el look tras ese barrido (0,25 s y 1,2 s), y otra
+  vez si el juego borra un efecto propio de `Lighting`.
+- **FOV handshake**: el FOV que impone el juego se adopta como base
+  (`Saved.ServerFOV` y `DEFAULT_FOV`) en vez de forzar 70; "Restablecer FOV" y
+  el respawn vuelven al encuadre real del juego. La lectura por
+  `Remotes.DataUpdate` queda como opcion desactivada (`UseRemote`).
+- **Arbitraje de camara**: si otro script escribe `CameraType` o `FieldOfView`
+  mientras UCam manda, se avisa una sola vez y `Ceder control` devuelve la
+  camara al juego sin dejarla clavada en `Scriptable`.
+- **Abrir una pestaña ya no activa sus opciones**: WindUI ejecuta el `Callback`
+  de cada control con su valor inicial al construirlo, asi que entrar en
+  Iluminacion aplicaba solo un preset (y lo mismo con el modo de camara o el
+  filtro). El adaptador descarta esos callbacks sinteticos hasta el frame
+  siguiente; los clics y cambios reales siguen funcionando igual.
+- El Loader apunta al tag `v13.5.0`.
+
+> Version estable: `v13.5.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -224,7 +246,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.4.0`.
+La version publicada apunta al tag `v13.5.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -235,7 +257,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.4.0"
+local VERSION = "v13.5.0"
 ```
 
 ## Interfaz (v13)
