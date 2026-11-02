@@ -251,7 +251,9 @@ gente.
 - **Camara lenta local** (`visuals/25_slowmo.lua`): baja la velocidad de las
   animaciones de tu cliente con `Animator:AdjustSpeed`, sin tocar servidor,
   fisica ni `WalkSpeed`. Funciona con rigs `Humanoid` y `AnimationController`.
-  Controles en **Creator → Cámara lenta local**.
+  Se aplica en `PreRender`, porque el `Animate` del juego reajusta la
+  velocidad de caminar/correr en cada `Heartbeat` y en `Heartbeat` la escala
+  se perdia. Controles en **Creator → Cámara lenta local**.
 - **Exportar skin a Studio** (`actors/38_skinexport.lua`): copia el rig del
   jugador a `UniversalCamera/skins/*.rbxmx` con partes, mallas, huesos,
   joints y accesorios, excluyendo scripts. El nombre sale de los atributos
@@ -261,7 +263,15 @@ gente.
 - `visuals/25_slowmo.lua` y `actors/38_skinexport.lua` entran al `ORDER`; el
   Loader apunta al tag `v13.6.0`.
 
-> Version estable: `v13.6.0`.
+### v13.6.1
+
+- **La camara lenta sobrevive al `Animate` del juego**: ese script llama
+  `AdjustSpeed` para walk/run en cada `Heartbeat`, asi que aplicar la escala
+  ahi se veia como un parpadeo de un frame. Ahora se aplica en `PreRender`,
+  que corre despues de los `Heartbeat` y antes de dibujar.
+- El Loader apunta al tag `v13.6.1`.
+
+> Version estable: `v13.6.1`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -271,7 +281,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.6.0`.
+La version publicada apunta al tag `v13.6.1`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -282,7 +292,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.6.0"
+local VERSION = "v13.6.1"
 ```
 
 ## Interfaz (v13)

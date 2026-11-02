@@ -8,6 +8,12 @@
 -- JumpPower, asi que en animaciones de caminar/correr puede notarse
 -- el deslizamiento. Sirve para revisar emotes y preparar tomas.
 --
+-- IMPORTANTE: el Animate del juego llama AdjustSpeed en CADA Heartbeat
+-- para las animaciones de caminar/correr. Por eso la escala se aplica en
+-- PreRender (despues de todos los Heartbeat y antes de dibujar): si se
+-- aplicara en Heartbeat, el juego la pisaria en el mismo frame y solo se
+-- veria un parpadeo. El Animator es el mismo, no se modifica el juego.
+--
 -- Dependencias: core/00_config.lua, core/10_utils.lua.
 -- Expone (UCam.*):
 --   SlowMotion (estado en 00_config),
@@ -16,8 +22,6 @@
 -- ============================================================
 local UCam = _G.UCam
 local S = UCam.SlowMotion
-
-local APPLY_INTERVAL = 0.2
 
 -- Registro de Animators del workspace. Es una tabla debil: si un
 -- personaje se destruye, no lo retenemos en memoria.
@@ -189,17 +193,16 @@ UCam.trackConnection(
     "SlowMotion:AnimatorAdded"
 )
 
--- Se revisa 5 veces por segundo: suficiente para que un track nuevo
--- entre en camara lenta y barato para el frame budget.
+-- PreRender corre despues de Heartbeat (donde el Animate del juego ajusta
+-- la velocidad de walk/run) y antes de dibujar: nuestro valor es el que se
+-- ve. Solo hace trabajo real mientras la camara lenta esta activada, y por
+-- track solo escribe si la velocidad actual no coincide con la objetivo.
 UCam.trackConnection(
-    UCam.RunService.Heartbeat:Connect(function(dt)
+    UCam.RunService.PreRender:Connect(function()
         if not S.Enabled then return end
-        S._timer = (S._timer or 0) + (dt or 0)
-        if S._timer < APPLY_INTERVAL then return end
-        S._timer = 0
         apply()
     end),
-    "SlowMotion:Heartbeat"
+    "SlowMotion:PreRender"
 )
 
 -- El barrido inicial se difiere para no sumar trabajo al arranque.
