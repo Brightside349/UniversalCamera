@@ -14,11 +14,15 @@
 --      por defecto. Asi "Restablecer FOV" y el respawn coinciden con
 --      el encuadre real del juego.
 --
---   3) ARBITRAJE DE CAMARA
---      Detecta que otro script escribe CameraType/CFrame/FOV mientras
---      UCam manda, avisa una sola vez y ofrece devolver el control.
---      No pelea por CameraType: el orden de render de UCamRender/
---      UCamEnforce (70_camcore) ya deja el encuadre de UCam al final.
+--   3) ARBITRAJE DE CAMARA (SIN AVISOS AUTOMATICOS)
+--      El script de camara del juego (StarterCharacterScripts.cam) pone
+--      CameraType = Scriptable en CADA frame y escribe su CFrame antes
+--      que nosotros. Contar eso como conflicto hacia saltar un aviso
+--      cada 8 s mientras se usaba la camara libre, aunque no hubiera
+--      nada roto: v13.6 elimina ese aviso. UCamRender/UCamEnforce
+--      (70_camcore) corren en RenderPriority.Camera + 1 y Last, asi que
+--      el encuadre de UCam siempre queda al final. El estado se puede
+--      consultar a mano en Ajustes → Ver estado de compatibilidad.
 --
 -- Dependencias: core/00_config, core/10_utils, visuals/20_filters,
 --               camera/70_camcore
@@ -38,7 +42,7 @@ UCam.Compat = Compat
 -- Sonido de estado: no se persiste (es de sesion). Si el juego se
 -- porta bien, no hay nada que guardar.
 Compat.Enabled     = true   -- reaplicar look tras el barrido del juego
-Compat.AutoYield   = false  -- devolver el control solo, sin preguntar
+Compat.AutoYield   = false  -- obsoleto desde v13.6: ya no hay aviso automatico
 Compat.UseRemote   = false  -- leer el FOV por Remotes.DataUpdate (puede
                             -- disparar el anticheat: por defecto solo se
                             -- observa el FOV que escribe el juego)
@@ -47,15 +51,18 @@ Compat.GameDriving = false
 Compat.Detected    = nil
 
 Compat._selfFovAt   = 0   -- ultima escritura de FOV hecha por UCam
-Compat._lastHit     = 0   -- ultima escritura externa detectada
-Compat._lastNotify  = 0   -- ultimo aviso mostrado
-Compat._hits        = 0   -- escrituras externas en la ventana actual
+Compat._hits        = 0   -- escrituras externas observadas (solo estado)
 
 local REAPPLY_DELAYS   = { 0.25, 1.2 }
-local CONFLICT_WINDOW  = 2
-local CONFLICT_HITS    = 5
-local NOTIFY_COOLDOWN  = 8
 local SELF_FOV_GRACE   = 0.25
+
+-- Rutas conocidas de scripts de camara de juegos que ya manejan su
+-- propia camara. En partida Script.Source no es legible, asi que la
+-- deteccion se hace por estructura y no por contenido.
+local GAME_CAMERA_PATHS = {
+    { "StarterPlayer", "StarterCharacterScripts", "cam" },
+    { "ReplicatedStorage", "ClientAssets", "Characters", "Common", "cam" },
+}
 
 local EFFECT_NAMES = {}
 if UCam.BLOOM_EFFECT_NAME then EFFECT_NAMES[UCam.BLOOM_EFFECT_NAME] = true end
@@ -74,23 +81,38 @@ end
 -- ============================================================
 -- Devuelve el primer LocalScript/ModuleScript sospechoso de manejar la
 -- camara, con su ruta. Sirve para el informe de estado, no para tocarlo.
+local function findByPath(path)
+    local node = game
+    for _, name in ipairs(path) do
+        node = node and node:FindFirstChild(name)
+        if not node then return nil end
+    end
+    return node
+end
+
 function Compat.findGameCameraScript()
+    -- 1) Rutas conocidas: funciona en partida, sin leer Source.
+    for _, path in ipairs(GAME_CAMERA_PATHS) do
+        local found = findByPath(path)
+        if found and found:IsA("LuaSourceContainer") then
+            return found:GetFullName()
+        end
+    end
+
+    -- 2) En Studio/plugins se puede leer Source: ultimo recurso para
+    -- juegos con otra estructura.
     local starterPlayer = game:FindFirstChild("StarterPlayer")
-    if not starterPlayer then return nil end
-    local characterScripts = starterPlayer:FindFirstChild("StarterCharacterScripts")
+    local characterScripts = starterPlayer
+        and starterPlayer:FindFirstChild("StarterCharacterScripts")
     if not characterScripts then return nil end
     for _, child in ipairs(characterScripts:GetChildren()) do
         if child:IsA("LuaSourceContainer") then
-            -- Source solo se puede leer en Studio/plugins. En partida la
-            -- consulta lanza error, asi que el informe de estado no debe
-            -- depender de ella: si no hay acceso, se omite el script.
             local ok, source = pcall(function()
                 return child.Source
             end)
-            if ok and type(source) == "string" then
-                if source:find("CameraType", 1, true) or source:find("CurrentCamera", 1, true) then
-                    return child:GetFullName()
-                end
+            if ok and type(source) == "string"
+                and (source:find("CameraType", 1, true) or source:find("CurrentCamera", 1, true)) then
+                return child:GetFullName()
             end
         end
     end
@@ -194,31 +216,15 @@ end
 -- ============================================================
 -- 3) ARBITRAJE DE CAMARA
 -- ============================================================
+--- Registra que el juego toco la camara. NO avisa: en juegos como este
+-- la camara propia escribe CameraType cada frame y el aviso se repetia
+-- sin que nada estuviera roto. Solo alimenta el informe de estado.
 function Compat.noteExternalWrite(reason)
     if not Compat.Enabled then return end
 
-    local now = os.clock()
-    if now - (Compat._lastHit or 0) > CONFLICT_WINDOW then
-        Compat._hits = 0
-    end
-    Compat._lastHit = now
     Compat._hits = (Compat._hits or 0) + 1
     Compat.GameDriving = true
-
-    if Compat._hits >= CONFLICT_HITS
-        and now - (Compat._lastNotify or 0) > NOTIFY_COOLDOWN then
-        Compat._lastNotify = now
-        Compat.Detected = { source = "game", reason = reason, at = now }
-        if UCam.notify then
-            UCam.notify(
-                "Compatibilidad",
-                "Este juego controla la camara por su cuenta. UCam ya no pelea por CameraType; si el encuadre se traba, usa Ceder control en Ajustes.",
-                5,
-                { important = true }
-            )
-        end
-        if Compat.AutoYield then Compat.handoffToGame(true) end
-    end
+    Compat.Detected = Compat.Detected or { source = "game", reason = reason, at = os.clock() }
 end
 
 -- Devuelve el control al juego sin dejar la camara en un estado raro:
@@ -287,20 +293,20 @@ if UCam.camera then
         if not Compat.Enabled then return end
         if os.clock() - (Compat._selfFovAt or 0) < SELF_FOV_GRACE then return end
 
-        if isControlling() then
-            Compat.noteExternalWrite("FieldOfView")
-            return
-        end
+        -- Mientras UCam manda, el FOV es suyo: zoom con rueda, FOV Pulse,
+        -- crash zoom y demas modos lo escriben cada frame. Eso no es un
+        -- conflicto del juego, y contarlo hacia que el aviso saltara cada
+        -- 8 s mientras se usaba la camara libre. Solo se adopta el FOV
+        -- cuando el juego tiene el control.
+        if isControlling() then return end
         Compat.adoptServerFOV(UCam.camera.FieldOfView, "observation")
     end), "Compat:FOV")
 
     track(UCam.camera:GetPropertyChangedSignal("CameraType"):Connect(function()
         if not Compat.Enabled then return end
-        local camType = UCam.camera.CameraType
-        -- Scriptable sin UCam al mando = otro script dirige la camara.
-        if not isControlling() and camType == Enum.CameraType.Scriptable then
-            Compat.noteExternalWrite("CameraType")
-        elseif isControlling() and camType ~= Enum.CameraType.Scriptable then
+        -- Sin UCam al mando, que el juego ponga Scriptable es lo normal:
+        -- solo se anota para el informe de estado, sin notificar.
+        if not isControlling() and UCam.camera.CameraType == Enum.CameraType.Scriptable then
             Compat.noteExternalWrite("CameraType")
         end
     end), "Compat:CameraType")

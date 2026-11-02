@@ -1,13 +1,51 @@
 -- ============================================================
--- Universal Camera PRO v13.5 · Loader
+-- Universal Camera PRO v13.6 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v13.5.0"
-local BASE = ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(VERSION)
-local FALLBACK_BASE = ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(VERSION)
+local VERSION = "v13.6.0"
+local TAG = VERSION
+local REF = TAG
+
+local function baseFor(ref)
+    return ("https://raw.githubusercontent.com/Brightside349/UniversalCamera/%s/src/"):format(ref)
+end
+local function fallbackFor(ref)
+    return ("https://cdn.jsdelivr.net/gh/Brightside349/UniversalCamera@%s/src/"):format(ref)
+end
+
+local BASE = baseFor(REF)
+local FALLBACK_BASE = fallbackFor(REF)
 local MAX_RETRIES = 3
+
+-- v13.5.1: si el tag configurado no esta publicado (o GitHub no responde),
+-- el Loader se quedaba con 0 partes y no habia forma de saber por que. Antes
+-- de descargar todo se comprueba un archivo conocido y, si el tag no existe,
+-- se cae a main: la version de desarrollo siempre esta disponible.
+local PROBE = "core/00_config.lua"
+local function reachable(url)
+    for _ = 1, 2 do
+        local ok, body = pcall(function()
+            return game:HttpGet(url)
+        end)
+        -- Un 404 de raw devuelve un cuerpo corto ("404: Not Found"), asi que
+        -- no basta con que la peticion no lance error.
+        if ok and type(body) == "string" and #body > 1000 and body:find("UCam", 1, true) then
+            return true
+        end
+        task.wait(0.2)
+    end
+    return false
+end
+
+if not reachable(BASE .. PROBE) and not reachable(FALLBACK_BASE .. PROBE) then
+    warn(("[UCam] El tag %s no esta publicado; se carga main."):format(TAG))
+    REF = "main"
+    VERSION = REF
+    BASE = baseFor(REF)
+    FALLBACK_BASE = fallbackFor(REF)
+end
 
 if _G.UCam and type(_G.UCam.Unload) == "function" then
     local ok, err = pcall(_G.UCam.Unload)
@@ -36,9 +74,11 @@ local ORDER = {
     "core/05_persistence.lua",
     "core/10_utils.lua",
     "visuals/20_filters.lua",
+    "visuals/25_slowmo.lua",
     "actors/30_fun.lua",
     "actors/32_bodycolor.lua",
     "actors/36_clones.lua",
+    "actors/38_skinexport.lua",
     "props/45_props.lua",
     "props/46_propsanim.lua",
     "camera/50_spectate.lua",
@@ -146,7 +186,7 @@ end
 table.clear(sources)
 
 if #failedList == 0 then
-    print(("[UCam] Universal Camera Pro %s cargado OK (%d partes). Camara libre, props con animador, clones y estudio."):format(VERSION, loaded))
+    print(("[UCam] Universal Camera Pro %s cargado OK (%d partes). Camara libre, props con animador, clones, estudio, camara lenta y skins."):format(VERSION, loaded))
 else
     warn(("[UCam] Carga completada con %d errores. Fallaron: %s"):format(
         #failedList,

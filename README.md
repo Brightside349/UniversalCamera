@@ -227,8 +227,9 @@ gente.
   el respawn vuelven al encuadre real del juego. La lectura por
   `Remotes.DataUpdate` queda como opcion desactivada (`UseRemote`).
 - **Arbitraje de camara**: si otro script escribe `CameraType` o `FieldOfView`
-  mientras UCam manda, se avisa una sola vez y `Ceder control` devuelve la
-  camara al juego sin dejarla clavada en `Scriptable`.
+  mientras UCam manda, se avisaba una sola vez y `Ceder control` devuelve la
+  camara al juego sin dejarla clavada en `Scriptable`. (El aviso automatico se
+  retiro en v13.6: ver abajo.)
 - **Abrir una pestaña ya no activa sus opciones**: WindUI ejecuta el `Callback`
   de cada control con su valor inicial al construirlo, asi que entrar en
   Iluminacion aplicaba solo un preset (y lo mismo con el modo de camara o el
@@ -236,7 +237,31 @@ gente.
   siguiente; los clics y cambios reales siguen funcionando igual.
 - El Loader apunta al tag `v13.5.0`.
 
-> Version estable: `v13.5.0`.
+### v13.6
+
+- **Fin del aviso de compatibilidad repetido**: el script de camara del juego
+  (`StarterCharacterScripts.cam`) escribe `CameraType = Scriptable` en cada
+  frame y su CFrame antes que UCam. Eso se contaba como conflicto y hacia
+  saltar el aviso cada 8 s al usar la camara libre, aunque nada estuviera
+  roto. Ya no se avisa: el estado se consulta a mano en
+  **Ajustes → Ver estado de compatibilidad**.
+- La deteccion del script de camara usa la estructura real del juego
+  (`StarterPlayer.StarterCharacterScripts.cam`) en vez de leer `Source`, que
+  en partida no es legible y hacia que el informe dijera "no detectado".
+- **Camara lenta local** (`visuals/25_slowmo.lua`): baja la velocidad de las
+  animaciones de tu cliente con `Animator:AdjustSpeed`, sin tocar servidor,
+  fisica ni `WalkSpeed`. Funciona con rigs `Humanoid` y `AnimationController`.
+  Controles en **Creator → Cámara lenta local**.
+- **Exportar skin a Studio** (`actors/38_skinexport.lua`): copia el rig del
+  jugador a `UniversalCamera/skins/*.rbxmx` con partes, mallas, huesos,
+  joints y accesorios, excluyendo scripts. El nombre sale de los atributos
+  `Character` y `Skin` del juego. Controles en **Creator → Skin a Studio**.
+- El serializador cierra el `<Item>` de una clase no soportada antes de
+  omitirla; antes dejaba el XML abierto y Studio rechazaba el archivo.
+- `visuals/25_slowmo.lua` y `actors/38_skinexport.lua` entran al `ORDER`; el
+  Loader apunta al tag `v13.6.0`.
+
+> Version estable: `v13.6.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -246,7 +271,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.5.0`.
+La version publicada apunta al tag `v13.6.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -257,7 +282,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.5.0"
+local VERSION = "v13.6.0"
 ```
 
 ## Interfaz (v13)

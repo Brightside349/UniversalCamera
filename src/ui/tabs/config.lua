@@ -315,7 +315,7 @@ function UCam.build_config(Window)
     if compat then
         ConfigTab:CreateParagraph({
             Title   = "El juego ya tiene su propia camara",
-            Content = "Algunos juegos manejan la camara y limpian Lighting al spawnear. UCam reaplica su look y adopta el FOV del juego en vez de forzar el suyo.",
+            Content = "Este juego maneja la camara y limpia Lighting al spawnear. UCam reaplica su look y adopta el FOV del juego en vez de forzar el suyo. Ya no avisa al detectar la camara del juego: consulta el estado aqui cuando lo necesites.",
         })
         ConfigTab:CreateToggle({
             Name         = "Reaplicar look tras el respawn",
@@ -324,11 +324,6 @@ function UCam.build_config(Window)
                 compat.Enabled = v == true
                 if compat.Enabled and compat.reapplyLook then pcall(compat.reapplyLook) end
             end,
-        })
-        ConfigTab:CreateToggle({
-            Name         = "Ceder el control automaticamente",
-            CurrentValue = compat.AutoYield,
-            Callback     = function(v) compat.AutoYield = v == true end,
         })
         ConfigTab:CreateButton({
             Name     = "Ceder control al juego",
@@ -339,7 +334,7 @@ function UCam.build_config(Window)
             Callback = function()
                 local s = compat.getStatus()
                 UCam.notify("Compatibilidad", string.format(
-                    "FOV del juego: %s · Conflicto: %s · Script del juego: %s",
+                    "FOV del juego: %s · El juego maneja la camara: %s · Script: %s",
                     tostring(s.serverFov or "?"),
                     s.gameDriving and "si" or "no",
                     tostring(s.gameCamera or "no detectado")

@@ -207,8 +207,124 @@ function UCam.build_creator(Window)
         end,
     })
 
+    -- ========================================================
+    -- v13.6: CAMARA LENTA LOCAL
+    -- El juego carga sus animaciones en el Animator de cada rig (con
+    -- Humanoid o con AnimationController), asi que bajar el Speed de los
+    -- tracks que ya suenan alcanza: no se toca el servidor ni WalkSpeed.
+    -- ========================================================
+    Tab:CreateSection("Cámara lenta local")
     Tab:CreateParagraph({
-        Title = "V12.5 local",
-        Content = "Estas herramientas amplían Director, escenas y UCam sin crear un backend ni cambiar el Loader principal.",
+        Title   = "Solo en tu cliente",
+        Content = "Ralentiza las animaciones que se reproducen en tu PC (incluidas las del juego) sin tocar la física ni a los demás jugadores. En animaciones de caminar/correr puede notarse deslizamiento, porque la velocidad de movimiento no cambia.",
+    })
+
+    local slow = UCam.SlowMotion
+    local slowToggle = Tab:CreateToggle({
+        Name         = "Activar cámara lenta",
+        CurrentValue = slow.Enabled,
+        Flag         = "V136SlowMoEnabled",
+        Callback     = function(value)
+            if UCam.setSlowMotionEnabled then UCam.setSlowMotionEnabled(value) end
+        end,
+    })
+    local slowSlider = Tab:CreateSlider({
+        Name         = "Velocidad de las animaciones",
+        Range        = { 0.1, 1 },
+        Increment    = 0.05,
+        Suffix       = "x",
+        CurrentValue = slow.Scale,
+        Flag         = "V136SlowMoScale",
+        Callback     = function(value)
+            if UCam.setSlowMotionScale then UCam.setSlowMotionScale(value) end
+        end,
+    })
+    Tab:CreateDropdown({
+        Name            = "Alcance",
+        Options         = slow.Scopes,
+        CurrentOption   = { slow.Scope },
+        MultipleOptions = false,
+        Flag            = "V136SlowMoScope",
+        Callback        = function(options)
+            local value = UCam.resolveDropdownValue(options)
+            if value and UCam.setSlowMotionScope then UCam.setSlowMotionScope(value) end
+        end,
+    })
+    Tab:CreateButton({
+        Name     = "Restaurar velocidad normal",
+        Callback = function()
+            if UCam.stopSlowMotion then UCam.stopSlowMotion() end
+            pcall(function() slowToggle:Set(false) end)
+            pcall(function() slowSlider:Set(1) end)
+            local status = UCam.getSlowMotionStatus and UCam.getSlowMotionStatus()
+            UCam.notify("Cámara lenta", ("Animaciones restauradas (%d en pantalla)."):format(status and status.tracks or 0), 4)
+        end,
+    })
+
+    -- ========================================================
+    -- v13.6: EXPORTAR SKIN A STUDIO
+    -- Los rigs del juego son modelos con Motor6D y huesos (no R15), asi
+    -- que se copia el personaje vivo: es el unico camino que conserva la
+    -- skin aplicada, los accesorios y la jerarquia real de huesos.
+    -- ========================================================
+    Tab:CreateSection("Skin a Studio (.rbxmx)")
+    Tab:CreateParagraph({
+        Title   = "El rig tal como se ve",
+        Content = "Copia el personaje elegido (partes, mallas, huesos, accesorios y colores) a UniversalCamera/skins/. Ábrelo en Studio y anímalo sin depender del juego; los scripts del personaje se excluyen. El archivo se nombra con el personaje y la skin del juego.",
+    })
+
+    local skinTargets = UCam.getSkinExportTargets and UCam.getSkinExportTargets()
+        or { "(sin jugadores)" }
+    local skinTarget = skinTargets[1]
+    local skinName = ""
+    local skinDropdown
+    skinDropdown = Tab:CreateDropdown({
+        Name            = "Personaje",
+        Options         = skinTargets,
+        CurrentOption   = { skinTarget },
+        MultipleOptions = false,
+        Callback        = function(options)
+            skinTarget = UCam.resolveDropdownValue(options) or skinTarget
+        end,
+    })
+    Tab:CreateInput({
+        Name            = "Nombre del archivo (opcional)",
+        PlaceholderText = "Automático: personaje, skin y fecha",
+        RemoveTextAfterFocusLost = false,
+        Callback        = function(value) skinName = value or "" end,
+    })
+    Tab:CreateButton({
+        Name     = "Exportar skin seleccionada",
+        Callback = function()
+            if not UCam.exportPlayerSkin then
+                UCam.notify("Skin", "El módulo de exportación no está cargado.", 4)
+                return
+            end
+            local ok, result, stats = UCam.exportPlayerSkin(skinTarget, { name = skinName })
+            if ok then
+                UCam.notify("Skin", string.format(
+                    "Guardado en %s · %d partes, %d joints, %d accesorios",
+                    tostring(result),
+                    stats and stats.parts or 0,
+                    stats and stats.joints or 0,
+                    stats and stats.accessories or 0
+                ), 7, { important = true })
+            else
+                UCam.notify("Skin", tostring(result), 5)
+            end
+        end,
+    })
+    Tab:CreateButton({
+        Name     = "Actualizar lista de jugadores",
+        Callback = function()
+            skinTargets = UCam.getSkinExportTargets()
+            pcall(function() skinDropdown:Refresh(skinTargets) end)
+            UCam.notify("Skin", "Lista actualizada.", 3)
+        end,
+    })
+
+    Tab:CreateParagraph({
+        Title = "V13.6 local",
+        Content = "Cámara lenta y exportación de skin trabajan solo en tu cliente. La cámara del juego no se modifica: UCam se dibuja después de ella.",
     })
 end
