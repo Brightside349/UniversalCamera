@@ -323,6 +323,31 @@ function UCam.build_creator(Window)
         end,
     })
 
+    -- v13.6.2: temporal. Guarda un JSON con el rig real del personaje
+    -- (tallas, mallas, joints, accesorios) para diagnosticar exports rotos.
+    Tab:CreateButton({
+        Name     = "🧪 Diagnóstico de rig (temporal)",
+        Callback = function()
+            if not UCam.exportRigReport then
+                UCam.notify("Diagnóstico", "El módulo de exportación no está cargado.", 4)
+                return
+            end
+            local ok, result, summary = UCam.exportRigReport(skinTarget)
+            if ok then
+                UCam.notify("Diagnóstico", string.format(
+                    "Guardado en %s · %d partes, %d joints, %d sobredimensionadas%s",
+                    tostring(result),
+                    summary and summary.parts or 0,
+                    summary and summary.joints or 0,
+                    summary and summary.oversized or 0,
+                    summary and summary.clipboard and " (copiado al portapapeles)" or ""
+                ), 9, { important = true })
+            else
+                UCam.notify("Diagnóstico", tostring(result), 5)
+            end
+        end,
+    })
+
     Tab:CreateParagraph({
         Title = "V13.6 local",
         Content = "Cámara lenta y exportación de skin trabajan solo en tu cliente. La cámara del juego no se modifica: UCam se dibuja después de ella.",
