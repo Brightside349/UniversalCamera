@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v13.6 · actors/38_skinexport
+-- Universal Camera Pro v13.6.2 · actors/38_skinexport
 -- Exporta el personaje de un jugador a un modelo .rbxmx local
 -- (XML de Roblox) para abrirlo en Studio y animarlo.
 --
@@ -75,12 +75,20 @@ local function cframeProp(name, value)
     ))
 end
 
+-- Propiedades de imagen. El formato actual de Roblox las guarda como
+-- Content (hijo <uri>) y no como el antiguo ContentId (hijo <url>). El
+-- nombre tampoco es el de la API: MeshId se serializa como MeshContent,
+-- TextureID como TextureContent, etc. Con el nombre viejo Studio las
+-- ignoraba y las mallas se importaban sin textura.
 local function contentProp(name, value)
     local text = tostring(value or "")
     if text == "" then
-        return prop(name, "ContentId", "<null></null>")
+        return prop(name, "Content", "<null></null>")
     end
-    return prop(name, "ContentId", "<url>" .. escapeXml(text) .. "</url>")
+    if tonumber(text) then
+        text = "rbxassetid://" .. tostring(math.floor(tonumber(text)))
+    end
+    return prop(name, "Content", "<uri>" .. escapeXml(text) .. "</uri>")
 end
 
 local function color3uint8(value)
@@ -157,7 +165,8 @@ local function assignRefs(root, refs)
     local counter = 0
     walk(root, function(instance)
         counter = counter + 1
-        refs[instance] = "RBX" .. tostring(counter)
+        -- Referents numericos, igual que escribe Studio en sus .rbxmx.
+        refs[instance] = tostring(counter)
     end)
 end
 
@@ -170,9 +179,12 @@ local function addBasePartProps(part, props, ctx)
         props[#props + 1] = cframeProp("CFrame", ctx.origin * cf)
     end
 
+    -- BasePart.Size se serializa en minuscula ("size"). Escrito como
+    -- "Size", Studio lo descarta y cada MeshPart se importa con el tamano
+    -- bruto de su malla: el modelo sale gigante y deformado.
     local size = read(part, "Size")
     if typeof(size) == "Vector3" then
-        props[#props + 1] = vector3Prop("Size", size)
+        props[#props + 1] = vector3Prop("size", size)
     end
 
     local color = read(part, "Color")
@@ -200,7 +212,8 @@ local function addBasePartProps(part, props, ctx)
     if part:IsA("Part") then
         local shape = read(part, "Shape")
         if typeof(shape) == "EnumItem" then
-            props[#props + 1] = tokenProp("Shape", shape.Value)
+            -- Part.Shape tambien serializa en minuscula.
+            props[#props + 1] = tokenProp("shape", shape.Value)
         end
         for _, face in ipairs({
             "TopSurface", "BottomSurface", "LeftSurface",
@@ -213,24 +226,20 @@ local function addBasePartProps(part, props, ctx)
     if part:IsA("MeshPart") then
         local meshId = read(part, "MeshId", "")
         if tostring(meshId or "") ~= "" then
-            props[#props + 1] = contentProp("MeshId", meshId)
+            props[#props + 1] = contentProp("MeshContent", meshId)
         end
         local textureId = read(part, "TextureID", "")
         if tostring(textureId or "") ~= "" then
-            props[#props + 1] = contentProp("TextureID", textureId)
+            props[#props + 1] = contentProp("TextureContent", textureId)
         end
     end
 
-    -- El rig del juego usa UnionOperation para ojos/detalles. Sin el
-    -- AssetId la union se importa como un bloque vacio en Studio.
+    -- El rig del juego usa UnionOperation para ojos/detalles. Una union
+    -- se guarda como Content: sin el, Studio importa un bloque vacio.
     if part:IsA("PartOperation") then
         local assetId = read(part, "AssetId", "")
         if tostring(assetId or "") ~= "" then
-            props[#props + 1] = contentProp("AssetId", assetId)
-        end
-        local meshId = read(part, "MeshId", "")
-        if tostring(meshId or "") ~= "" then
-            props[#props + 1] = contentProp("MeshId", meshId)
+            props[#props + 1] = contentProp("Content", assetId)
         end
     end
 end
@@ -238,8 +247,13 @@ end
 local function addJointProps(joint, props, refs)
     local part0 = read(joint, "Part0")
     local part1 = read(joint, "Part1")
-    local ref0 = part0 and refProp("Part0", part0, refs)
-    local ref1 = part1 and refProp("Part1", part1, refs)
+
+    -- WeldConstraint guarda sus referencias como Part0Internal y
+    -- Part1Internal. Con "Part0"/"Part1" el joint se importaba sin
+    -- partes y el rig se desarmaba: era el "sin esqueleto" del export.
+    local weld = joint:IsA("WeldConstraint")
+    local ref0 = part0 and refProp(weld and "Part0Internal" or "Part0", part0, refs)
+    local ref1 = part1 and refProp(weld and "Part1Internal" or "Part1", part1, refs)
     if not (ref0 and ref1) then return false end
 
     props[#props + 1] = ref0
@@ -254,10 +268,8 @@ local function addJointProps(joint, props, refs)
         props[#props + 1] = cframeProp("C1", c1)
     end
 
-    if joint:IsA("Motor6D") then
-        -- La pose de reposo vive en C0/C1; Transform se guarda limpio.
-        props[#props + 1] = cframeProp("Transform", IDENTITY)
-    end
+    -- Motor6D.Transform no se serializa (la pose de reposo vive en C0/C1),
+    -- asi que no se escribe: Studio lo ignora y solo ensuciaba el XML.
     if joint:IsA("WeldConstraint") then
         props[#props + 1] = boolProp("Enabled", read(joint, "Enabled", true))
     end
@@ -289,7 +301,7 @@ local function addInstanceProps(instance, props, refs, ctx)
     end
 
     if instance:IsA("Humanoid") then
-        props[#props + 1] = floatProp("Health", read(instance, "Health", 100))
+        -- Humanoid.Health no se serializa; MaxHealth y DisplayName si.
         props[#props + 1] = floatProp("MaxHealth", read(instance, "MaxHealth", 100))
         local displayName = read(instance, "DisplayName", "")
         if type(displayName) == "string" and displayName ~= "" then
@@ -312,7 +324,7 @@ local function addInstanceProps(instance, props, refs, ctx)
 
     if instance:IsA("Decal") or instance:IsA("Texture") then
         local texture = read(instance, "Texture", "")
-        props[#props + 1] = contentProp("Texture", texture)
+        props[#props + 1] = contentProp("TextureContent", texture)
         local face = read(instance, "Face")
         if typeof(face) == "EnumItem" then
             props[#props + 1] = tokenProp("Face", face.Value)
@@ -322,8 +334,8 @@ local function addInstanceProps(instance, props, refs, ctx)
     end
 
     if instance:IsA("SpecialMesh") then
-        props[#props + 1] = contentProp("MeshId", read(instance, "MeshId", ""))
-        props[#props + 1] = contentProp("TextureId", read(instance, "TextureId", ""))
+        props[#props + 1] = contentProp("MeshContent", read(instance, "MeshId", ""))
+        props[#props + 1] = contentProp("TextureContent", read(instance, "TextureId", ""))
         local meshType = read(instance, "MeshType")
         if typeof(meshType) == "EnumItem" then
             props[#props + 1] = tokenProp("MeshType", meshType.Value)
@@ -340,9 +352,9 @@ local function addInstanceProps(instance, props, refs, ctx)
     end
 
     if instance:IsA("CharacterMesh") then
-        props[#props + 1] = contentProp("MeshId", read(instance, "MeshId", ""))
-        props[#props + 1] = contentProp("BaseTextureId", read(instance, "BaseTextureId", ""))
-        props[#props + 1] = contentProp("OverlayTextureId", read(instance, "OverlayTextureId", ""))
+        props[#props + 1] = contentProp("MeshContent", read(instance, "MeshId", ""))
+        props[#props + 1] = contentProp("BaseTextureContent", read(instance, "BaseTextureId", ""))
+        props[#props + 1] = contentProp("OverlayTextureContent", read(instance, "OverlayTextureId", ""))
         local bodyPart = read(instance, "BodyPart")
         if typeof(bodyPart) == "EnumItem" then
             props[#props + 1] = tokenProp("BodyPart", bodyPart.Value)
@@ -351,23 +363,29 @@ local function addInstanceProps(instance, props, refs, ctx)
     end
 
     if instance:IsA("Shirt") then
-        props[#props + 1] = contentProp("ShirtTemplate", read(instance, "ShirtTemplate", ""))
+        props[#props + 1] = contentProp("ShirtTemplateContent", read(instance, "ShirtTemplate", ""))
         return true
     end
 
     if instance:IsA("Pants") then
-        props[#props + 1] = contentProp("PantsTemplate", read(instance, "PantsTemplate", ""))
+        props[#props + 1] = contentProp("PantsTemplateContent", read(instance, "PantsTemplate", ""))
         return true
     end
 
     if instance:IsA("SurfaceAppearance") then
-        for _, key in ipairs({ "ColorMap", "MetalnessMap", "NormalMap", "RoughnessMap" }) do
+        local maps = {
+            ColorMap = "ColorMapContent",
+            MetalnessMap = "MetalnessMapContent",
+            NormalMap = "NormalMapContent",
+            RoughnessMap = "RoughnessMapContent",
+            TexturePack = "TexturePackContent",
+        }
+        for key, serialized in pairs(maps) do
             local value = read(instance, key, "")
             if tostring(value or "") ~= "" then
-                props[#props + 1] = contentProp(key, value)
+                props[#props + 1] = contentProp(serialized, value)
             end
         end
-        props[#props + 1] = floatProp("AlphaCutoff", read(instance, "AlphaCutoff", 0))
         local alphaMode = read(instance, "AlphaMode")
         if typeof(alphaMode) == "EnumItem" then
             props[#props + 1] = tokenProp("AlphaMode", alphaMode.Value)
@@ -653,4 +671,271 @@ function UCam.exportPlayerSkin(target, opts)
     end
 
     return true, path, stats
+end
+
+
+-- ============================================================
+-- DIAGNOSTICO TEMPORAL DEL RIG (v13.6.2)
+-- ============================================================
+-- Funcion de soporte para reportar rigs que no exportan bien. Vuelca
+-- la estructura real del personaje en partida (tallas, mallas, joints,
+-- accesorios y atributos del juego) a un JSON en UniversalCamera/skins
+-- y, si el executor lo permite, al portapapeles.
+--
+-- No participa en la exportacion: se puede borrar sin tocar el resto.
+local function jsonText(value)
+    local text = tostring(value or "")
+    text = text:gsub("\\", "\\\\")
+    text = text:gsub('"', '\\"')
+    text = text:gsub("\n", "\\n")
+    text = text:gsub("\r", "\\r")
+    text = text:gsub("\t", "\\t")
+    return '"' .. text .. '"'
+end
+
+local function jsonNumber(value, digits)
+    local number = tonumber(value)
+    if not number then return "null" end
+    return string.format("%." .. tostring(digits or 4) .. "f", number)
+end
+
+local function jsonVector(value, digits)
+    if typeof(value) ~= "Vector3" then return "null" end
+    return "["
+        .. jsonNumber(value.X, digits) .. ","
+        .. jsonNumber(value.Y, digits) .. ","
+        .. jsonNumber(value.Z, digits) .. "]"
+end
+
+local function jsonCFrame(value, digits)
+    if typeof(value) ~= "CFrame" then return "null" end
+    local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = value:GetComponents()
+    local values = { x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 }
+    local out = {}
+    for index, component in ipairs(values) do
+        out[index] = jsonNumber(component, digits)
+    end
+    return "[" .. table.concat(out, ",") .. "]"
+end
+
+local function jsonAttributes(instance)
+    local ok, attributes = pcall(function()
+        return instance:GetAttributes()
+    end)
+    if not ok or type(attributes) ~= "table" then return "{}" end
+
+    local keys = {}
+    for key in pairs(attributes) do
+        keys[#keys + 1] = tostring(key)
+    end
+    table.sort(keys)
+
+    local out = {}
+    for _, key in ipairs(keys) do
+        local value = attributes[key]
+        local encoded
+        if type(value) == "string" then
+            encoded = jsonText(value)
+        elseif type(value) == "number" then
+            encoded = jsonNumber(value, 6)
+        elseif type(value) == "boolean" then
+            encoded = value and "true" or "false"
+        elseif typeof(value) == "Vector3" then
+            encoded = jsonVector(value)
+        else
+            encoded = jsonText(tostring(value))
+        end
+        out[#out + 1] = jsonText(key) .. ":" .. encoded
+    end
+    return "{" .. table.concat(out, ",") .. "}"
+end
+
+--- Vuelca la estructura del rig de un jugador a un JSON de diagnostico.
+-- @param target Player o etiqueta del dropdown de skin.
+-- @return ok boolean, pathOrError string, summary table|nil
+function UCam.exportRigReport(target)
+    local player = target
+    if type(player) == "string" then
+        player = UCam.resolveSkinExportTarget(player)
+    end
+    if not player or not player:IsA("Player") then
+        return false, "Selecciona un jugador válido.", nil
+    end
+
+    local character = player.Character
+    if not character or not character.Parent then
+        return false, "Ese jugador todavía no tiene personaje.", nil
+    end
+
+    local counts = {}
+    local parts, joints, attachments = {}, {}, {}
+    local meshParts, meshEmpty, specialMeshes = 0, 0, 0
+    local biggest, smallest = 0, math.huge
+    local oversized, jointMismatch, accessories = 0, 0, 0
+
+    for _, desc in ipairs(character:GetDescendants()) do
+        local class = desc.ClassName
+        counts[class] = (counts[class] or 0) + 1
+
+        if desc:IsA("BasePart") then
+            local size = read(desc, "Size")
+            local maxAxis = 0
+            if typeof(size) == "Vector3" then
+                maxAxis = math.max(size.X, size.Y, size.Z)
+                biggest = math.max(biggest, maxAxis)
+                smallest = math.min(smallest, maxAxis)
+                if maxAxis > 10 then
+                    oversized = oversized + 1
+                end
+            end
+
+            local meshId = ""
+            if desc:IsA("MeshPart") then
+                meshParts = meshParts + 1
+                meshId = tostring(read(desc, "MeshId", "") or "")
+                if meshId == "" then
+                    meshEmpty = meshEmpty + 1
+                end
+            end
+
+            parts[#parts + 1] = "{"
+                .. '"path":' .. jsonText(desc:GetFullName())
+                .. ',"class":' .. jsonText(class)
+                .. ',"size":' .. jsonVector(size, 5)
+                .. ',"maxAxis":' .. jsonNumber(maxAxis, 5)
+                .. ',"cframe":' .. jsonCFrame(read(desc, "CFrame"), 5)
+                .. ',"meshId":' .. jsonText(meshId)
+                .. ',"textureId":' .. jsonText(read(desc, "TextureID", ""))
+                .. ',"anchored":' .. (read(desc, "Anchored", false) and "true" or "false")
+                .. ',"massless":' .. (read(desc, "Massless", false) and "true" or "false")
+                .. ',"transparency":' .. jsonNumber(read(desc, "Transparency", 0), 4)
+                .. "}"
+        elseif desc:IsA("JointInstance") or desc:IsA("WeldConstraint") then
+            local part0 = read(desc, "Part0")
+            local part1 = read(desc, "Part1")
+            local mismatch = "null"
+            if desc:IsA("Motor6D") and part0 and part1 then
+                local okPose, expected = pcall(function()
+                    return part0.CFrame * desc.C0 * desc.C1:Inverse()
+                end)
+                if okPose and typeof(expected) == "CFrame" then
+                    local delta = (expected.Position - part1.CFrame.Position).Magnitude
+                    mismatch = jsonNumber(delta, 6)
+                    if delta > 0.05 then
+                        jointMismatch = jointMismatch + 1
+                    end
+                end
+            end
+            joints[#joints + 1] = "{"
+                .. '"path":' .. jsonText(desc:GetFullName())
+                .. ',"class":' .. jsonText(class)
+                .. ',"part0":' .. jsonText(part0 and part0:GetFullName() or "")
+                .. ',"part1":' .. jsonText(part1 and part1:GetFullName() or "")
+                .. ',"c0":' .. jsonCFrame(read(desc, "C0"), 5)
+                .. ',"c1":' .. jsonCFrame(read(desc, "C1"), 5)
+                .. ',"poseError":' .. mismatch
+                .. "}"
+        elseif desc:IsA("Attachment") then
+            attachments[#attachments + 1] = "{"
+                .. '"path":' .. jsonText(desc:GetFullName())
+                .. ',"class":' .. jsonText(class)
+                .. ',"cframe":' .. jsonCFrame(read(desc, "CFrame"), 5)
+                .. ',"visible":' .. (read(desc, "Visible", false) and "true" or "false")
+                .. "}"
+        elseif desc:IsA("SpecialMesh") then
+            specialMeshes = specialMeshes + 1
+        elseif desc:IsA("Accessory") then
+            accessories = accessories + 1
+        end
+    end
+
+    local pivot, extents, scale = "null", "null", "null"
+    local okPivot, modelPivot = pcall(function() return character:GetPivot() end)
+    if okPivot then pivot = jsonCFrame(modelPivot, 4) end
+    local okExtents, modelExtents = pcall(function() return character:GetExtentsSize() end)
+    if okExtents then extents = jsonVector(modelExtents, 3) end
+    local okScale, modelScale = pcall(function() return character:GetScale() end)
+    if okScale then scale = jsonNumber(modelScale, 4) end
+
+    local humanoidInfo = "null"
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoidInfo = "{"
+            .. '"rigType":' .. jsonText(tostring(read(humanoid, "RigType", "")))
+            .. ',"hipHeight":' .. jsonNumber(read(humanoid, "HipHeight", 0), 4)
+            .. ',"walkSpeed":' .. jsonNumber(read(humanoid, "WalkSpeed", 0), 4)
+            .. ',"displayName":' .. jsonText(read(humanoid, "DisplayName", ""))
+            .. "}"
+    end
+
+    local classNames = {}
+    for class in pairs(counts) do classNames[#classNames + 1] = class end
+    table.sort(classNames)
+    local countOut = {}
+    for _, class in ipairs(classNames) do
+        countOut[#countOut + 1] = jsonText(class) .. ":" .. tostring(counts[class])
+    end
+
+    local summary = {
+        parts = #parts,
+        joints = #joints,
+        attachments = #attachments,
+        oversized = oversized,
+        jointMismatch = jointMismatch,
+        meshEmpty = meshEmpty,
+    }
+
+    local body = "{"
+        .. '"tool":"UniversalCamera",'
+        .. '"version":' .. jsonText(UCam.VERSION or "?") .. ","
+        .. '"purpose":"diagnostico de rig",'
+        .. '"placeId":' .. tostring(game.PlaceId) .. ","
+        .. '"jobId":' .. jsonText(game.JobId) .. ","
+        .. '"time":' .. jsonText(os.date("!%Y-%m-%dT%H:%M:%SZ")) .. ","
+        .. '"player":' .. jsonText(player.Name) .. ","
+        .. '"character":' .. jsonText(character:GetFullName()) .. ","
+        .. '"attributes":' .. jsonAttributes(character) .. ","
+        .. '"primaryPart":' .. jsonText(character.PrimaryPart and character.PrimaryPart:GetFullName() or "") .. ","
+        .. '"pivot":' .. pivot .. ","
+        .. '"extents":' .. extents .. ","
+        .. '"modelScale":' .. scale .. ","
+        .. '"humanoid":' .. humanoidInfo .. ","
+        .. '"counts":{' .. table.concat(countOut, ",") .. "},"
+        .. '"meshParts":' .. tostring(meshParts) .. ","
+        .. '"meshPartsWithoutMesh":' .. tostring(meshEmpty) .. ","
+        .. '"specialMeshes":' .. tostring(specialMeshes) .. ","
+        .. '"accessories":' .. tostring(accessories) .. ","
+        .. '"sizeRange":{"min":' .. jsonNumber(smallest == math.huge and 0 or smallest, 5)
+        .. ',"max":' .. jsonNumber(biggest, 5) .. "},"
+        .. '"parts":[' .. table.concat(parts, ",") .. "],"
+        .. '"joints":[' .. table.concat(joints, ",") .. "],"
+        .. '"attachments":[' .. table.concat(attachments, ",") .. "]"
+        .. "}"
+
+    if typeof(writefile) ~= "function" then
+        return false, "Este executor no permite writefile; no se puede guardar el diagnóstico.", nil
+    end
+
+    local baseName = "_diagnostico_rig_" .. sanitizeName(player.Name) .. "_"
+        .. os.date("%Y%m%d_%H%M%S") .. ".json"
+    local path = EXPORT_FOLDER .. "/" .. baseName
+    if not ensureFolder(EXPORT_FOLDER) then
+        path = baseName
+    end
+
+    local written, writeErr = pcall(writefile, path, body)
+    if not written then
+        path = baseName
+        written, writeErr = pcall(writefile, path, body)
+    end
+    if not written then
+        return false, "No se pudo escribir el diagnóstico: " .. tostring(writeErr), nil
+    end
+
+    if typeof(setclipboard) == "function" then
+        pcall(setclipboard, body)
+        summary.clipboard = true
+    end
+
+    return true, path, summary
 end

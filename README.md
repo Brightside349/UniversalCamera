@@ -271,7 +271,28 @@ gente.
   que corre despues de los `Heartbeat` y antes de dibujar.
 - El Loader apunta al tag `v13.6.1`.
 
-> Version estable: `v13.6.1`.
+### v13.6.2
+
+- **Skin a Studio ya importa bien el rig**: el serializador escribia las
+  propiedades con el nombre de la API y Studio las descartaba. `Size` va
+  como `size` y `Shape` como `shape`; `MeshPart.MeshId` como `MeshContent`
+  y `TextureID` como `TextureContent` (tipo `Content` con `<uri>`), igual en
+  `SpecialMesh`, `Decal`, uniones (`Content`) y `SurfaceAppearance`. Sin
+  `size` cada `MeshPart` se importaba con el tamano bruto de su malla: de
+  ahi el modelo gigante y desfigurado.
+- **Rig articulado**: `WeldConstraint` guarda sus referencias como
+  `Part0Internal` y `Part1Internal`. Con `Part0`/`Part1` se importaba sin
+  partes y el personaje se desarmaba. Los referents ahora son numericos,
+  como los escribe Studio.
+- Se dejo de escribir `Motor6D.Transform` y `Humanoid.Health`, que no se
+  serializan en `.rbxmx`.
+- **Diagnostico temporal** en **Creator → Skin a Studio → Diagnóstico de
+  rig (temporal)**: guarda un JSON con el rig real del personaje en partida
+  (tallas, mallas, joints, accesorios y atributos del juego) y lo copia al
+  portapapeles si el executor lo permite.
+- El Loader apunta al tag `v13.6.2`.
+
+> Version estable: `v13.6.2`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -281,7 +302,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.6.1`.
+La version publicada apunta al tag `v13.6.2`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -292,7 +313,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.6.1"
+local VERSION = "v13.6.2"
 ```
 
 ## Interfaz (v13)

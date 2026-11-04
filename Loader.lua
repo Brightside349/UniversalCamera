@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera PRO v13.6.1 · Loader
+-- Universal Camera PRO v13.6.2 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v13.6.1"
+local VERSION = "v13.6.2"
 local TAG = VERSION
 local REF = TAG
 
