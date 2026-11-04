@@ -292,7 +292,18 @@ gente.
   portapapeles si el executor lo permite.
 - El Loader apunta al tag `v13.6.2`.
 
-> Version estable: `v13.6.2`.
+### v13.6.3
+
+- **Diagnostico de rig mas completo**: cada parte registra ademas su
+  `AssetId`, color, material y forma; las uniones creadas en partida (sin
+  `AssetId`) se cuentan aparte porque su geometria no viaja en el `.rbxmx`.
+- El JSON incluye `exportPreview`: simula el export con las mismas reglas
+  que el archivo final (cuantas partes, joints y adjuntos entran, que clases
+  se omiten). Asi se ve el resultado antes de abrir Studio.
+- El aviso de exportar skin menciona cuantas uniones quedaron sin malla.
+- El Loader apunta al tag `v13.6.3`.
+
+> Version estable: `v13.6.3`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -302,7 +313,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.6.2`.
+La version publicada apunta al tag `v13.6.3`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -313,7 +324,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.6.2"
+local VERSION = "v13.6.3"
 ```
 
 ## Interfaz (v13)

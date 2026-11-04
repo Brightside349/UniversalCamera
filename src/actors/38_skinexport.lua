@@ -1,5 +1,5 @@
 -- ============================================================
--- Universal Camera Pro v13.6.2 · actors/38_skinexport
+-- Universal Camera Pro v13.6.3 · actors/38_skinexport
 -- Exporta el personaje de un jugador a un modelo .rbxmx local
 -- (XML de Roblox) para abrirlo en Studio y animarlo.
 --
@@ -470,10 +470,16 @@ local function ensureFolder(path)
 end
 
 local function countTree(root)
-    local stats = { parts = 0, accessories = 0, joints = 0, attachments = 0 }
+    local stats = { parts = 0, accessories = 0, joints = 0, attachments = 0, unionsWithoutAsset = 0 }
     walk(root, function(instance)
         if instance:IsA("BasePart") then
             stats.parts = stats.parts + 1
+            -- Una union creada en partida no tiene AssetId: su geometria
+            -- no viaja en el .rbxmx y en Studio queda sin malla.
+            if instance:IsA("PartOperation")
+                and tostring(read(instance, "AssetId", "") or "") == "" then
+                stats.unionsWithoutAsset = stats.unionsWithoutAsset + 1
+            end
         elseif instance:IsA("Accessory") then
             stats.accessories = stats.accessories + 1
         elseif instance:IsA("JointInstance") or instance:IsA("WeldConstraint") then
@@ -675,7 +681,7 @@ end
 
 
 -- ============================================================
--- DIAGNOSTICO TEMPORAL DEL RIG (v13.6.2)
+-- DIAGNOSTICO TEMPORAL DEL RIG (v13.6.3)
 -- ============================================================
 -- Funcion de soporte para reportar rigs que no exportan bien. Vuelca
 -- la estructura real del personaje en partida (tallas, mallas, joints,
@@ -705,6 +711,19 @@ local function jsonVector(value, digits)
         .. jsonNumber(value.X, digits) .. ","
         .. jsonNumber(value.Y, digits) .. ","
         .. jsonNumber(value.Z, digits) .. "]"
+end
+
+local function jsonColor(value, digits)
+    if typeof(value) ~= "Color3" then return "null" end
+    return "["
+        .. jsonNumber(value.R, digits) .. ","
+        .. jsonNumber(value.G, digits) .. ","
+        .. jsonNumber(value.B, digits) .. "]"
+end
+
+local function enumName(value)
+    if typeof(value) == "EnumItem" then return value.Name end
+    return ""
 end
 
 local function jsonCFrame(value, digits)
@@ -772,6 +791,7 @@ function UCam.exportRigReport(target)
     local meshParts, meshEmpty, specialMeshes = 0, 0, 0
     local biggest, smallest = 0, math.huge
     local oversized, jointMismatch, accessories = 0, 0, 0
+    local unionsWithoutAsset = 0
 
     for _, desc in ipairs(character:GetDescendants()) do
         local class = desc.ClassName
@@ -798,6 +818,13 @@ function UCam.exportRigReport(target)
                 end
             end
 
+            -- Una union sin AssetId no tiene geometria que guardar: al
+            -- exportar quedaria como un bloque vacio.
+            local assetId = tostring(read(desc, "AssetId", "") or "")
+            if desc:IsA("PartOperation") and assetId == "" then
+                unionsWithoutAsset = unionsWithoutAsset + 1
+            end
+
             parts[#parts + 1] = "{"
                 .. '"path":' .. jsonText(desc:GetFullName())
                 .. ',"class":' .. jsonText(class)
@@ -806,6 +833,10 @@ function UCam.exportRigReport(target)
                 .. ',"cframe":' .. jsonCFrame(read(desc, "CFrame"), 5)
                 .. ',"meshId":' .. jsonText(meshId)
                 .. ',"textureId":' .. jsonText(read(desc, "TextureID", ""))
+                .. ',"assetId":' .. jsonText(assetId)
+                .. ',"color":' .. jsonColor(read(desc, "Color"), 3)
+                .. ',"material":' .. jsonText(enumName(read(desc, "Material")))
+                .. ',"shape":' .. jsonText(enumName(read(desc, "Shape")))
                 .. ',"anchored":' .. (read(desc, "Anchored", false) and "true" or "false")
                 .. ',"massless":' .. (read(desc, "Massless", false) and "true" or "false")
                 .. ',"transparency":' .. jsonNumber(read(desc, "Transparency", 0), 4)
@@ -876,6 +907,39 @@ function UCam.exportRigReport(target)
         countOut[#countOut + 1] = jsonText(class) .. ":" .. tostring(counts[class])
     end
 
+    -- Simulacion de lo que el exportador incluiria en el .rbxmx, con las
+    -- mismas reglas que usa exportPlayerSkin. Sirve para ver de antemano
+    -- que se pierde (sonidos, efectos, scripts...) y que si entra.
+    local previewIncluded, previewSkipped = {}, {}
+    local preview = { parts = 0, joints = 0, attachments = 0 }
+    walk(character, function(instance)
+        local class = instance.ClassName
+        previewIncluded[class] = (previewIncluded[class] or 0) + 1
+        if instance:IsA("BasePart") then
+            preview.parts = preview.parts + 1
+        elseif instance:IsA("JointInstance") or instance:IsA("WeldConstraint") then
+            preview.joints = preview.joints + 1
+        elseif instance:IsA("Attachment") then
+            preview.attachments = preview.attachments + 1
+        end
+    end)
+    for _, desc in ipairs(character:GetDescendants()) do
+        if not isExportable(desc) then
+            previewSkipped[desc.ClassName] = (previewSkipped[desc.ClassName] or 0) + 1
+        end
+    end
+
+    local function encodeCounts(bag)
+        local names = {}
+        for class in pairs(bag) do names[#names + 1] = class end
+        table.sort(names)
+        local out = {}
+        for _, class in ipairs(names) do
+            out[#out + 1] = jsonText(class) .. ":" .. tostring(bag[class])
+        end
+        return "{" .. table.concat(out, ",") .. "}"
+    end
+
     local summary = {
         parts = #parts,
         joints = #joints,
@@ -907,6 +971,12 @@ function UCam.exportRigReport(target)
         .. '"accessories":' .. tostring(accessories) .. ","
         .. '"sizeRange":{"min":' .. jsonNumber(smallest == math.huge and 0 or smallest, 5)
         .. ',"max":' .. jsonNumber(biggest, 5) .. "},"
+        .. '"unionsWithoutAsset":' .. tostring(unionsWithoutAsset) .. ","
+        .. '"exportPreview":{"parts":' .. tostring(preview.parts)
+        .. ',"joints":' .. tostring(preview.joints)
+        .. ',"attachments":' .. tostring(preview.attachments)
+        .. ',"included":' .. encodeCounts(previewIncluded)
+        .. ',"skipped":' .. encodeCounts(previewSkipped) .. "},"
         .. '"parts":[' .. table.concat(parts, ",") .. "],"
         .. '"joints":[' .. table.concat(joints, ",") .. "],"
         .. '"attachments":[' .. table.concat(attachments, ",") .. "]"

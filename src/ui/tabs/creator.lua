@@ -302,13 +302,20 @@ function UCam.build_creator(Window)
             end
             local ok, result, stats = UCam.exportPlayerSkin(skinTarget, { name = skinName })
             if ok then
-                UCam.notify("Skin", string.format(
+                local message = string.format(
                     "Guardado en %s · %d partes, %d joints, %d accesorios",
                     tostring(result),
                     stats and stats.parts or 0,
                     stats and stats.joints or 0,
                     stats and stats.accessories or 0
-                ), 7, { important = true })
+                )
+                if stats and (stats.unionsWithoutAsset or 0) > 0 then
+                    message = message .. string.format(
+                        " · %d unión(es) sin malla en Studio",
+                        stats.unionsWithoutAsset
+                    )
+                end
+                UCam.notify("Skin", message, 7, { important = true })
             else
                 UCam.notify("Skin", tostring(result), 5)
             end
@@ -323,7 +330,7 @@ function UCam.build_creator(Window)
         end,
     })
 
-    -- v13.6.2: temporal. Guarda un JSON con el rig real del personaje
+    -- v13.6.3: temporal. Guarda un JSON con el rig real del personaje
     -- (tallas, mallas, joints, accesorios) para diagnosticar exports rotos.
     Tab:CreateButton({
         Name     = "🧪 Diagnóstico de rig (temporal)",
