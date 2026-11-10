@@ -303,7 +303,20 @@ gente.
 - El aviso de exportar skin menciona cuantas uniones quedaron sin malla.
 - El Loader apunta al tag `v13.6.3`.
 
-> Version estable: `v13.6.3`.
+### v13.6.4
+
+- **Todas las pestañas quedan armadas al arrancar**: el contenido ya no se
+  construye recién al abrir cada pestaña (ese primer clic pagaba el costo
+  completo y parecía que había que cargar cada módulo a mano). Después de
+  crear los cascarones, un precargador arma una pestaña por frame en segundo
+  plano; abrir la ventana y recorrer cualquier pestaña es instantáneo.
+- Si se abre una pestaña que todavía no llegó, se arma en ese momento y el
+  precargador la salta, así que nunca se ve vacía.
+- Sin cambios en cámara, filtros ni ningún otro módulo: solo cambia cuándo se
+  construye la UI, no lo que hace.
+- El Loader apunta al tag `v13.6.4`.
+
+> Version estable: `v13.6.4`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -313,7 +326,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.6.3`.
+La version publicada apunta al tag `v13.6.4`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -324,7 +337,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.6.3"
+local VERSION = "v13.6.4"
 ```
 
 ## Interfaz (v13)
