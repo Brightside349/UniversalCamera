@@ -4,7 +4,8 @@ Camara libre cinematografica para Roblox con modos de camara, espectador,
 Director, filtros, iluminacion, guias de composicion, Clean Shot, escenas,
 **Props** locales por ID de asset, **Animador** con timeline de keyframes y
 **Clones**: copias locales de cualquier jugador para grabar tomas con mucha
-gente.
+gente, y **Replay**: grabacion y reproduccion local de la partida para filmar
+tomas de camara.
 
 ### v12.1
 
@@ -316,7 +317,39 @@ gente.
   construye la UI, no lo que hace.
 - El Loader apunta al tag `v13.6.4`.
 
-> Version estable: `v13.6.4`.
+### v13.7
+
+- **Replay local tipo `record` de L4D2** (`demo/92_recorder.lua`,
+  `demo/94_player.lua`, `demo/96_file.lua`, `demo/98_takes.lua`): graba a los
+  jugadores y a los props locales, los reproduce con un rig fantasma y permite
+  filmar tomas de camara sobre esa reproduccion. El demo es de tu cliente:
+  nadie mas lo ve y no se envia nada al servidor.
+- **Que se graba**: la raiz de cada personaje (CFrame) y el `Transform` de cada
+  `Motor6D`, mas posicion y rotacion de los props. No se guardan animaciones ni
+  se reproduce logica del servidor: es una captura visual del movimiento.
+- Formato binario `.ucamdemo` (`UCDM`, cabecera JSON y bloques `float32`
+  little-endian) con tasa de muestreo configurable (20/30/60 Hz). En la misma
+  sesion el fantasma es un clon exacto del personaje; al cargar un archivo se
+  arma un rig proxy con las partes guardadas y los mismos joints, por si el
+  juego ya no tiene ese diseño.
+- **Pestaña 🎬 Replay** en **Creacion**: Grabar/Detener, duracion maxima,
+  incluir jugadores y props, barra de tiempo, play/pausa/detener, marcadores,
+  biblioteca de demos guardados (cargar, guardar como, borrar), exportar e
+  importar base64 y lista de tomas.
+- **Tomas**: cada toma guarda el recorrido de la camara libre (CFrame + FOV) y
+  su ventana del demo. Se reproducen con la UI oculta (Clean Shot) y en
+  secuencia, una detras de otra; al terminar se restauran camara, HUD y
+  jugadores reales.
+- Los demos se guardan en `UniversalCamera/<PlaceId>/demos` cuando el executor
+  tiene filesystem; sin el, la grabacion y la reproduccion funcionan igual
+  durante la sesion.
+- **RageUI del juego**: cuando el HUD se oculta (camara libre, Clean Shot o
+  secuencia de tomas) tambien se apaga `PlayerGui.RageUI`. Si el exe la crea o
+  la vuelve a abrir mientras el HUD esta oculto, el vigilante la apaga para que
+  no entre en las tomas, y la restaura al salir junto con el resto del HUD.
+- El Loader apunta al tag `v13.7.0`.
+
+> Version estable: `v13.7.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -326,7 +359,7 @@ gente.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.6.4`.
+La version publicada apunta al tag `v13.7.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -337,7 +370,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.6.4"
+local VERSION = "v13.7.0"
 ```
 
 ## Interfaz (v13)
@@ -399,6 +432,28 @@ La animacion vive en la sesion actual; los props en si siguen guardandose.
    actual** para ver cuantas partes se estan moviendo realmente. El coste que
    queda es de dibujado: cada clon sigue siendo un personaje completo.
 
+## Replay y tomas (v13.7)
+
+1. Abre **🎬 Replay** (Creacion), elige tasa y duracion maxima, y pulsa
+   **Grabar**. Se graban tu personaje, los demas jugadores y los props locales
+   mientras el demo corre en tu cliente.
+2. Al detener, el demo queda cargado: usa la barra de tiempo o **Play** para
+   verlo. Los jugadores vivos se ocultan y en su lugar aparecen fantasmas; los
+   props se mueven con la misma pista.
+3. Para una toma, busca el momento, mueve la camara libre al encuadre inicial y
+   pulsa **Grabar toma**. La camara se graba desde ahi durante la duracion de
+   la toma; repite en otros momentos para tener varias tomas del mismo demo.
+4. **Reproducir secuencia** encadena todas las tomas con la UI oculta. Al
+   terminar vuelven la camara, el HUD y los jugadores reales.
+5. **Guardar como** escribe el `.ucamdemo` en
+   `UniversalCamera/<PlaceId>/demos`; **Biblioteca** lo vuelve a cargar en otra
+   sesion. **Exportar base64** sirve para compartirlo por texto.
+
+Limites: el replay es una captura visual (no reproduce fisica, daño ni
+eventos), los avatares de otra sesion usan un rig proxy si el diseño ya no
+existe, y el archivo crece aproximadamente **1 MB por minuto y actor** a 30 Hz
+(la exportacion base64 ocupa cerca de un tercio mas).
+
 ## Estructura del workspace
 
 ```text
@@ -428,6 +483,11 @@ Universal Camera/
     ├── props/
     │   ├── 45_props.lua         # props locales por ID de asset (v11)
     │   └── 46_propsanim.lua     # timeline de keyframes (v12.5)
+    ├── demo/
+    │   ├── 92_recorder.lua      # grabacion de actores y props (v13.7)
+    │   ├── 94_player.lua        # fantasmas y reproduccion (v13.7)
+    │   ├── 96_file.lua          # .ucamdemo, biblioteca y base64 (v13.7)
+    │   └── 98_takes.lua         # tomas de camara y secuencia (v13.7)
     ├── runtime/
     │   ├── 85_performance.lua  # diagnostico de frame budget
     │   ├── 88_v9extras.lua      # eventos, gamepad y escenas
@@ -438,7 +498,7 @@ Universal Camera/
         ├── 05_adapter.lua        # adaptador a WindUI (API estilo Rayfield)
         ├── 00_registry.lua      # registro de builders y tabs de plugins
         ├── 90_builder.lua        # ventana, tabs y autosave
-        └── tabs/                 # un builder por pestaña
+        └── tabs/                 # un builder por pestaña (incluye replay.lua)
 ```
 
 ## Orden de carga

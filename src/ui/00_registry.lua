@@ -26,6 +26,7 @@ UCam._uiBuilders = {
     "bodycolor",
     "props",
     "propsanim",
+    "replay",
     "fun",
     "config",
     "creator",

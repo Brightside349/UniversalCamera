@@ -27,6 +27,12 @@ function UCam.Unload()
         if UCam.stopFun then UCam.stopFun() end
         if UCam.stopBodyColor then UCam.stopBodyColor() end
         if UCam.stopClones then UCam.stopClones() end
+        -- v13.7: soltar la camara del Replay y borrar los rigs fantasma
+        -- antes de que el registry destruya instancias.
+        if UCam.demoSequenceStop then pcall(UCam.demoSequenceStop) end
+        if UCam.demoTakeStop then pcall(UCam.demoTakeStop) end
+        if UCam.demoStop then pcall(UCam.demoStop) end
+        UCam.DemoCamera = nil
         if UCam.restoreAllPlayers then UCam.restoreAllPlayers() end
         if UCam.propAnimStop then UCam.propAnimStop() end
         if UCam.destroyGreenScreen then UCam.destroyGreenScreen() end

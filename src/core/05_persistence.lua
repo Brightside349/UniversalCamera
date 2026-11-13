@@ -198,6 +198,16 @@ local SCHEMA = {
         Library = nil,
     },
 
+    -- v13.7: ajustes del Replay (los demos se guardan aparte, en .ucamdemo)
+    Demo = {
+        Rate = nil, MaxDuration = nil, MaxActors = nil,
+        IncludeLocal = nil, IncludeOthers = nil, IncludeProps = nil,
+        HideLive = nil, Loop = nil, Speed = nil,
+    },
+    DemoTakes = {
+        Duration = nil, Easing = nil, HideUI = nil, Letterbox = nil,
+    },
+
     -- TimeControl
     -- v8.1: Módulos eliminados (SlowMo, TimeControl, Combos, Macros, AudioReactive, FiltersPro)
     -- Ya no se persisten

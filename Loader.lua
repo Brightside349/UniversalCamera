@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera PRO v13.6.4 · Loader
+-- Universal Camera PRO v13.7.0 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v13.6.4"
+local VERSION = "v13.7.0"
 local TAG = VERSION
 local REF = TAG
 
@@ -85,6 +85,12 @@ local ORDER = {
     "camera/60_director.lua",
     "camera/70_camcore.lua",
     "camera/72_compat.lua",
+    -- v13.7: Replay. El grabador necesita props; el reproductor necesita
+    -- clones/utilidades ya cargados y el archivo necesita al reproductor.
+    "demo/92_recorder.lua",
+    "demo/94_player.lua",
+    "demo/96_file.lua",
+    "demo/98_takes.lua",
     "ui/00_registry.lua",
     "runtime/85_performance.lua",
     "extensions/85_plugins.lua",
@@ -101,6 +107,7 @@ local ORDER = {
     "ui/tabs/gimbal.lua",
     "ui/tabs/props.lua",
     "ui/tabs/propsanim.lua",
+    "ui/tabs/replay.lua",
     "ui/tabs/clones.lua",
     "ui/tabs/fun.lua",
     "ui/tabs/bodycolor.lua",

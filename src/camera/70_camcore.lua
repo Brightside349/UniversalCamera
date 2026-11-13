@@ -32,6 +32,7 @@ local customHudPaths = {
     "Round.Game.SurvivorHP.AmyCards",
     "Round.Game.Teams",
     "InGameUI",
+    "RageUI",
 }
 
 local function setCustomHudHidden(hidden)
@@ -48,37 +49,13 @@ local function setCustomHudHidden(hidden)
             end
 
             if current and current ~= playerGui then
-                if UCam.Hud.CustomStates[current] == nil then
-                    if current:IsA("GuiObject") then
-                        UCam.Hud.CustomStates[current] = {
-                            Kind = "Visible",
-                            Value = current.Visible,
-                        }
-                    elseif current:IsA("LayerCollector") then
-                        UCam.Hud.CustomStates[current] = {
-                            Kind = "Enabled",
-                            Value = current.Enabled,
-                        }
-                    end
-                end
-                if current:IsA("GuiObject") then
-                    current.Visible = false
-                elseif current:IsA("LayerCollector") then
-                    current.Enabled = false
-                end
+                -- hideHudTree tambien baja por carpetas (RageUI puede ser
+                -- un Folder con varias ScreenGuis dentro).
+                UCam.hideHudTree(current)
             end
         end
     else
-        for instance, state in pairs(UCam.Hud.CustomStates) do
-            if instance and instance.Parent then
-                if state.Kind == "Visible" and instance:IsA("GuiObject") then
-                    instance.Visible = state.Value
-                elseif state.Kind == "Enabled" and instance:IsA("LayerCollector") then
-                    instance.Enabled = state.Value
-                end
-            end
-        end
-        UCam.Hud.CustomStates = {}
+        UCam.restoreHudInstances()
     end
 end
 
@@ -467,6 +444,19 @@ local fovPulseT = 0
 local fovPulseBaseFOV = nil
 
 function UCam.updateCamera(deltaTime)
+    -- v13.7: el Replay puede tomar la camara durante una toma o una
+    -- secuencia. Es el UNICO punto donde se le cede el control: el resto
+    -- del tiempo vale nil y el nucleo funciona igual que antes.
+    if UCam.DemoCamera then
+        local ok, handled = pcall(UCam.DemoCamera, deltaTime)
+        if not ok then
+            -- Un fallo en la toma no debe congelar la camara para siempre.
+            UCam.DemoCamera = nil
+        elseif handled then
+            return
+        end
+    end
+
     -- v8.1: updateTimeControl eliminado — ya no se tickea en cada frame.
     -- v7: transiciones de filtro / temporal
     if UCam.updateFilters then

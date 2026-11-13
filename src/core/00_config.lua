@@ -223,6 +223,8 @@ UCam.Hud = {
     Transparencies = {},
     CustomStates = {},
     CoreGuiStates = {},
+    _rageConn = nil,        -- vigilante de PlayerGui.RageUI (v13.7)
+    _ragePlayerGui = nil,
 }
 
 -- v6: 14 modos de camara
@@ -1017,6 +1019,72 @@ UCam.Clones = {
     _bulkParts      = nil,
     _bulkCFrames    = nil,
     _invCache       = {},
+}
+
+-- ============================================================
+-- v13.7: REPLAY / DEMO — grabacion local de actores y props.
+-- No es un demo del motor: guarda la pose de cada rig (Motor6D
+-- Transform + raiz) y las CFrames de los props para reconstruir
+-- la escena en tu cliente y filmarla con camara libre.
+-- ============================================================
+UCam.Demo = {
+    Recording    = false,
+    Playing      = false,
+    Paused       = false,
+    Rate         = 20,          -- muestras por segundo (20/30/60)
+    Rates        = { 20, 30, 60 },
+    MaxDuration  = 180,         -- tope de grabacion en segundos
+    MaxActors    = 12,          -- actores simultaneos (jugadores)
+    IncludeLocal = true,
+    IncludeOthers = true,
+    IncludeProps = true,
+    HideLive     = true,        -- ocultar personajes vivos al reproducir
+    Loop         = false,
+    Speed        = 1,
+    Playhead     = 0,
+    Duration     = 0,
+    Elapsed      = 0,
+    Current      = nil,         -- demo cargado/grabado
+    Library      = {},          -- indice de archivos guardados
+    Selected     = "",
+    _captureConn = nil,
+    _playConn    = nil,
+    _accum       = 0,
+    _actors      = {},          -- pistas creadas en esta grabacion
+    _actorByKey  = {},
+    _ghosts      = {},          -- rigs de reproduccion
+    _hiddenParts = {},
+    _hiddenHumanoids = {},
+    _warnedNoFS  = false,
+    _lastError   = nil,
+}
+
+-- v13.7: TOMAS — pasadas de camara grabadas sobre un demo.
+-- Una toma guarda su propio recorrido (CFrame + FOV por muestra),
+-- de modo que el mismo demo se puede filmar desde varios angulos
+-- sin volver a grabar a los actores. La secuencia las encadena.
+UCam.DemoTakes = {
+    Items        = {},          -- tomas del demo actual (alias de Current.takes)
+    Selected     = 0,
+    Playing      = false,
+    SequencePlaying = false,
+    Duration     = 6,
+    Easing       = "Smooth",
+    Easings      = { "Linear", "Smooth", "Sin", "Expo", "Bounce", "Elastic", "Back" },
+    HideUI       = true,
+    Letterbox    = true,
+    _recording   = false,
+    _elapsed     = 0,
+    _takeIn      = 0,
+    _takeDuration = 6,
+    _route       = {},
+    _recordConn  = nil,
+    _playingTake = nil,
+    _seqQueue    = {},
+    _seqIndex    = 0,
+    _seqElapsed  = 0,
+    _savedUI     = nil,
+    _savedLetterbox = nil,
 }
 
 -- v8.1 FIX (crítico #4): timeout de 5 s. Si el juego no tiene

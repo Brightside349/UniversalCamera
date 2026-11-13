@@ -114,6 +114,121 @@ function UCam.getCleanupReport()
 end
 
 -- ============================================================
+-- HUD DEL JUEGO: RAGEUI (ragemode del exe)
+-- ============================================================
+-- Al ocultar el HUD (camara libre, Clean Shot o secuencia de tomas)
+-- tambien hay que apagar PlayerGui.RageUI. El exe puede crearla despues
+-- de entrar en camara libre, asi que el HUD queda vigilando PlayerGui.
+
+local function hudKindOf(instance)
+    if instance:IsA("GuiObject") then
+        return "Visible", instance.Visible
+    elseif instance:IsA("LayerCollector") then
+        return "Enabled", instance.Enabled
+    end
+    return nil
+end
+
+function UCam.hideHudInstance(instance)
+    if not instance or not instance.Parent then return false end
+    local kind, value = hudKindOf(instance)
+    if not kind then return false end
+    local states = UCam.Hud.CustomStates
+    if states[instance] == nil then
+        states[instance] = { Kind = kind, Value = value }
+    end
+    if kind == "Visible" then
+        instance.Visible = false
+    else
+        instance.Enabled = false
+    end
+    return true
+end
+
+--- Oculta una instancia GUI; si es un contenedor (Folder), baja por sus hijos.
+function UCam.hideHudTree(instance)
+    if not instance then return end
+    if UCam.hideHudInstance(instance) then return end
+    for _, child in ipairs(instance:GetChildren()) do
+        UCam.hideHudTree(child)
+    end
+end
+
+function UCam.restoreHudInstances()
+    local states = UCam.Hud.CustomStates
+    if not states then return end
+    for instance, state in pairs(states) do
+        if instance and instance.Parent then
+            if state.Kind == "Visible" and instance:IsA("GuiObject") then
+                instance.Visible = state.Value
+            elseif state.Kind == "Enabled" and instance:IsA("LayerCollector") then
+                instance.Enabled = state.Value
+            end
+        end
+    end
+    table.clear(states)
+end
+
+local function guardRageUi(instance)
+    if not instance then return end
+    if UCam.Hud.Hidden then UCam.hideHudTree(instance) end
+
+    if instance:IsA("LayerCollector") then
+        -- El juego puede volver a abrirla mientras sigues en camara libre.
+        UCam.trackConnection(instance:GetPropertyChangedSignal("Enabled"):Connect(function()
+            if UCam.Hud.Hidden and instance.Enabled then
+                UCam.hideHudTree(instance)
+            end
+        end), "Hud:RageUI:Enabled")
+    elseif instance:IsA("GuiObject") then
+        UCam.trackConnection(instance:GetPropertyChangedSignal("Visible"):Connect(function()
+            if UCam.Hud.Hidden and instance.Visible then
+                UCam.hideHudTree(instance)
+            end
+        end), "Hud:RageUI:Visible")
+    else
+        for _, child in ipairs(instance:GetChildren()) do
+            guardRageUi(child)
+        end
+        -- RageUI puede ser un Folder que se llena despues de aparecer.
+        UCam.trackConnection(instance.ChildAdded:Connect(function(child)
+            guardRageUi(child)
+        end), "Hud:RageUI:Child")
+    end
+end
+
+local function watchRageUiOn(playerGui)
+    if not playerGui or playerGui == UCam.Hud._ragePlayerGui then return end
+    UCam.Hud._ragePlayerGui = playerGui
+
+    if UCam.Hud._rageConn then
+        UCam.untrackConnection(UCam.Hud._rageConn)
+        UCam.Hud._rageConn = nil
+    end
+    UCam.Hud._rageConn = UCam.trackConnection(
+        playerGui.ChildAdded:Connect(function(child)
+            if child.Name == "RageUI" then guardRageUi(child) end
+        end),
+        "Hud:RageUI"
+    )
+
+    local existing = playerGui:FindFirstChild("RageUI")
+    if existing then guardRageUi(existing) end
+end
+
+local function watchPlayerGui()
+    local player = UCam.player
+    if not player then return end
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if playerGui then watchRageUiOn(playerGui) end
+    UCam.trackConnection(player.ChildAdded:Connect(function(child)
+        if child.Name == "PlayerGui" then watchRageUiOn(child) end
+    end), "Hud:PlayerGui")
+end
+
+watchPlayerGui()
+
+-- ============================================================
 -- REFRESCAR REFERENCIAS AL PERSONAJE
 -- v8: Esta función YA NO debe llamarse cada frame. Se llama
 -- una vez aquí y desde CharacterAdded / CharacterRemoving.

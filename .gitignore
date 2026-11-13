@@ -13,3 +13,5 @@ Thumbs.db
 
 # Local tooling / agent metadata (never commit)
 .tools/
+tools/
+tests/_sources.lua

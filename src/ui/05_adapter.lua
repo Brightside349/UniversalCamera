@@ -109,6 +109,19 @@ function Proxy:Set(value)
 end
 
 function Proxy:Refresh(value)
+    -- Los dropdowns refrescan su LISTA de opciones; tratarlo como una
+    -- seleccion solo elegia la primera y dejaba la lista vieja.
+    local native = rawget(self, "_native")
+    if type(value) == "table" and native and type(native.Refresh) == "function" then
+        -- Cubre las dos formas de la libreria: Refresh(options) y
+        -- Values = options + Refresh().
+        native.Values = value
+        local ok = pcall(function() native:Refresh(value) end)
+        if ok then
+            self._value = value[1]
+            return
+        end
+    end
     self:Set(value)
 end
 
@@ -578,7 +591,7 @@ local SECTION_INFO = {
     },
     ["Creación"] = {
         Icon = "lucide:wand-sparkles",
-        Tabs = { Props = true, Animador = true, ["Diversión"] = true },
+        Tabs = { Props = true, Animador = true, Replay = true, ["Diversión"] = true },
     },
     ["Sistema"] = {
         Icon = "lucide:settings-2",
