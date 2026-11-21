@@ -587,7 +587,7 @@ local SECTION_INFO = {
     },
     ["Personajes"] = {
         Icon = "lucide:users",
-        Tabs = { Clones = true, Cuerpo = true },
+        Tabs = { Clones = true, Cuerpo = true, Emotes = true },
     },
     ["Creación"] = {
         Icon = "lucide:wand-sparkles",

@@ -323,6 +323,31 @@ UCam.SlowMotion = {
 }
 
 -- ============================================================
+-- v13.8: EMOTES LOCALES POR PERSONAJE
+-- Un baile por personaje, cargado en el Animator del jugador local.
+-- Nada de remotes: no se envia nada al servidor y los demas
+-- jugadores no ven el baile. La clave de Dances es el atributo
+-- "Character" del modelo (el mismo que lee el Animate del juego),
+-- no el nombre del jugador.
+-- ============================================================
+UCam.Emotes = {
+    Enabled      = true,      -- la tecla de baile responde
+    AutoPlay     = true,      -- al equipar el personaje, baila solo
+    CancelOnMove = true,      -- caminar o saltar corta el baile
+    Loop         = true,      -- repetir hasta cancelar
+    Key          = "G",       -- nombre de Enum.KeyCode, configurable
+    Priority     = "Action4", -- por encima de walk/run del juego
+    Priorities   = { "Action", "Action2", "Action3", "Action4", "Movement", "Idle" },
+    Dances       = {
+        Amy   = { AnimationId = "rbxassetid://100087556277798" },
+        Sonic = { AnimationId = "rbxassetid://105029386873522" },
+    },
+    _track     = nil,
+    _anim      = nil,
+    _character = nil,
+}
+
+-- ============================================================
 -- v7: TECLAS PERSONALIZABLES (movement keybinds)
 -- getKeyboardDirection() y el fly de Fun leen de aquí, en vez de hardcodear.
 -- Los valores son strings de nombres de Enum.KeyCode.

@@ -119,6 +119,12 @@ local SCHEMA = {
 
     -- Auto-HUD
     AutoHUD = { Enabled = nil },
+
+    -- v13.8: baile local (la tabla Dances no se persiste: es codigo).
+    Emotes = {
+        Enabled = nil, AutoPlay = nil, CancelOnMove = nil,
+        Loop = nil, Key = nil, Priority = nil,
+    },
     Capture = { Countdown = nil, HideGuides = nil },
     LookAtLock = { HeightOffset = nil, Smoothing = nil },
     Guides = { Enabled = nil, Type = nil, Opacity = nil },

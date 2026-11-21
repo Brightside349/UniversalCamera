@@ -24,6 +24,7 @@ UCam._uiBuilders = {
     "estudio",
     "clones",
     "bodycolor",
+    "emotes",
     "props",
     "propsanim",
     "replay",

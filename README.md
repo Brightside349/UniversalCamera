@@ -349,7 +349,26 @@ tomas de camara.
   no entre en las tomas, y la restaura al salir junto con el resto del HUD.
 - El Loader apunta al tag `v13.7.0`.
 
-> Version estable: `v13.7.0`.
+### v13.8
+
+- **Emotes locales por personaje** (`actors/37_emotes.lua`,
+  `ui/tabs/emotes.lua`): el baile propio de Amy y Sonic se carga en el
+  `Animator` de tu personaje y se reproduce **solo en tu cliente**. No usa
+  remotes, no toca el servidor y los demás jugadores no lo ven.
+- Un id por personaje, como en el juego: Amy `100087556277798`, Sonic
+  `105029386873522`. El personaje se detecta por el atributo `Character`
+  del modelo (el mismo que lee el `Animate` del juego), con el nombre del
+  modelo como respaldo cuando coincide.
+- Tecla configurable (`G` por defecto), auto-play al equipar el personaje,
+  bucle, corte al moverte o saltar y prioridad `Action4` para que no pelee
+  con walk/run del juego.
+- Se limpia al morir, al cambiar de personaje y al salir de ronda. La
+  pestaña está en **Personajes → 🕺 Emotes**.
+- `Emotes` entra en el `SCHEMA` de persistencia (la tabla `Dances` no: es
+  código).
+- El Loader apunta al tag `v13.8.0`.
+
+> Version estable: `v13.8.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -359,7 +378,7 @@ tomas de camara.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.7.0`.
+La version publicada apunta al tag `v13.8.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -370,7 +389,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.7.0"
+local VERSION = "v13.8.0"
 ```
 
 ## Interfaz (v13)
