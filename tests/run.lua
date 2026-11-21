@@ -66,8 +66,19 @@ function CFrame.new(x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22)
     }, CFrame)
 end
 
-local function normalize(v)
-    local m = math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+-- v13.9: el codec de bailes reconstruye las poses con euler XYZ.
+function CFrame.fromEulerAnglesXYZ(rx, ry, rz)
+    rx, ry, rz = rx or 0, ry or 0, rz or 0
+    local cx, sx = math.cos(rx), math.sin(rx)
+    local cy, sy = math.cos(ry), math.sin(ry)
+    local cz, sz = math.cos(rz), math.sin(rz)
+    return CFrame.new(0, 0, 0,
+        cy * cz, -cy * sz, sy,
+        cx * sz + sx * sy * cz, cx * cz - sx * sy * sz, -sx * cy,
+        sx * sz - cx * sy * cz, sx * cz + cx * sy * sz, cx * cy)
+end
+
+local function normalize(v)    local m = math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
     if m == 0 then return Vector3.new(0, 0, 0) end
     return Vector3.new(v.x / m, v.y / m, v.z / m)
 end
@@ -206,6 +217,13 @@ local Enum = {
     KeyCode = enumGroup("KeyCode", { "Unknown", "Delete", "Escape", "F", "P", "W", "A", "S", "D", "Space", "LeftControl", "LeftShift" }),
     Font = enumGroup("Font", { "SourceSans", "SourceSansBold" }),
     CoreGuiType = enumGroup("CoreGuiType", { "Backpack", "Chat", "PlayerList", "Health", "All" }),
+    -- v13.9: el codec de emotes construye Poses y el bailes usa prioridades.
+    PoseEasingStyle = enumGroup("PoseEasingStyle", { "Linear", "Cubic", "Constant" }),
+    AnimationPriority = enumGroup("AnimationPriority", {
+        "Core", "Utility", "Mobility", "Objective", "Ambient", "Action",
+        "Action1", "Action2", "Action3", "Action4", "Event", "Performance",
+        "Movement", "Idle", "Idle2", "Idle3",
+    }),
     RenderPriority = { Camera = { Value = 200 }, Last = { Value = 2000 } },
 }
 local EnumMt = { __index = function(_, key) return nil end }
@@ -318,6 +336,10 @@ local function newInstance(className)
         props.BreakJointsOnDeath = true
         props.EvaluateStateMachine = true
         props.Health = 100
+        -- v13.9: los bailes se cortan al morir, andar o saltar.
+        props.Died = Signal.new()
+        props.Running = Signal.new()
+        props.Jumping = Signal.new()
     elseif className == "Motor6D" or className == "Weld" then
         props.C0 = CFrame.new()
         props.C1 = CFrame.new()
@@ -477,6 +499,87 @@ function InstanceMethods:GetPropertyChangedSignal(prop)
         changed[prop] = signal
     end
     return signal
+end
+
+function InstanceMethods:GetAttribute(name)
+    local props = rawget(self, "_props")
+    return props._attributes and props._attributes[name]
+end
+
+function InstanceMethods:SetAttribute(name, value)
+    local props = rawget(self, "_props")
+    props._attributes = props._attributes or {}
+    props._attributes[name] = value
+    local signal = props._attrSignals and props._attrSignals[name]
+    if signal then signal:Fire() end
+end
+
+-- v13.9: los bailes leen el atributo "Character" del modelo, como el
+-- Animate del juego.
+function InstanceMethods:GetAttributeChangedSignal(name)
+    local props = rawget(self, "_props")
+    props._attrSignals = props._attrSignals or {}
+    local signal = props._attrSignals[name]
+    if not signal then
+        signal = Signal.new()
+        props._attrSignals[name] = signal
+    end
+    return signal
+end
+
+-- ============================================================
+-- ANIMATOR MINIMO (v13.9)
+-- No simula el clock de animacion: Length es fija y se puede pisar.
+-- Basta para comprobar que el baile carga, se corta y se destruye.
+-- ============================================================
+local Track = {}
+Track.__index = Track
+Track.__typeof = "AnimationTrack"
+function Track:Play(fade)
+    self.IsPlaying = true
+    self._plays = (self._plays or 0) + 1
+end
+function Track:Stop(fade) self.IsPlaying = false end
+function Track:AdjustSpeed() end
+function Track:ScaleSpeed() end
+function Track:Destroy()
+    self.IsPlaying = false
+    self._destroyed = true
+    local list = self._ownerTracks
+    if list then
+        for i, other in ipairs(list) do
+            if other == self then
+                table.remove(list, i)
+                break
+            end
+        end
+    end
+end
+
+function InstanceMethods:LoadAnimation(animation)
+    local props = rawget(self, "_props")
+    props._tracks = props._tracks or {}
+    local track = setmetatable({
+        Animation    = animation,
+        Looped       = false,
+        Weight       = 1,
+        Time         = 0,
+        Length       = 10,
+        Priority     = Enum.AnimationPriority.Action,
+        IsPlaying    = false,
+        _ownerTracks = props._tracks,
+    }, Track)
+    props._tracks[#props._tracks + 1] = track
+    return track
+end
+
+function InstanceMethods:GetPlayingAnimationTracks()
+    local props = rawget(self, "_props")
+    local out = {}
+    for _, track in ipairs(props._tracks or {}) do
+        if track.IsPlaying then out[#out + 1] = track end
+    end
+    return out
 end
 
 local function cloneInstance(original)
@@ -772,6 +875,28 @@ end
 -- ============================================================
 -- GLOBALES DEL ENTORNO
 -- ============================================================
+-- ============================================================
+-- TRANSPORTE DE BAILES (v13.9)
+-- El codec descarga cada baile con game:HttpGet. En test se sirve el
+-- contenido real de src/ desde SOURCES, contando las peticiones para
+-- comprobar la cache.
+-- ============================================================
+local HttpLog = { calls = 0, urls = {} }
+local function httpServe(url)
+    HttpLog.calls += 1
+    HttpLog.urls[HttpLog.calls] = tostring(url)
+    local rel = tostring(url):match("src/(.+)$")
+    if rel and SOURCES[rel] then return SOURCES[rel] end
+    return "404: Not Found"
+end
+
+local KeyframeSequenceProvider = { registered = {} }
+function KeyframeSequenceProvider:RegisterKeyframeSequence(sequence)
+    local hash = ("rbxanim://ucam-test/%d"):format(#self.registered + 1)
+    self.registered[#self.registered + 1] = { hash = hash, sequence = sequence }
+    return hash
+end
+
 local game = {
     PlaceId = 1234,
     JobId = "test",
@@ -787,12 +912,13 @@ function game:GetService(name)
         CoreGui = CoreGui,
         HttpService = HttpService,
         Workspace = workspace,
+        KeyframeSequenceProvider = KeyframeSequenceProvider,
     }
     if name == "Workspace" then return workspace end
     return services[name] or newInstance(name)
 end
 function game:GetObjects() error("GetObjects no disponible en test") end
-function game:HttpGet() error("HttpGet no disponible en test") end
+function game:HttpGet(url) return httpServe(url) end
 
 local typeof = function(value)
     if type(value) == "table" then
@@ -971,6 +1097,8 @@ local LOAD_ORDER = {
     "demo/94_player.lua",
     "demo/96_file.lua",
     "demo/98_takes.lua",
+    "emotes/00_codec.lua",
+    "actors/37_emotes.lua",
 }
 
 for _, path in ipairs(LOAD_ORDER) do
@@ -1403,6 +1531,284 @@ test("oculta RageUI con el HUD y la vigila si reaparece", function()
     eq(nested.Enabled, true, "RageUI anidada restaurada")
 
     playerGui:Destroy()
+end)
+
+-- ============================================================
+-- BAILES EMPAQUETADOS (v13.9)
+-- ============================================================
+local PACK_BASE = "https://raw.githubusercontent.com/Brightside349/UniversalCamera/v13.9.0/src/"
+
+-- Medidas reales del export de cada baile (poses por keyframe, keyframes).
+local PACK_GOLDEN = {
+    Amy      = { pack = "emotes/amy.lua",      poses = 49, frames = 301 },
+    Sonic    = { pack = "emotes/sonic.lua",    poses = 52, frames = 314 },
+    Knuckles = { pack = "emotes/knuckles.lua", poses = 28, frames = 314 },
+}
+
+local function withPackBase(body)
+    local oldBase, oldFallback = UCam.BASE, UCam.FALLBACK_BASE
+    UCam.BASE, UCam.FALLBACK_BASE = PACK_BASE, PACK_BASE
+    local ok, err = pcall(body)
+    UCam.BASE, UCam.FALLBACK_BASE = oldBase, oldFallback
+    if not ok then error(err, 2) end
+end
+
+local function danceRig(name, key)
+    local rig = newInstance("Model")
+    rig.Name = name
+    local hum = newInstance("Humanoid")
+    hum.Parent = rig
+    local animator = newInstance("Animator")
+    animator.Parent = hum
+    if key then rig:SetAttribute("Character", key) end
+    rig.Parent = workspace
+    return rig, hum, animator
+end
+
+--- Personaje local con rig de baile y estado de Emotes aislado por prueba.
+local function withDanceCharacter(rig, body)
+    local E = UCam.Emotes
+    local saved = {
+        character = UCam.player.Character,
+        dances    = E.Dances,
+        autoPlay  = E.AutoPlay,
+        cancel    = E.CancelOnMove,
+        source    = E.Source,
+        priority  = E.Priority,
+        loop      = E.Loop,
+    }
+    UCam.player.Character = rig
+    E.AutoPlay, E.CancelOnMove = false, true
+    E.Source, E.Priority, E.Loop = "local", "Action4", true
+    UCam.stopEmote()
+    local ok, err = pcall(body)
+    UCam.stopEmote()
+    UCam.player.Character = saved.character
+    E.Dances, E.AutoPlay, E.CancelOnMove = saved.dances, saved.autoPlay, saved.cancel
+    E.Source, E.Priority, E.Loop = saved.source, saved.priority, saved.loop
+    rig:Destroy()
+    if not ok then error(err, 2) end
+end
+
+test("los tres bailes del repo decodifican con las medidas del export", function()
+    withPackBase(function()
+        local codec = UCam.EmoteCodec
+        codec.release()
+        local calls = HttpLog.calls
+        for key, want in pairs(PACK_GOLDEN) do
+            local hash = codec.hashFor(key, want.pack)
+            truthy(hash, key .. " registro un hash local")
+            local entry = KeyframeSequenceProvider.registered[#KeyframeSequenceProvider.registered]
+            eq(entry.hash, hash, key .. " el hash registrado es el que se devuelve")
+            local sequence = entry.sequence
+            eq(sequence.Loop, true, key .. " secuencia en bucle")
+            local frames = sequence:GetChildren()
+            eq(#frames, want.frames, key .. " keyframes")
+            local poses = 0
+            for _, keyframe in ipairs(frames) do
+                for _, pose in ipairs(keyframe:GetDescendants()) do
+                    if pose.ClassName == "Pose" then poses += 1 end
+                end
+                near(#keyframe:GetChildren() > 0 and 1 or 0, 1, 0, key .. " cada keyframe tiene sus poses")
+            end
+            eq(poses, want.frames * want.poses, key .. " poses")
+            near(frames[2].Time, 1 / 30, 1e-4, key .. " separacion de 30 fps")
+            near(frames[#frames].Time, (want.frames - 1) / 30, 1e-4, key .. " duracion del clip")
+        end
+        eq(HttpLog.calls - calls, 3, "una peticion por baile")
+        codec.release()
+    end)
+end)
+
+test("las poses construidas son finitas y sin escalados raros", function()
+    withPackBase(function()
+        local codec = UCam.EmoteCodec
+        local data = codec.base64Decode(codec.fetch("emotes/amy.lua"))
+        eq(#data, 90835, "el pack de Amy decodifica a su tamano real")
+        local sequence = codec.build(data)
+        truthy(sequence, "secuencia construida")
+        local frames = sequence:GetChildren()
+        local componentNames = {
+            "x", "y", "z",
+            "r00", "r01", "r02",
+            "r10", "r11", "r12",
+            "r20", "r21", "r22",
+        }
+        local checked, maxOffset = 0, 0
+        for index = 1, #frames, 20 do
+            for _, pose in ipairs(frames[index]:GetDescendants()) do
+                if pose.ClassName == "Pose" then
+                    local cf = pose.CFrame
+                    for _, name in ipairs(componentNames) do
+                        local value = cf[name]
+                        truthy(type(value) == "number" and value == value
+                            and value ~= math.huge and value ~= -math.huge,
+                            "componente no finita en " .. name)
+                    end
+                    near(math.sqrt(cf.r00 * cf.r00 + cf.r10 * cf.r10 + cf.r20 * cf.r20), 1, 1e-3, "columna unitaria")
+                    maxOffset = math.max(maxOffset, math.abs(cf.x) + math.abs(cf.y) + math.abs(cf.z))
+                    checked += 1
+                    eq(pose.Weight, 1, "peso de la pose")
+                end
+            end
+        end
+        truthy(checked > 200, "se comprobaron bastantes poses")
+        truthy(maxOffset < 20, "los desplazamientos quedan dentro del rig: " .. maxOffset)
+        sequence:Destroy()
+    end)
+end)
+
+test("la cache evita re-descargar y release la suelta", function()
+    withPackBase(function()
+        local codec = UCam.EmoteCodec
+        codec.release()
+        local calls = HttpLog.calls
+        local first = codec.hashFor("Amy", "emotes/amy.lua")
+        eq(HttpLog.calls - calls, 1, "la primera vez descarga")
+        eq(codec.prepared().prepared, 1, "uno preparado")
+        eq(codec.prepared().total, 3, "tres bailes configurados")
+        local second = codec.hashFor("Amy", "emotes/amy.lua")
+        eq(HttpLog.calls - calls, 1, "la segunda vez usa la cache")
+        eq(second, first, "el hash en cache es el mismo")
+        codec.release()
+        eq(codec.isReady("Amy"), false, "tras release ya no esta listo")
+        local third = codec.hashFor("Amy", "emotes/amy.lua")
+        eq(HttpLog.calls - calls, 2, "tras release vuelve a descargar")
+        truthy(third ~= first, "queda registrado como hash nuevo")
+        codec.release()
+    end)
+end)
+
+test("un pack que no se descarga falla claro y permite reintentar", function()
+    withPackBase(function()
+        local codec = UCam.EmoteCodec
+        codec.release()
+        local hash, err = codec.hashFor("Amy", "emotes/no-existe.lua")
+        eq(hash, nil, "sin hash")
+        truthy(tostring(err):find("no se pudo descargar", 1, true), "nombra la descarga: " .. tostring(err))
+        eq(codec.isReady("Amy"), false, "no queda marcado como listo")
+        local seqShort, errShort = codec.build("0123")
+        eq(seqShort, nil, "un payload corto no construye")
+        truthy(errShort, "el payload corto avisa por que")
+        truthy(codec.hashFor("Amy", "emotes/amy.lua"), "se puede reintentar tras el fallo")
+        codec.release()
+    end)
+end)
+
+test("bailar carga el pack local en el Animator del personaje", function()
+    local rig, _, animator = danceRig("UCamDanceRig", "Amy")
+    withDanceCharacter(rig, function()
+        withPackBase(function()
+            local ok, msg = UCam.playEmote()
+            truthy(ok, msg)
+            truthy(msg:find("empaquetado", 1, true), "dice que es empaquetado")
+            local tracks = animator:GetPlayingAnimationTracks()
+            eq(#tracks, 1, "un solo track")
+            eq(tracks[1].Priority, Enum.AnimationPriority.Action4, "prioridad Action4")
+            eq(tracks[1].Looped, true, "en bucle")
+            eq(tracks[1]._plays, 1, "se reprodujo")
+            truthy(tostring(tracks[1].Animation.AnimationId):find("ucam%-test", 1) ~= nil, "usa el hash local")
+            eq(UCam.getEmoteStatus().source, "local", "el estado marca origen local")
+            eq(UCam.getEmoteStatus().character, "Amy", "el estado marca el personaje")
+
+            local track, anim = UCam.Emotes._track, UCam.Emotes._anim
+            UCam.stopEmote()
+            eq(track.IsPlaying, false, "track parado")
+            eq(track._destroyed, true, "track destruido")
+            eq(anim._destroyed, true, "Animation destruida")
+            eq(#animator:GetPlayingAnimationTracks(), 0, "el animator no conserva tracks")
+            UCam.EmoteCodec.release()
+        end)
+    end)
+end)
+
+test("caminar, saltar y morir cortan el baile", function()
+    local rig, hum, animator = danceRig("UCamDanceRig2", "Amy")
+    withDanceCharacter(rig, function()
+        withPackBase(function()
+            UCam.attachEmoteCharacter(rig)
+
+            UCam.playEmote()
+            truthy(UCam.Emotes._track, "esta bailando")
+            hum.Running:Fire(20)
+            eq(UCam.Emotes._track, nil, "andar corta")
+            eq(#animator:GetPlayingAnimationTracks(), 0, "sin tracks vivos")
+
+            UCam.playEmote()
+            hum.Jumping:Fire()
+            eq(UCam.Emotes._track, nil, "saltar corta")
+
+            UCam.playEmote()
+            hum.Died:Fire()
+            eq(UCam.Emotes._track, nil, "morir corta")
+
+            UCam.Emotes.CancelOnMove = false
+            UCam.playEmote()
+            hum.Running:Fire(20)
+            truthy(UCam.Emotes._track, "con CancelOnMove apagado andar no corta")
+            eq(UCam.toggleEmote(), false, "la tecla vuelve a parar")
+            eq(UCam.Emotes._track, nil, "toggle parado")
+        end)
+    end)
+end)
+
+test("cambiar el atributo Character cambia de baile sin respawnear", function()
+    local rig, _, animator = danceRig("UCamDanceRig3", "Amy")
+    withDanceCharacter(rig, function()
+        withPackBase(function()
+            UCam.Emotes.AutoPlay = true
+            UCam.attachEmoteCharacter(rig)
+            eq(UCam.getEmoteStatus().character, "Amy", "empieza con Amy")
+            rig:SetAttribute("Character", "Sonic")
+            eq(UCam.getEmoteStatus().character, "Sonic", "pasa a Sonic")
+            eq(#animator:GetPlayingAnimationTracks(), 1, "un solo track tras el cambio")
+            UCam.Emotes.AutoPlay = false
+        end)
+    end)
+end)
+
+test("el modo asset usa AnimationId y sin datos lo dice claro", function()
+    local rig, _, animator = danceRig("UCamDanceRig4", "Amy")
+    withDanceCharacter(rig, function()
+        UCam.Emotes.Source = "asset"
+        local ok, msg = UCam.playEmote()
+        truthy(ok, msg)
+        local track = animator:GetPlayingAnimationTracks()[1]
+        eq(track.Animation.AnimationId, "rbxassetid://100087556277798", "usa el id del dueno del asset")
+        eq(UCam.getEmoteStatus().source, "asset", "el estado marca origen asset")
+
+        UCam.Emotes.Dances = { Amy = {} }
+        local ok2, msg2 = UCam.playEmote()
+        eq(ok2, false, "sin pack ni id no baila")
+        truthy(tostring(msg2):find("No hay baile disponible", 1, true), "mensaje claro: " .. tostring(msg2))
+
+        UCam.Emotes.Dances = { Amy = { Pack = "emotes/no-existe.lua" } }
+        local ok3, msg3 = UCam.playEmote()
+        eq(ok3, false, "un pack roto no baila")
+        truthy(tostring(msg3):find("No hay baile disponible", 1, true), "explica el pack roto: " .. tostring(msg3))
+    end)
+end)
+
+test("sin Animator o sin atributo Character no intenta bailar", function()
+    local bare = newInstance("Model")
+    bare.Name = "UCamNoRig"
+    bare:SetAttribute("Character", "Amy")
+    local hum = newInstance("Humanoid")
+    hum.Parent = bare
+    bare.Parent = workspace
+    withDanceCharacter(bare, function()
+        local ok, msg = UCam.playEmote()
+        eq(ok, false, "sin Animator no hay baile")
+        truthy(tostring(msg):find("Animator", 1, true), "dice que falta el Animator: " .. tostring(msg))
+    end)
+
+    local rig, _, _ = danceRig("UCamDanceRig5", nil)
+    withDanceCharacter(rig, function()
+        local ok, msg = UCam.playEmote()
+        eq(ok, false, "sin atributo no hay clave")
+        truthy(tostring(msg):find("Character", 1, true), "dice que falta el atributo: " .. tostring(msg))
+    end)
+    bare:Destroy()
 end)
 
 -- ============================================================

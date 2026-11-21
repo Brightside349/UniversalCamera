@@ -27,6 +27,9 @@ function UCam.Unload()
         if UCam.stopFun then UCam.stopFun() end
         if UCam.stopBodyColor then UCam.stopBodyColor() end
         if UCam.stopClones then UCam.stopClones() end
+        -- v13.9: cortar el baile y soltar los KeyframeSequence registrados.
+        if UCam.stopEmote then pcall(UCam.stopEmote) end
+        if UCam.EmoteCodec then pcall(UCam.EmoteCodec.release) end
         -- v13.7: soltar la camara del Replay y borrar los rigs fantasma
         -- antes de que el registry destruya instancias.
         if UCam.demoSequenceStop then pcall(UCam.demoSequenceStop) end

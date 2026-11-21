@@ -12,7 +12,12 @@ $files = @(
     "demo/92_recorder.lua",
     "demo/94_player.lua",
     "demo/96_file.lua",
-    "demo/98_takes.lua"
+    "demo/98_takes.lua",
+    "emotes/00_codec.lua",
+    "emotes/amy.lua",
+    "emotes/sonic.lua",
+    "emotes/knuckles.lua",
+    "actors/37_emotes.lua"
 )
 
 $builder = New-Object System.Text.StringBuilder

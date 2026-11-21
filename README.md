@@ -368,7 +368,35 @@ tomas de camara.
   código).
 - El Loader apunta al tag `v13.8.0`.
 
-> Version estable: `v13.8.0`.
+### v13.9
+
+- **Bailes empaquetados, sin permisos de assets**: el clip no se descarga de
+  Roblox. Viaja dentro de UCam como datos (`src/emotes/amy.lua`,
+  `sonic.lua`, `knuckles.lua`), se reconstruye en tu cliente como
+  `KeyframeSequence` y se registra con
+  `KeyframeSequenceProvider:RegisterKeyframeSequence`. El hash resultante es
+  el `AnimationId` del track, así que el baile funciona **en cualquier
+  juego**, incluido uno cuyo dueño no puede (ni necesita) autorizar nada.
+- Se sigue el permiso roto solo como respaldo: `Emotes.Source` permite
+  elegir **Empaquetado (local)** o **AssetId (requiere permiso)** en la
+  pestaña. Con `Pack` presente se intenta el empaquetado primero.
+- Formato binario compacto (cabecera + poses + rotaciones/cantidades
+  cuantizadas a 1/24 de grado, ~0.04° de error). Amy 49 poses y 301
+  keyframes, Sonic 52x314, Knuckles 28x314; los tres a 30 fps y ~10 s.
+- **Cobertura de rig verificada**: 49/49, 52/52 y 28/28 poses encuentran su
+  `Motor6D` en los rigs reales del juego (el Animator empareja por el nombre
+  del `Part1`).
+- Cada baile se descarga solo cuando se usa y se cachea durante la sesion;
+  la construccion se reparte en tandas de 24 keyframes para no congelar el
+  cliente. `📦 Preparar todos los bailes` adelanta el primer uso.
+- Amortiguadores nuevos en la pestaña: aviso de "Empaquetando…" al primer
+  uso, **Origen** en `ℹ️ Ver estado` y recuento de bailes ya empaquetados.
+- Pruebas headless del codec y del baile (`tests/run.sh`): round-trip de los
+  tres packs reales, cache, fallos de descarga, prioridad, corte al andar,
+  saltar y morir, y cambio de personaje por atributo.
+- El Loader apunta al tag `v13.9.0`.
+
+> Version estable: `v13.9.0`.
 >
 > Novedades v11: pestaña 🪑 Props (spawn por ID, mover con cámara, rotar,
 > escalar, snap al suelo, colisión y persistencia), eliminación de opciones
@@ -378,7 +406,7 @@ tomas de camara.
 
 Pega el contenido de `Loader.lua` en el entorno de ejecucion. El Loader
 descarga las partes de `src/` desde GitHub raw y usa jsDelivr como fallback.
-La version publicada apunta al tag `v13.8.0`.
+La version publicada apunta al tag `v13.9.0`.
 
 Para probar una rama de desarrollo, cambia temporalmente:
 
@@ -389,7 +417,7 @@ local VERSION = "main"
 Para una ejecucion reproducible, conserva un tag:
 
 ```lua
-local VERSION = "v13.8.0"
+local VERSION = "v13.9.0"
 ```
 
 ## Interfaz (v13)
@@ -494,7 +522,13 @@ Universal Camera/
     ├── actors/
     │   ├── 30_fun.lua           # diversion, escala y efectos locales
     │   ├── 32_bodycolor.lua     # colores y materiales
-    │   └── 36_clones.lua        # clones locales, espejo optimizado y diseño (v12.7)
+    │   ├── 36_clones.lua        # clones locales, espejo optimizado y diseño (v12.7)
+    │   └── 37_emotes.lua        # baile local por personaje (v13.8)
+    ├── emotes/
+    │   ├── 00_codec.lua         # base64 → KeyframeSequence → hash local (v13.9)
+    │   ├── amy.lua              # pack del baile de Amy (datos, no en el ORDER)
+    │   ├── sonic.lua            # pack del baile de Sonic
+    │   └── knuckles.lua         # pack del baile de Knuckles
     ├── camera/
     │   ├── 50_spectate.lua      # espectador
     │   ├── 60_director.lua      # waypoints y director

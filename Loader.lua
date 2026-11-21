@@ -1,10 +1,10 @@
 -- ============================================================
--- Universal Camera PRO v13.8.0 · Loader
+-- Universal Camera PRO v13.9.0 · Loader
 -- El unico script que se pega en el juego.
 -- Descarga las partes desde GitHub raw y las ejecuta en orden.
 -- ============================================================
 
-local VERSION = "v13.8.0"
+local VERSION = "v13.9.0"
 local TAG = VERSION
 local REF = TAG
 
@@ -78,6 +78,7 @@ local ORDER = {
     "actors/30_fun.lua",
     "actors/32_bodycolor.lua",
     "actors/36_clones.lua",
+    "emotes/00_codec.lua",
     "actors/37_emotes.lua",
     "actors/38_skinexport.lua",
     "props/45_props.lua",

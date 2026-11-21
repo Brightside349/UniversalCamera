@@ -17,7 +17,7 @@ function UCam.build_emotes(Window)
     Tab:CreateSection("Baile local (solo tú lo ves)")
     Tab:CreateParagraph({
         Title = "Cómo funciona",
-        Content = "Carga el baile del personaje que tengas equipado en tu propio Animator: no se envía nada al servidor y los demás jugadores no lo ven. Se corta al morir, al cambiar de personaje y, si lo dejas activo, al moverte o saltar.",
+        Content = "Carga el baile del personaje que tengas equipado en tu propio Animator: no se envía nada al servidor y los demás jugadores no lo ven. El baile viaja empaquetado dentro de UCam y se registra en tu cliente, así que funciona en cualquier juego sin depender del permiso de ningún asset. Se corta al morir, al cambiar de personaje y, si lo dejas activo, al moverte o saltar.",
     })
 
     Tab:CreateToggle({
@@ -120,13 +120,41 @@ function UCam.build_emotes(Window)
         Name = "ℹ️ Ver estado",
         Callback = function()
             local status = UCam.getEmoteStatus()
+            local ready = UCam.EmoteCodec.prepared()
             UCam.notify("Emotes", table.concat({
                 ("Personaje: %s"):format(status.character or "no detectado"),
                 ("Reproduciendo: %s"):format(status.playing and "sí" or "no"),
+                ("Origen: %s"):format(status.source == "local" and "empaquetado (local)" or (status.source or "—")),
                 ("Asset: %s"):format(status.animationId or "—"),
                 ("Duración: %.2f s"):format(status.length or 0),
                 ("Bucle: %s · Prioridad: %s"):format(status.loop and "sí" or "no", status.priority),
+                ("Bailes empaquetados: %d/%d"):format(ready.prepared, ready.total),
             }, "\n"), 6)
+        end,
+    })
+    Tab:CreateButton({
+        Name = "📦 Preparar todos los bailes",
+        Callback = function()
+            -- El empaquetado solo ocurre una vez por sesión: se adelanta para
+            -- que la tecla suene al primer pulsado en vez de esperar la descarga.
+            if E._preparing then
+                UCam.notify("Emotes", "Ya se están preparando los bailes.", 3)
+                return
+            end
+            E._preparing = true
+            task.spawn(function()
+                local done = 0
+                for key, dance in pairs(E.Dances) do
+                    if dance.Pack and not UCam.EmoteCodec.isReady(key) then
+                        local hash = UCam.EmoteCodec.hashFor(key, dance.Pack)
+                        if hash then done += 1 end
+                    elseif UCam.EmoteCodec.isReady(key) then
+                        done += 1
+                    end
+                end
+                E._preparing = false
+                UCam.notify("Emotes", ("Bailes listos en tu cliente: %d."):format(done), 5)
+            end)
         end,
     })
     Tab:CreateButton({
@@ -145,15 +173,27 @@ function UCam.build_emotes(Window)
     -- ============================================================
     Tab:CreateSection("Personajes con baile")
     Tab:CreateParagraph({
-        Title = "Ids cargados",
-        Content = "Amy y Sonic. El personaje se detecta por el atributo \"Character\" del modelo (el mismo que usa el Animate del juego); si el juego no lo marca, se acepta el nombre del modelo cuando coincide.",
+        Title = "Bailes cargados",
+        Content = "Amy, Sonic y Knuckles. El personaje se detecta por el atributo \"Character\" del modelo (el mismo que usa el Animate del juego); si el juego no lo marca, se acepta el nombre del modelo cuando coincide.",
+    })
+    Tab:CreateDropdown({
+        Name = "Origen del baile",
+        Options = { "Empaquetado (local)", "AssetId (requiere permiso)" },
+        CurrentOption = { E.Source == "asset" and "AssetId (requiere permiso)" or "Empaquetado (local)" },
+        MultipleOptions = false,
+        Flag = "UCamEmoteSource",
+        Callback = function(options)
+            local value = UCam.resolveDropdownValue(options)
+            if not value then return end
+            E.Source = value:find("AssetId", 1, true) and "asset" or "local"
+        end,
     })
     Tab:CreateButton({
-        Name = "🔎 Ver ids configurados",
+        Name = "🔎 Ver bailes configurados",
         Callback = function()
             local lines = {}
             for name, dance in pairs(E.Dances) do
-                table.insert(lines, ("%s → %s"):format(name, dance.AnimationId))
+                table.insert(lines, ("%s → %s"):format(name, dance.Pack or dance.AnimationId or "—"))
             end
             table.sort(lines)
             UCam.notify("Emotes", #lines > 0 and table.concat(lines, "\n") or "Sin bailes configurados.", 6)

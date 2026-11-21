@@ -338,13 +338,20 @@ UCam.Emotes = {
     Key          = "G",       -- nombre de Enum.KeyCode, configurable
     Priority     = "Action4", -- por encima de walk/run del juego
     Priorities   = { "Action", "Action2", "Action3", "Action4", "Movement", "Idle" },
+    -- v13.9: el baile viaja dentro de UCam (Pack) y se registra en tu
+    -- cliente con KeyframeSequenceProvider. AnimationId queda solo como
+    -- respaldo para quien es dueno de su propia experiencia.
+    Source       = "local",   -- "local" (empaquetado) o "asset" (AnimationId)
     Dances       = {
-        Amy   = { AnimationId = "rbxassetid://100087556277798" },
-        Sonic = { AnimationId = "rbxassetid://105029386873522" },
+        Amy      = { Pack = "emotes/amy.lua",      AnimationId = "rbxassetid://100087556277798" },
+        Sonic    = { Pack = "emotes/sonic.lua",    AnimationId = "rbxassetid://105029386873522" },
+        Knuckles = { Pack = "emotes/knuckles.lua" },
     },
     _track     = nil,
     _anim      = nil,
     _character = nil,
+    _source    = nil,
+    _preparing = false,
 }
 
 -- ============================================================

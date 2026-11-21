@@ -100,7 +100,7 @@ function UCam.playEmote(keyOverride)
     end
 
     local dance = E.Dances[key]
-    if not dance or dance.AnimationId == "" then
+    if not dance then
         return false, ("No hay baile configurado para %s."):format(tostring(key))
     end
 
@@ -111,37 +111,75 @@ function UCam.playEmote(keyOverride)
 
     release()
 
-    local anim = Instance.new("Animation")
+    -- v13.9: primero el baile empaquetado (funciona en cualquier juego,
+    -- sin permiso de assets). Si no hay Pack o falla, se usa AnimationId,
+    -- que solo funciona en experiencias autorizadas por el dueño del asset.
+    local anim, source, packErr
+    local packPath = (E.Source ~= "asset") and dance.Pack or nil
+    if packPath then
+        if not UCam.EmoteCodec.isReady(key) and UCam.notify then
+            UCam.notify("Emotes", ("Empaquetando el baile de %s en tu cliente (solo la primera vez)…"):format(tostring(key)), 4)
+        end
+
+        local hash, err = UCam.EmoteCodec.hashFor(key, packPath)
+        if hash then
+            anim = Instance.new("Animation")
+            anim.AnimationId = hash
+            source = "local"
+        else
+            packErr = err
+            warn(("[UCam] Baile empaquetado de %s fallo: %s"):format(tostring(key), tostring(err)))
+        end
+    end
+
+    -- hashFor puede ceder el frame mientras se construye el baile: el
+    -- personaje pudo morir o cambiarse en ese intervalo.
+    if anim and (not character.Parent or animatorOf(character) ~= animator) then
+        return false, "El personaje cambió mientras se empaquetaba el baile."
+    end
+
+    if not anim and dance.AnimationId and dance.AnimationId ~= "" then
+        anim = Instance.new("Animation")
+        anim.AnimationId = dance.AnimationId
+        source = "asset"
+    end
+
+    if not anim then
+        return false, ("No hay baile disponible para %s%s"):format(
+            tostring(key), packErr and (" (" .. tostring(packErr) .. ")") or ""
+        )
+    end
+
     anim.Name = "UCamDance_" .. key
-    anim.AnimationId = dance.AnimationId
 
     local ok, track = pcall(function()
         return animator:LoadAnimation(anim)
     end)
     if not ok or not track then
         anim:Destroy()
-        return false, ("%s no cargó: revisa el permiso del asset."):format(dance.AnimationId)
+        return false, ("%s no cargó."):format(anim.AnimationId)
     end
 
     track.Looped = E.Loop == true
     track.Priority = priorityOf(E.Priority)
 
     E._track, E._anim, E._character = track, anim, key
+    E._source = source
     if UCam.trackInstance then
         UCam.trackInstance(anim, "Emotes:animation")
     end
 
     track:Play(0.15)
 
-    -- Un asset sin acceso no lanza error: carga un track vacio (Length 0)
-    -- y el baile simplemente no se ve. Se avisa una sola vez.
+    -- Un track sin datos no lanza error: carga vacio (Length 0) y el baile
+    -- simplemente no se ve. Se avisa una sola vez.
     task.delay(1, function()
         if E._track == track and track.Length == 0 then
-            warn(("[UCam] El baile de %s no reporta duración. Revisa el permiso de %s."):format(key, dance.AnimationId))
+            warn(("[UCam] El baile de %s no reporta duración (origen: %s)."):format(key, tostring(source)))
         end
     end)
 
-    return true, ("%s: bailando."):format(key)
+    return true, ("%s: bailando%s."):format(key, source == "local" and " (empaquetado)" or "")
 end
 
 --- Reproduce si no habia nada, y para si ya estaba sonando.
@@ -160,6 +198,7 @@ function UCam.getEmoteStatus()
         playing    = track ~= nil,
         character  = E._character,
         animationId = E._anim and E._anim.AnimationId or nil,
+        source     = E._source,
         length     = track and track.Length or 0,
         priority   = E.Priority,
         loop       = E.Loop == true,

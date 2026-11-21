@@ -123,7 +123,7 @@ local SCHEMA = {
     -- v13.8: baile local (la tabla Dances no se persiste: es codigo).
     Emotes = {
         Enabled = nil, AutoPlay = nil, CancelOnMove = nil,
-        Loop = nil, Key = nil, Priority = nil,
+        Loop = nil, Key = nil, Priority = nil, Source = nil,
     },
     Capture = { Countdown = nil, HideGuides = nil },
     LookAtLock = { HeightOffset = nil, Smoothing = nil },

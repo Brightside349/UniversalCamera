@@ -15,3 +15,5 @@ Thumbs.db
 .tools/
 tools/
 tests/_sources.lua
+# Caida del sink de Studio; lo que se publica es src/emotes/*.lua
+emote_src/
